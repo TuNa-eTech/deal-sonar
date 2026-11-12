@@ -1,10 +1,39 @@
 {
   "manifest_version": 3,
   "name": "DealSonar",
-  "version": "0.1.0",
-  "description": "DealSonar browser companion",
+  "version": "0.2.0",
+  "description": "Đọc bài mới tần suất thấp trong các group Facebook bạn đã tham gia và chuyển về ứng dụng DealSonar trên máy tính.",
   "minimum_chrome_version": "116",
-  "background": { "service_worker": "background.js", "type": "module" },
-  "action": { "default_popup": "src/popup/index.html" },
-  "permissions": ["nativeMessaging", "storage"]
+  "permissions": [
+    "nativeMessaging",
+    "storage",
+    "alarms",
+    "tabs",
+    "scripting",
+    "idle"
+  ],
+  "host_permissions": [
+    "https://www.facebook.com/groups/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "DealSonar",
+    "default_popup": "src/popup/index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/groups/*"],
+      "js": ["tap.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.facebook.com/groups/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }
