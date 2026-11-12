@@ -78,7 +78,7 @@ impl FoldedText {
             text_norm,
             eager: Some(self),
             lazy: std::cell::RefCell::new(IncrementalSpanMapper::new()),
-            digit_starts: std::cell::OnceCell::new(),
+            tokens: std::cell::OnceCell::new(),
         }
     }
 }
@@ -225,6 +225,109 @@ impl IncrementalSpanMapper {
     }
 }
 
+/// Cached word and digit-run boundaries over `text_fold`, computed at most once per post
+/// and shared across `enum_kw`, `gazetteer`, `vn_money`, `vn_area`, and `number`.
+pub(crate) struct FoldedTokens {
+    pub(crate) words: Vec<(u32, u32)>,
+    pub(crate) digit_starts: Vec<usize>,
+}
+
+const IS_ASCII_ALNUM_TABLE: [bool; 256] = {
+    let mut t = [false; 256];
+    let mut i = 0usize;
+    while i < 256 {
+        let b = i as u8;
+        t[i] = (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') || (b >= b'0' && b <= b'9');
+        i += 1;
+    }
+    t
+};
+
+impl FoldedTokens {
+    fn build(tf: &str) -> Self {
+        let bytes = tf.as_bytes();
+        let len = bytes.len();
+        if len == 0 {
+            return Self {
+                words: Vec::new(),
+                digit_starts: Vec::new(),
+            };
+        }
+        let est_words = (len / 5).max(8);
+        let mut words = Vec::with_capacity(est_words);
+        let mut digit_starts = Vec::new();
+
+        if tf.is_ascii() {
+            let mut tok_start = 0usize;
+            for tok in tf.split(' ') {
+                let tok_end = tok_start + tok.len();
+                let mut pos = tok_start;
+                while pos < tok_end {
+                    let b0 = bytes[pos];
+                    if !IS_ASCII_ALNUM_TABLE[b0 as usize] {
+                        pos += 1;
+                        continue;
+                    }
+                    let w_start = pos;
+                    pos += 1;
+                    while pos < tok_end && IS_ASCII_ALNUM_TABLE[bytes[pos] as usize] {
+                        pos += 1;
+                    }
+                    words.push((w_start as u32, pos as u32));
+                    if b0.wrapping_sub(b'0') < 10 {
+                        digit_starts.push(w_start);
+                    }
+                }
+                tok_start = tok_end + 1;
+            }
+        } else {
+            let mut pos = 0usize;
+            while pos < len {
+                let b0 = bytes[pos];
+                if b0 < 0x80 {
+                    if !IS_ASCII_ALNUM_TABLE[b0 as usize] {
+                        pos += 1;
+                        continue;
+                    }
+                } else {
+                    let ch = tf[pos..].chars().next().unwrap();
+                    if !ch.is_alphanumeric() {
+                        pos += ch.len_utf8();
+                        continue;
+                    }
+                }
+                let w_start = pos;
+                if b0 < 0x80 && b0.wrapping_sub(b'0') < 10 {
+                    digit_starts.push(w_start);
+                }
+                while pos < len {
+                    let b = bytes[pos];
+                    if b < 0x80 {
+                        if IS_ASCII_ALNUM_TABLE[b as usize] {
+                            pos += 1;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        let ch = tf[pos..].chars().next().unwrap();
+                        if ch.is_alphanumeric() {
+                            pos += ch.len_utf8();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                words.push((w_start as u32, pos as u32));
+            }
+        }
+
+        Self {
+            words,
+            digit_starts,
+        }
+    }
+}
+
 /// Borrowed view over `text_fold` that computes byte-span mappings into `text_norm` lazily
 /// and incrementally up to `fold_end` only when an extractor actually produces a match.
 pub(crate) struct FoldedView<'a> {
@@ -232,7 +335,7 @@ pub(crate) struct FoldedView<'a> {
     text_norm: &'a str,
     eager: Option<&'a FoldedText>,
     lazy: std::cell::RefCell<IncrementalSpanMapper>,
-    digit_starts: std::cell::OnceCell<Vec<usize>>,
+    tokens: std::cell::OnceCell<FoldedTokens>,
 }
 
 impl<'a> FoldedView<'a> {
@@ -243,40 +346,27 @@ impl<'a> FoldedView<'a> {
             text_norm,
             eager: None,
             lazy: std::cell::RefCell::new(IncrementalSpanMapper::new()),
-            digit_starts: std::cell::OnceCell::new(),
+            tokens: std::cell::OnceCell::new(),
         }
     }
 
+    /// Cached maximal alphanumeric word spans `(start, end)` in `self.text_fold`.
+    #[inline]
+    pub(crate) fn words(&self) -> &[(u32, u32)] {
+        &self
+            .tokens
+            .get_or_init(|| FoldedTokens::build(self.text_fold))
+            .words
+    }
+
     /// Cached byte offsets of word-starting ASCII digit runs in `self.text_fold`,
-    /// shared across `vn_money` and `vn_area` so `text_fold` is scanned for digits only once.
+    /// shared across `vn_money`, `vn_area`, and `number` so `text_fold` is tokenized only once.
+    #[inline]
     pub(crate) fn digit_starts(&self) -> &[usize] {
-        self.digit_starts.get_or_init(|| {
-            let bytes = self.text_fold.as_bytes();
-            let len = bytes.len();
-            let mut out = Vec::new();
-            let mut i = 0usize;
-            while i < len {
-                if bytes[i].wrapping_sub(b'0') < 10 {
-                    let left_ok = if i == 0 {
-                        true
-                    } else if bytes[i - 1] < 0x80 {
-                        !bytes[i - 1].is_ascii_alphanumeric()
-                    } else {
-                        !crate::prefilter::has_alnum_before(self.text_fold, i)
-                    };
-                    if left_ok {
-                        out.push(i);
-                    }
-                    i += 1;
-                    while i < len && bytes[i].wrapping_sub(b'0') < 10 {
-                        i += 1;
-                    }
-                } else {
-                    i += 1;
-                }
-            }
-            out
-        })
+        &self
+            .tokens
+            .get_or_init(|| FoldedTokens::build(self.text_fold))
+            .digit_starts
     }
 
     #[inline]

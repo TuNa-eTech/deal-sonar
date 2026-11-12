@@ -21,6 +21,8 @@ struct CompiledAlias {
     is_short: bool,
     /// `0` if `phrase.len() <= first_word.len() + 1`, else `phrase.as_bytes()[first_word.len() + 1]`
     next_byte: u8,
+    /// `0` if `phrase.len() <= first_word.len() + 2`, else `phrase.as_bytes()[first_word.len() + 2]`
+    next_byte2: u8,
 }
 
 struct FirstWordBucket {
@@ -97,22 +99,13 @@ struct GazetteerIndex {
     entries: Vec<AdminEntry>,
     /// Fast `(first_byte, word_len)` bitmask prefilter before table lookup.
     first_word_mask: [u64; 256],
+    /// Fast `(first_byte, second_byte)` bitmask prefilter (`b0 < 128`, `b1 < 128`).
+    first_two_mask: [u128; 128],
     /// Open-addressed FNV-1a table from first token -> `FirstWordBucket` (avoids SipHash per word).
     by_first_word: FastStaticWordMap<FirstWordBucket>,
     /// Map from folded province alias -> canonical province name (for `scope` resolution)
     province_scope_map: HashMap<&'static str, &'static str>,
 }
-
-const IS_ASCII_ALNUM: [bool; 256] = {
-    let mut t = [false; 256];
-    let mut i = 0usize;
-    while i < 256 {
-        let b = i as u8;
-        t[i] = (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') || (b >= b'0' && b <= b'9');
-        i += 1;
-    }
-    t
-};
 
 static VN_ADMIN_INDEX: LazyLock<GazetteerIndex> = LazyLock::new(build_vn_admin_index);
 
@@ -157,115 +150,40 @@ pub(crate) fn extract_gazetteer_from_folded(
             .or(Some(trimmed))
     });
 
-    // Tokenize `tf` into alphanumeric/dot words (splitting on spaces and punctuation except '.' inside "q.1", "q.7")
-    // Actually scanning word boundaries directly on `tf` handles both "q.7" and multi-word "tp thu duc" cleanly!
     let mut raw_hits: Vec<(usize, usize, AdminEntry, f64)> = Vec::new();
     let bytes = tf.as_bytes();
     let len = bytes.len();
-    let mut pos = 0usize;
+    let mut skip_until = 0usize;
 
-    while pos < len {
+    for &(ws_u32, we_u32) in folded.words() {
+        let word_start = ws_u32 as usize;
         if first_only {
             if let Some(&(_, last_end, _, _)) = raw_hits.last() {
-                if pos.saturating_sub(last_end) > 25 {
+                if word_start.saturating_sub(last_end) > 25 {
                     break;
                 }
             }
         }
-        let b = bytes[pos];
-        if b < 0x80 {
-            if !IS_ASCII_ALNUM[b as usize] {
-                pos += 1;
-                continue;
-            }
-        } else {
-            let ch = tf[pos..].chars().next().unwrap();
-            if !ch.is_alphanumeric() {
-                pos += ch.len_utf8();
-                continue;
-            }
+        if word_start < skip_until {
+            continue;
         }
-        // Because every iteration either skips non-alphanumeric bytes or jumps to `first_end`/`match_end`
-        // (both guaranteed to end at a word boundary), `pos` here is always a word start.
-        let mut first_end = pos + 1;
-        while first_end < len && IS_ASCII_ALNUM[bytes[first_end] as usize] {
-            first_end += 1;
-        }
-        if first_end < len && bytes[first_end] >= 0x80 {
-            first_end = scan_alnum_end(tf, first_end);
-        }
-        let wlen = first_end - pos;
+        let word_end = we_u32 as usize;
+        let wlen = word_end - word_start;
+        let b0 = bytes[word_start];
+        let b1 = if wlen >= 2 { bytes[word_start + 1] } else { 0 };
         let wlen_bit = 1u64 << if wlen < 63 { wlen } else { 63 };
-
-        if (idx.first_word_mask[b as usize] & wlen_bit) != 0 {
-            if let Some(bucket) = idx.by_first_word.get(&tf[pos..first_end]) {
-                let next_b = if first_end + 1 < len {
-                    bytes[first_end + 1]
-                } else {
-                    0
-                };
-                let can_match_long =
-                    next_b < 128 && (bucket.next_byte_mask & (1u128 << next_b)) != 0;
-                if bucket.has_short_phrase || can_match_long {
-                    let mut best: Option<(usize, AdminEntry, f64)> = None;
-                    for &(phrase, meta) in &bucket.items {
-                        if meta.next_byte != 0 && meta.next_byte != next_b {
-                            continue;
-                        }
-                        let end_pos = pos + phrase.len();
-                        if end_pos > tf.len() || !tf[pos..].starts_with(phrase) {
-                            continue;
-                        }
-                        let entry = idx.entries[meta.entry_idx];
-                        if let Some(req_prov) = canonical_scope {
-                            if !entry.province.eq_ignore_ascii_case(req_prov)
-                                && entry.province != req_prov
-                            {
-                                continue;
-                            }
-                        }
-                        let right_ok = !crate::prefilter::has_alnum_at(tf, end_pos);
-                        if !right_ok {
-                            continue;
-                        }
-                        if meta.is_short && !short_alias_context_ok(tf, pos, end_pos, phrase) {
-                            continue;
-                        }
-
-                        let conf = if meta.is_short {
-                            if canonical_scope.is_some() || has_location_cue_before(tf, pos) {
-                                0.90
-                            } else {
-                                0.80
-                            }
-                        } else if entry.ward.is_some() {
-                            0.97
-                        } else if entry.district.is_some() {
-                            0.95
-                        } else {
-                            0.93
-                        };
-
-                        // `items` is already sorted longest phrase first; among equal-length phrases,
-                        // prefer scoped/more-specific entries.
-                        if let Some((best_end, _, best_conf)) = best {
-                            if end_pos > best_end || (end_pos == best_end && conf > best_conf) {
-                                best = Some((end_pos, entry, conf));
-                            }
-                        } else {
-                            best = Some((end_pos, entry, conf));
-                        }
-                    }
-
-                    if let Some((match_end, entry, conf)) = best {
-                        raw_hits.push((pos, match_end, entry, conf));
-                        pos = match_end;
-                        continue;
-                    }
-                }
+        if b0 < 128
+            && b1 < 128
+            && (idx.first_word_mask[b0 as usize] & wlen_bit) != 0
+            && (idx.first_two_mask[b0 as usize] & (1u128 << b1)) != 0
+        {
+            if let Some((match_end, entry, conf)) =
+                try_match_gazetteer_word(tf, bytes, len, idx, canonical_scope, word_start, word_end)
+            {
+                raw_hits.push((word_start, match_end, entry, conf));
+                skip_until = match_end;
             }
         }
-        pos = first_end;
     }
 
     if raw_hits.is_empty() {
@@ -1411,12 +1329,14 @@ fn build_vn_admin_index() -> GazetteerIndex {
             if first_end > 0 {
                 let first = &alias[..first_end];
                 let next_byte = alias.as_bytes().get(first_end + 1).copied().unwrap_or(0);
+                let next_byte2 = alias.as_bytes().get(first_end + 2).copied().unwrap_or(0);
                 raw_by_first_word.entry(first).or_default().push((
                     alias,
                     CompiledAlias {
                         entry_idx,
                         is_short: false,
                         next_byte,
+                        next_byte2,
                     },
                 ));
             }
@@ -1426,12 +1346,14 @@ fn build_vn_admin_index() -> GazetteerIndex {
             if first_end > 0 {
                 let first = &short[..first_end];
                 let next_byte = short.as_bytes().get(first_end + 1).copied().unwrap_or(0);
+                let next_byte2 = short.as_bytes().get(first_end + 2).copied().unwrap_or(0);
                 raw_by_first_word.entry(first).or_default().push((
                     short,
                     CompiledAlias {
                         entry_idx,
                         is_short: true,
                         next_byte,
+                        next_byte2,
                     },
                 ));
             }
@@ -1439,11 +1361,17 @@ fn build_vn_admin_index() -> GazetteerIndex {
     }
 
     let mut first_word_mask = [0u64; 256];
+    let mut first_two_mask = [0u128; 128];
     let mut by_first_word: FastStaticWordMap<FirstWordBucket> =
         FastStaticWordMap::with_capacity(raw_by_first_word.len());
     for (word, mut list) in raw_by_first_word {
-        if let Some(&b0) = word.as_bytes().first() {
+        let wb = word.as_bytes();
+        if let Some(&b0) = wb.first() {
             first_word_mask[b0 as usize] |= 1u64 << word.len().min(63);
+            let b1 = wb.get(1).copied().unwrap_or(0);
+            if b0 < 128 && b1 < 128 {
+                first_two_mask[b0 as usize] |= 1u128 << b1;
+            }
         }
         list.sort_by(|a, b| {
             b.0.len()
@@ -1472,7 +1400,83 @@ fn build_vn_admin_index() -> GazetteerIndex {
     GazetteerIndex {
         entries,
         first_word_mask,
+        first_two_mask,
         by_first_word,
         province_scope_map,
     }
+}
+
+#[inline]
+fn try_match_gazetteer_word(
+    tf: &str,
+    bytes: &[u8],
+    len: usize,
+    idx: &GazetteerIndex,
+    canonical_scope: Option<&str>,
+    pos: usize,
+    first_end: usize,
+) -> Option<(usize, AdminEntry, f64)> {
+    let bucket = idx.by_first_word.get(&tf[pos..first_end])?;
+    let next_b = if first_end + 1 < len {
+        bytes[first_end + 1]
+    } else {
+        0
+    };
+    let next_b2 = if first_end + 2 < len {
+        bytes[first_end + 2]
+    } else {
+        0
+    };
+    let can_match_long = next_b < 128 && (bucket.next_byte_mask & (1u128 << next_b)) != 0;
+    if !bucket.has_short_phrase && !can_match_long {
+        return None;
+    }
+
+    let mut best: Option<(usize, AdminEntry, f64)> = None;
+    for &(phrase, meta) in &bucket.items {
+        if (meta.next_byte != 0 && meta.next_byte != next_b)
+            || (meta.next_byte2 != 0 && meta.next_byte2 != next_b2)
+        {
+            continue;
+        }
+        let end_pos = pos + phrase.len();
+        if end_pos > len || !tf[pos..].starts_with(phrase) {
+            continue;
+        }
+        let entry = idx.entries[meta.entry_idx];
+        if let Some(req_prov) = canonical_scope {
+            if !entry.province.eq_ignore_ascii_case(req_prov) && entry.province != req_prov {
+                continue;
+            }
+        }
+        if crate::prefilter::has_alnum_at(tf, end_pos) {
+            continue;
+        }
+        if meta.is_short && !short_alias_context_ok(tf, pos, end_pos, phrase) {
+            continue;
+        }
+
+        let conf = if meta.is_short {
+            if canonical_scope.is_some() || has_location_cue_before(tf, pos) {
+                0.90
+            } else {
+                0.80
+            }
+        } else if entry.ward.is_some() {
+            0.97
+        } else if entry.district.is_some() {
+            0.95
+        } else {
+            0.93
+        };
+
+        if let Some((best_end, _, best_conf)) = best {
+            if end_pos > best_end || (end_pos == best_end && conf > best_conf) {
+                best = Some((end_pos, entry, conf));
+            }
+        } else {
+            best = Some((end_pos, entry, conf));
+        }
+    }
+    best
 }

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
-use regex::{Regex, RegexBuilder};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
@@ -10,7 +10,7 @@ use thiserror::Error;
 use crate::extractors::area::extract_vn_area_from_folded;
 use crate::extractors::date_vi::extract_date_vi_from_folded;
 use crate::extractors::enum_kw::{
-    compile_enum_patterns, extract_enum_kw_compiled, CompiledEnumPatterns,
+    compile_enum_patterns, extract_enum_kw_compiled, matches_any_enum_kw, CompiledEnumPatterns,
 };
 use crate::extractors::gazetteer::extract_gazetteer_from_folded;
 use crate::extractors::money::extract_vn_money_from_folded;
@@ -223,67 +223,58 @@ enum CompiledPatternItem {
     Regex(Regex),
 }
 
-impl CompiledPatternItem {
-    fn matches(&self, text_fold: &str) -> bool {
-        match self {
-            Self::Keyword(kw) => kw_contains_folded(text_fold, kw),
-            Self::Regex(re) => re.is_match(text_fold),
-        }
-    }
-}
-
-/// Precompiled pattern list that uses a SIMD Aho-Corasick literal alternation regex
-/// as a fast negative filter before checking exact word boundaries.
+/// Precompiled pattern list using shared [`FoldedView::words`] lookup (`CompiledEnumPatterns`)
+/// plus linear-time compiled regexes.
 #[derive(Debug, Clone, Default)]
 struct CompiledPatternList {
-    items: Vec<CompiledPatternItem>,
-    all_keywords_fast_filter: Option<Regex>,
+    keyword_items: Vec<String>,
+    kw_patterns: Option<Box<CompiledEnumPatterns>>,
+    regex_items: Vec<Regex>,
 }
 
 impl CompiledPatternList {
     fn from_items(items: Vec<CompiledPatternItem>) -> Self {
-        let all_ascii_keywords = items.len() >= 2
-            && items
-                .iter()
-                .all(|it| matches!(it, CompiledPatternItem::Keyword(kw) if kw.is_ascii() && !kw.is_empty()));
-
-        let all_keywords_fast_filter = if all_ascii_keywords {
-            let pat = items
-                .iter()
-                .filter_map(|it| match it {
-                    CompiledPatternItem::Keyword(kw) => Some(regex::escape(kw)),
-                    CompiledPatternItem::Regex(_) => None,
-                })
-                .collect::<Vec<_>>()
-                .join("|");
-            RegexBuilder::new(&pat)
-                .unicode(false)
-                .size_limit(512 * 1024)
-                .dfa_size_limit(512 * 1024)
-                .build()
-                .ok()
+        let mut keyword_items = Vec::new();
+        let mut regex_items = Vec::new();
+        for item in items {
+            match item {
+                CompiledPatternItem::Keyword(kw) => keyword_items.push(kw),
+                CompiledPatternItem::Regex(re) => regex_items.push(re),
+            }
+        }
+        let kw_patterns = if keyword_items.len() >= 3 {
+            let mut map = BTreeMap::new();
+            map.insert("_".to_string(), keyword_items.clone());
+            Some(Box::new(compile_enum_patterns(&map)))
         } else {
             None
         };
 
         Self {
-            items,
-            all_keywords_fast_filter,
+            keyword_items,
+            kw_patterns,
+            regex_items,
         }
     }
 
     #[inline]
     fn is_empty(&self) -> bool {
-        self.items.is_empty()
+        self.keyword_items.is_empty() && self.regex_items.is_empty()
     }
 
-    fn matches_any(&self, text_fold: &str) -> bool {
-        if let Some(re) = &self.all_keywords_fast_filter {
-            if !re.is_match(text_fold) {
-                return false;
-            }
-        }
-        self.items.iter().any(|p| p.matches(text_fold))
+    fn matches_any(&self, folded: &FoldedView<'_>) -> bool {
+        let kw_match = if let Some(pat) = &self.kw_patterns {
+            matches_any_enum_kw(folded, pat)
+        } else {
+            self.keyword_items
+                .iter()
+                .any(|kw| kw_contains_folded(folded.text_fold, kw))
+        };
+        kw_match
+            || self
+                .regex_items
+                .iter()
+                .any(|re| re.is_match(folded.text_fold))
     }
 }
 
@@ -558,6 +549,9 @@ fn compile_condition(
             for c in items {
                 out.push(compile_condition(c, depth + 1, rule_id)?);
             }
+            // Evaluate O(1) metadata/field predicates (`HasField`, `FieldCmp`, `LenLt`, `LenGt`, `LangIn`)
+            // before full-text `KwAny` / `KwNone` / `Re` scans so conjunctions short-circuit immediately.
+            out.sort_by_key(condition_eval_cost);
             Ok(CompiledCondition::All(out))
         }
         Condition::Any(items) => {
@@ -568,6 +562,7 @@ fn compile_condition(
             for c in items {
                 out.push(compile_condition(c, depth + 1, rule_id)?);
             }
+            out.sort_by_key(condition_eval_cost);
             Ok(CompiledCondition::Any(out))
         }
         Condition::Not(inner) => Ok(CompiledCondition::Not(Box::new(compile_condition(
@@ -636,6 +631,24 @@ fn compile_condition(
             }
             Ok(CompiledCondition::FieldCmp(cmp.clone()))
         }
+    }
+}
+
+fn condition_eval_cost(cond: &CompiledCondition) -> u8 {
+    match cond {
+        CompiledCondition::HasField(_)
+        | CompiledCondition::LenLt(_)
+        | CompiledCondition::LenGt(_)
+        | CompiledCondition::LangIn(_)
+        | CompiledCondition::FieldCmp(_) => 0,
+        CompiledCondition::Not(inner) => condition_eval_cost(inner).saturating_add(1),
+        CompiledCondition::All(items) | CompiledCondition::Any(items) => items
+            .iter()
+            .map(condition_eval_cost)
+            .max()
+            .unwrap_or(1)
+            .max(1),
+        CompiledCondition::KwAny(_) | CompiledCondition::KwNone(_) | CompiledCondition::Re(_) => 3,
     }
 }
 
@@ -733,19 +746,13 @@ impl CompiledRuleset {
     ) -> RulesetOutcome {
         let char_len_cache = std::cell::OnceCell::new();
         if let Some(pf) = &self.prefilter {
-            if !eval_prefilter(pf, &post.text_norm, folded.text_fold, &char_len_cache) {
+            if !eval_prefilter(pf, &post.text_norm, folded, &char_len_cache) {
                 return RulesetOutcome::PrefilterReject;
             }
         }
 
         let extracted = self.run_extractors(post, folded, ref_ts_ms);
-        self.classify_extracted(
-            post,
-            folded.text_fold,
-            &char_len_cache,
-            field_defs,
-            extracted,
-        )
+        self.classify_extracted(post, folded, &char_len_cache, field_defs, extracted)
     }
 
     /// Runs prefilter, all extractors, and all classify rules without short-circuiting prefilter
@@ -760,17 +767,11 @@ impl CompiledRuleset {
         let pf_ok = self
             .prefilter
             .as_ref()
-            .map(|pf| eval_prefilter(pf, &post.text_norm, folded.text_fold, &char_len_cache))
+            .map(|pf| eval_prefilter(pf, &post.text_norm, folded, &char_len_cache))
             .unwrap_or(true);
         let extracted = self.run_extractors(post, folded, ref_ts_ms);
         for rule in &self.classify {
-            let _ = eval_condition(
-                &rule.when,
-                post,
-                folded.text_fold,
-                &char_len_cache,
-                &extracted,
-            );
+            let _ = eval_condition(&rule.when, post, folded, &char_len_cache, &extracted);
         }
         usize::from(pf_ok) + extracted.len()
     }
@@ -842,13 +843,13 @@ impl CompiledRuleset {
     fn classify_extracted(
         &self,
         post: &NormalizedText,
-        text_fold: &str,
+        folded: &FoldedView<'_>,
         char_len_cache: &std::cell::OnceCell<usize>,
         field_defs: &[FieldDef],
         extracted: ExtractedFields,
     ) -> RulesetOutcome {
         for rule in &self.classify {
-            if eval_condition(&rule.when, post, text_fold, char_len_cache, &extracted) {
+            if eval_condition(&rule.when, post, folded, char_len_cache, &extracted) {
                 match rule.verdict {
                     RuleVerdict::Match => {
                         let all_required_present = field_defs
@@ -915,7 +916,7 @@ fn get_char_len(text_norm: &str, cache: &std::cell::OnceCell<usize>) -> usize {
 fn eval_prefilter(
     pf: &CompiledPrefilter,
     text_norm: &str,
-    text_fold: &str,
+    folded: &FoldedView<'_>,
     char_len_cache: &std::cell::OnceCell<usize>,
 ) -> bool {
     if let Some(min_len) = pf.min_len {
@@ -928,10 +929,10 @@ fn eval_prefilter(
             return false;
         }
     }
-    if !pf.any.is_empty() && !pf.any.matches_any(text_fold) {
+    if !pf.any.is_empty() && !pf.any.matches_any(folded) {
         return false;
     }
-    if pf.none.matches_any(text_fold) {
+    if pf.none.matches_any(folded) {
         return false;
     }
     true
@@ -940,24 +941,25 @@ fn eval_prefilter(
 fn eval_condition(
     cond: &CompiledCondition,
     post: &NormalizedText,
-    text_fold: &str,
+    folded: &FoldedView<'_>,
     char_len_cache: &std::cell::OnceCell<usize>,
     extracted: &ExtractedFields,
 ) -> bool {
     match cond {
         CompiledCondition::All(items) => items
             .iter()
-            .all(|c| eval_condition(c, post, text_fold, char_len_cache, extracted)),
+            .all(|c| eval_condition(c, post, folded, char_len_cache, extracted)),
         CompiledCondition::Any(items) => items
             .iter()
-            .any(|c| eval_condition(c, post, text_fold, char_len_cache, extracted)),
+            .any(|c| eval_condition(c, post, folded, char_len_cache, extracted)),
         CompiledCondition::Not(inner) => {
-            !eval_condition(inner, post, text_fold, char_len_cache, extracted)
+            !eval_condition(inner, post, folded, char_len_cache, extracted)
         }
-        CompiledCondition::KwAny(items) => items.matches_any(text_fold),
-        CompiledCondition::KwNone(items) => !items.matches_any(text_fold),
+        CompiledCondition::KwAny(items) => items.matches_any(folded),
+        CompiledCondition::KwNone(items) => !items.matches_any(folded),
         CompiledCondition::Re(re) => {
-            re.is_match(text_fold) || (!re.as_str().is_ascii() && re.is_match(&post.text_norm))
+            re.is_match(folded.text_fold)
+                || (!re.as_str().is_ascii() && re.is_match(&post.text_norm))
         }
         CompiledCondition::HasField(f) => extracted
             .get(f)

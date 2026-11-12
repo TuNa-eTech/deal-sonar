@@ -1,26 +1,91 @@
 use std::collections::{BTreeMap, HashMap};
 
-use regex::{Regex, RegexBuilder};
 use serde_json::Value;
 
 use crate::normalize::{fold_text, fold_with_spans, FoldedView};
 use crate::prefilter::{has_alnum_at, has_alnum_before};
 use crate::types::ExtractionMatch;
 
+/// Open-addressed FNV-1a word table so `enum_kw` avoids `SipHash` overhead per candidate word.
+#[derive(Debug, Clone)]
+struct FastWordMap<V> {
+    mask: usize,
+    slots: Vec<Option<(String, V)>>,
+}
+
+impl<V> FastWordMap<V> {
+    fn with_capacity(entries_len: usize) -> Self {
+        let cap = (entries_len.saturating_mul(4)).next_power_of_two().max(16);
+        let mut slots = Vec::with_capacity(cap);
+        slots.resize_with(cap, || None);
+        Self {
+            mask: cap - 1,
+            slots,
+        }
+    }
+
+    #[inline(always)]
+    fn hash_word(bytes: &[u8]) -> usize {
+        let mut h = 0xcbf2_9ce4_8422_2325_u64;
+        let mut i = 0usize;
+        while i < bytes.len() {
+            h = (h ^ (bytes[i] as u64)).wrapping_mul(0x0100_0000_01b3);
+            i += 1;
+        }
+        (h ^ (h >> 32)) as usize
+    }
+
+    fn insert(&mut self, key: String, val: V) {
+        let mut idx = Self::hash_word(key.as_bytes()) & self.mask;
+        loop {
+            match &mut self.slots[idx] {
+                None => {
+                    self.slots[idx] = Some((key, val));
+                    return;
+                }
+                Some((k, existing)) if *k == key => {
+                    *existing = val;
+                    return;
+                }
+                Some(_) => {
+                    idx = (idx + 1) & self.mask;
+                }
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn get(&self, key: &str) -> Option<&V> {
+        let kb = key.as_bytes();
+        let mut idx = Self::hash_word(kb) & self.mask;
+        loop {
+            match &self.slots[idx] {
+                None => return None,
+                Some((k, v)) => {
+                    if k.len() == kb.len() && k.as_bytes() == kb {
+                        return Some(v);
+                    }
+                    idx = (idx + 1) & self.mask;
+                }
+            }
+        }
+    }
+}
+
 /// Pre-indexed folded keyword lookup table for fast single-pass `enum_kw` extraction.
 #[derive(Debug, Clone)]
 pub(crate) struct CompiledEnumPatterns {
     first_word_mask: [u64; 256],
-    by_first_word: HashMap<String, Vec<(String, String)>>,
+    first_two_mask: [u128; 128],
+    by_first_word: FastWordMap<Vec<(String, String)>>,
+    has_first_words: bool,
     other: Vec<(String, String)>,
-    fast_filters: Vec<Regex>,
 }
 
 /// Pre-fold and index `(folded_keyword, enum_key)` pairs by first word (longest keyword first).
 pub(crate) fn compile_enum_patterns(map: &BTreeMap<String, Vec<String>>) -> CompiledEnumPatterns {
-    let mut by_first_word: HashMap<String, Vec<(String, String)>> = HashMap::new();
+    let mut raw_by_first_word: HashMap<String, Vec<(String, String)>> = HashMap::new();
     let mut other: Vec<(String, String)> = Vec::new();
-    let mut all_folded: Vec<String> = Vec::new();
 
     for (enum_val, kws) in map {
         for kw in kws {
@@ -28,11 +93,10 @@ pub(crate) fn compile_enum_patterns(map: &BTreeMap<String, Vec<String>>) -> Comp
             if kf.is_empty() {
                 continue;
             }
-            all_folded.push(kf.clone());
             let first_len = scan_alnum_prefix(&kf);
             if first_len > 0 {
                 let first_tok = kf[..first_len].to_string();
-                by_first_word
+                raw_by_first_word
                     .entry(first_tok)
                     .or_default()
                     .push((kf, enum_val.clone()));
@@ -43,42 +107,31 @@ pub(crate) fn compile_enum_patterns(map: &BTreeMap<String, Vec<String>>) -> Comp
     }
 
     let mut first_word_mask = [0u64; 256];
-    for (word, bucket) in &mut by_first_word {
-        if let Some(&b0) = word.as_bytes().first() {
+    let mut first_two_mask = [0u128; 128];
+    let has_first_words = !raw_by_first_word.is_empty();
+    let mut by_first_word = FastWordMap::with_capacity(raw_by_first_word.len());
+    for (word, mut bucket) in raw_by_first_word {
+        let wb = word.as_bytes();
+        if let Some(&b0) = wb.first() {
             first_word_mask[b0 as usize] |= 1u64 << word.len().min(63);
+            if b0 < 128 {
+                let b1 = wb.get(1).copied().unwrap_or(0);
+                if b1 < 128 {
+                    first_two_mask[b0 as usize] |= 1u128 << b1;
+                }
+            }
         }
         bucket.sort_by(|a, b| b.0.len().cmp(&a.0.len()).then_with(|| a.1.cmp(&b.1)));
+        by_first_word.insert(word, bucket);
     }
     other.sort_by(|a, b| b.0.len().cmp(&a.0.len()).then_with(|| a.1.cmp(&b.1)));
 
-    // Chunk literal alternations into groups of <= 10 so `regex-automata` always uses SIMD Teddy!
-    let mut fast_filters = Vec::new();
-    if all_folded.len() >= 2 && all_folded.iter().all(|s| s.is_ascii()) {
-        for chunk in all_folded.chunks(10) {
-            let pat = chunk
-                .iter()
-                .map(|s| regex::escape(s))
-                .collect::<Vec<_>>()
-                .join("|");
-            if let Ok(re) = RegexBuilder::new(&pat)
-                .unicode(false)
-                .size_limit(512 * 1024)
-                .dfa_size_limit(512 * 1024)
-                .build()
-            {
-                fast_filters.push(re);
-            } else {
-                fast_filters.clear();
-                break;
-            }
-        }
-    }
-
     CompiledEnumPatterns {
         first_word_mask,
+        first_two_mask,
         by_first_word,
+        has_first_words,
         other,
-        fast_filters,
     }
 }
 
@@ -126,6 +179,54 @@ pub fn extract_enum_kw(
     )
 }
 
+/// Fast boolean keyword-set check reusing [`FoldedView::words`] without computing `text_norm` spans.
+pub(crate) fn matches_any_enum_kw(
+    folded: &FoldedView<'_>,
+    patterns: &CompiledEnumPatterns,
+) -> bool {
+    let tf = folded.text_fold;
+    if tf.is_empty() || (!patterns.has_first_words && patterns.other.is_empty()) {
+        return false;
+    }
+    let bytes = tf.as_bytes();
+    let len = bytes.len();
+
+    if patterns.has_first_words {
+        for &(ws_u32, we_u32) in folded.words() {
+            let word_start = ws_u32 as usize;
+            let word_end = we_u32 as usize;
+            let wlen = word_end - word_start;
+            let b0 = bytes[word_start];
+            let wlen_bit = 1u64 << if wlen < 63 { wlen } else { 63 };
+            if (patterns.first_word_mask[b0 as usize] & wlen_bit) == 0 {
+                continue;
+            }
+            if b0 < 128 {
+                let b1 = if wlen >= 2 { bytes[word_start + 1] } else { 0 };
+                if b1 < 128 && (patterns.first_two_mask[b0 as usize] & (1u128 << b1)) == 0 {
+                    continue;
+                }
+            }
+            if let Some(candidates) = patterns.by_first_word.get(&tf[word_start..word_end]) {
+                for (kw_fold, _) in candidates {
+                    let end = word_start + kw_fold.len();
+                    if end <= len && tf[word_start..].starts_with(kw_fold.as_str()) {
+                        let check_right = has_alnum_before(kw_fold, kw_fold.len());
+                        if !check_right || !has_alnum_at(tf, end) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    patterns
+        .other
+        .iter()
+        .any(|(kw_fold, _)| tf.contains(kw_fold.as_str()))
+}
+
 pub(crate) fn extract_enum_kw_compiled<'a>(
     text_norm: &str,
     folded: &FoldedView<'_>,
@@ -134,66 +235,50 @@ pub(crate) fn extract_enum_kw_compiled<'a>(
     first_only: bool,
 ) -> Vec<ExtractionMatch> {
     let tf = folded.text_fold;
-    if tf.is_empty() || (patterns.by_first_word.is_empty() && patterns.other.is_empty()) {
-        return Vec::new();
-    }
-    if !patterns.fast_filters.is_empty() && !patterns.fast_filters.iter().any(|re| re.is_match(tf))
-    {
+    if tf.is_empty() || (!patterns.has_first_words && patterns.other.is_empty()) {
         return Vec::new();
     }
 
     let mut chosen: Vec<(usize, usize, &'a str)> = Vec::new();
     let bytes = tf.as_bytes();
-    let mut pos = 0usize;
+    let len = bytes.len();
 
-    while pos < bytes.len() {
-        let b = bytes[pos];
-        let is_alnum = if b < 0x80 {
-            b.is_ascii_alphanumeric()
-        } else {
-            tf[pos..]
-                .chars()
-                .next()
-                .map(|c| c.is_alphanumeric())
-                .unwrap_or(false)
-        };
-
-        if is_alnum && !has_alnum_before(tf, pos) {
-            let tok_len = scan_alnum_prefix(&tf[pos..]);
-            let first_tok = &tf[pos..pos + tok_len];
-            let wlen_bit = 1u64 << first_tok.len().min(63);
-            let candidates_opt = ((patterns.first_word_mask[b as usize] & wlen_bit) != 0)
-                .then(|| patterns.by_first_word.get(first_tok))
-                .flatten();
-            if let Some(candidates) = candidates_opt {
-                let mut matched = false;
+    if patterns.has_first_words {
+        let mut skip_until = 0usize;
+        for &(ws_u32, we_u32) in folded.words() {
+            let word_start = ws_u32 as usize;
+            if word_start < skip_until {
+                continue;
+            }
+            let word_end = we_u32 as usize;
+            let wlen = word_end - word_start;
+            let b0 = bytes[word_start];
+            let wlen_bit = 1u64 << if wlen < 63 { wlen } else { 63 };
+            if (patterns.first_word_mask[b0 as usize] & wlen_bit) == 0 {
+                continue;
+            }
+            if b0 < 128 {
+                let b1 = if wlen >= 2 { bytes[word_start + 1] } else { 0 };
+                if b1 < 128 && (patterns.first_two_mask[b0 as usize] & (1u128 << b1)) == 0 {
+                    continue;
+                }
+            }
+            if let Some(candidates) = patterns.by_first_word.get(&tf[word_start..word_end]) {
                 for (kw_fold, enum_val) in candidates {
-                    let end = pos + kw_fold.len();
-                    if end <= tf.len() && tf[pos..].starts_with(kw_fold.as_str()) {
+                    let end = word_start + kw_fold.len();
+                    if end <= len && tf[word_start..].starts_with(kw_fold.as_str()) {
                         let check_right = has_alnum_before(kw_fold, kw_fold.len());
                         if !check_right || !has_alnum_at(tf, end) {
-                            chosen.push((pos, end, enum_val.as_str()));
-                            pos = end;
-                            matched = true;
-                            if !multi && first_only && patterns.other.is_empty() {
-                                break;
-                            }
+                            chosen.push((word_start, end, enum_val.as_str()));
+                            skip_until = end;
                             break;
                         }
                     }
                 }
-                if matched {
-                    if !multi && first_only && patterns.other.is_empty() {
-                        break;
-                    }
-                    continue;
+                if !chosen.is_empty() && !multi && first_only && patterns.other.is_empty() {
+                    break;
                 }
             }
-            pos += tok_len;
-        } else if b < 0x80 {
-            pos += 1;
-        } else {
-            pos += tf[pos..].chars().next().map(|c| c.len_utf8()).unwrap_or(1);
         }
     }
 

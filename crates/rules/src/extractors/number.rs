@@ -125,18 +125,21 @@ pub(crate) fn extract_number_from_folded(
 
     let mut hits: Vec<(usize, usize, Value, f64)> = Vec::new();
 
-    // 1. Number + Unit suffix matches
-    for num_m in NUM_TOKEN_RE.find_iter(tf) {
-        let n_start = num_m.start();
-        let n_end = num_m.end();
-        if n_start > 0
-            && tf[..n_start]
-                .chars()
-                .next_back()
-                .map(|c| c.is_alphanumeric())
-                .unwrap_or(false)
+    // 1. Number + Unit suffix matches (using cached `folded.digit_starts()` instead of DFA scan)
+    let bytes = tf.as_bytes();
+    for &n_start in folded.digit_starts() {
+        let mut n_end = n_start + 1;
+        while n_end < bytes.len() && bytes[n_end].is_ascii_digit() {
+            n_end += 1;
+        }
+        if n_end + 1 < bytes.len()
+            && (bytes[n_end] == b'.' || bytes[n_end] == b',')
+            && bytes[n_end + 1].is_ascii_digit()
         {
-            continue;
+            n_end += 2;
+            while n_end < bytes.len() && bytes[n_end].is_ascii_digit() {
+                n_end += 1;
+            }
         }
         let after_num = &tf[n_end..];
         let ws_bytes = after_num.len() - after_num.trim_start_matches(' ').len();
@@ -154,7 +157,7 @@ pub(crate) fn extract_number_from_folded(
                         .map(|c| c.is_alphanumeric())
                         .unwrap_or(false);
                 if right_ok {
-                    if let Some(base) = parse_float(num_m.as_str()) {
+                    if let Some(base) = parse_float(&tf[n_start..n_end]) {
                         if !overlaps(&hits, n_start, unit_end) {
                             let scaled = base * (*mult);
                             if let Some(jv) = number_to_json_value(scaled) {

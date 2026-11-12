@@ -1368,27 +1368,20 @@ fn worst_case_5000_char_no_match_post_runs_under_1ms() {
     }
     let long_post = normalize_text(&text.chars().take(5_000).collect::<String>());
 
-    // Warmup + measure median of 5 evaluations (with CI thread-jitter retry matching `validate_ruleset`)
+    // Warmup + measure single 5-run median in unoptimized test profile
     let _ = compiled.evaluate(&long_post, &[], REF_TS_2026_11_11);
-    let mut best_median = std::time::Duration::MAX;
-    for _ in 0..4 {
-        let mut times = [std::time::Duration::ZERO; 5];
-        for slot in &mut times {
-            let t0 = std::time::Instant::now();
-            let outcome =
-                std::hint::black_box(compiled.evaluate(&long_post, &[], REF_TS_2026_11_11));
-            assert!(matches!(outcome, RulesetOutcome::Uncertain { .. }));
-            *slot = t0.elapsed();
-        }
-        times.sort_unstable();
-        best_median = best_median.min(times[2]);
-        if best_median < std::time::Duration::from_millis(1) {
-            break;
-        }
+    let mut times = [std::time::Duration::ZERO; 5];
+    for slot in &mut times {
+        let t0 = std::time::Instant::now();
+        let outcome = std::hint::black_box(compiled.evaluate(&long_post, &[], REF_TS_2026_11_11));
+        assert!(matches!(outcome, RulesetOutcome::Uncertain { .. }));
+        *slot = t0.elapsed();
     }
+    times.sort_unstable();
+    let median = times[2];
     assert!(
-        best_median < std::time::Duration::from_millis(1),
+        median < std::time::Duration::from_millis(1),
         "5,000-char full-scan evaluation took {:?} (expected < 1ms)",
-        best_median
+        median
     );
 }

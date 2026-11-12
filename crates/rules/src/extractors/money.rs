@@ -120,28 +120,54 @@ pub(crate) fn extract_vn_money_from_folded(
         let tail_end = floor_utf8_boundary(tf, (base + 128).min(len));
         let tail = &tf[base..tail_end];
 
-        // Fast 1-byte guard: skip numbers not followed by a money unit or range connector
+        // Fast 2-byte guard: skip numbers not followed by a money unit or range connector
         let num_tok_len = skip_grouped_or_decimal_number(tail.as_bytes());
         let mut ws_idx = num_tok_len;
         let tail_bytes = tail.as_bytes();
         while ws_idx < tail_bytes.len() && tail_bytes[ws_idx] == b' ' {
             ws_idx += 1;
         }
-        let next_non_space = if ws_idx < tail_bytes.len() {
-            tail_bytes[ws_idx]
-        } else {
-            0
+        let after_slice = &tail_bytes[ws_idx..];
+        let b0 = after_slice.first().copied().unwrap_or(0);
+        let b1 = after_slice.get(1).copied().unwrap_or(0);
+        let b2 = after_slice.get(2).copied().unwrap_or(0);
+
+        let is_unit_prefix = match b0 {
+            // ty, ti, toi, tr, trieu (rejects "tre", "trong", "tren", "tinh", "thanh")
+            b't' => {
+                ((b1 == b'y' || b1 == b'i') && !b2.is_ascii_alphabetic())
+                    || (b1 == b'o' && b2 == b'i')
+                    || (b1 == b'r' && (b2 == b'i' || !b2.is_ascii_alphabetic()))
+            }
+            b'c' => b1 == b'u' && !b2.is_ascii_alphabetic(), // cu (rejects "cua", "cung")
+            b'l' => b1 == b'i' && b2 == b't',                // lit
+            b'n' => b1 == b'g' && (b2 == b'h' || b2 == b'a'), // nghin, ngan (rejects "nguoi", "ngay")
+            b'k' => (b1 == b'a' && !b2.is_ascii_alphabetic()) || !b1.is_ascii_alphanumeric(), // ka, k
+            _ => false,
         };
-        if !matches!(
-            next_non_space,
-            b't' | b'c' | b'l' | b'n' | b'k' | b'v' | b'd' | b'-' | b'~'
-        ) {
+        let is_range_connector = b0 == b'-'
+            || b0 == b'~'
+            || after_slice.starts_with(b"den ")
+            || after_slice.starts_with(b"toi ");
+        let is_vnd_prefix = num_tok_len >= 5
+            && ((b0 == b'v' && b1 == b'n')
+                || (b0 == b'd' && (b1 == b'o' || !b1.is_ascii_alphanumeric())));
+
+        if !is_unit_prefix && !is_range_connector && !is_vnd_prefix {
             min_pos = base + num_tok_len.max(1);
             continue;
         }
 
+        let after_str = &tail[ws_idx..];
+        let can_have_range = is_range_connector
+            || (is_unit_prefix
+                && (after_slice.contains(&b'-')
+                    || after_slice.contains(&b'~')
+                    || after_str.contains(" den ")
+                    || after_str.contains(" toi ")));
+
         // 1. Compound ranges ("12 - 15tr/th", "từ 800 triệu đến 1.2 tỷ")
-        if MONEY_COMPOUND_RANGE_RE.is_match(tail) {
+        if can_have_range && MONEY_COMPOUND_RANGE_RE.is_match(tail) {
             if let Some(caps) = MONEY_COMPOUND_RANGE_RE.captures(tail) {
                 let m0 = caps.get(0).unwrap();
                 let full_end = base + m0.end();
@@ -235,7 +261,7 @@ pub(crate) fn extract_vn_money_from_folded(
         }
 
         // 2. Single shorthand/unit amounts ("3tr5", "2 tỷ 3", "15 củ", "500k", "dưới 400 triệu")
-        if MONEY_SINGLE_RE.is_match(tail) {
+        if is_unit_prefix && MONEY_SINGLE_RE.is_match(tail) {
             if let Some(caps) = MONEY_SINGLE_RE.captures(tail) {
                 let m0 = caps.get(0).unwrap();
                 let full_end = base + m0.end();
@@ -306,7 +332,7 @@ pub(crate) fn extract_vn_money_from_folded(
         }
 
         // 3. Grouped VND amounts ("15.000.000đ", "500,000 vnd")
-        if matches!(next_non_space, b'd' | b'v') && MONEY_GROUPED_VND_RE.is_match(tail) {
+        if is_vnd_prefix && MONEY_GROUPED_VND_RE.is_match(tail) {
             if let Some(caps) = MONEY_GROUPED_VND_RE.captures(tail) {
                 let m0 = caps.get(0).unwrap();
                 let full_end = base + m0.end();

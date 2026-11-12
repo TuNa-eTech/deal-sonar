@@ -35,6 +35,39 @@ static AREA_SINGLE_RE: LazyLock<Regex> = LazyLock::new(|| {
         .expect("valid single area regex")
 });
 
+/// Fast precheck using `libcore` `-O3` `str::contains` / `str::find` so posts without area units
+/// or `<num> x <num>` dimensions return immediately (even when words like `"hang xom"` contain `'x'`).
+#[inline]
+fn has_area_cue(tf: &str) -> bool {
+    if tf.contains("m2") || tf.contains("vuong") {
+        return true;
+    }
+    let bytes = tf.as_bytes();
+    let len = bytes.len();
+    let mut from = 0usize;
+    while let Some(rel) = tf[from..].find('x') {
+        let x_pos = from + rel;
+        let mut r = x_pos + 1;
+        while r < len && bytes[r] == b' ' {
+            r += 1;
+        }
+        if r < len && bytes[r].is_ascii_digit() && x_pos > 0 {
+            let mut l = x_pos;
+            while l > 0 && bytes[l - 1] == b' ' {
+                l -= 1;
+            }
+            if l > 0 {
+                let lb = bytes[l - 1];
+                if lb.is_ascii_digit() || lb == b'm' || lb == b't' {
+                    return true;
+                }
+            }
+        }
+        from = x_pos + 1;
+    }
+    false
+}
+
 /// Extract Vietnamese area expressions (`50m2`, `50 m²`, `5x20`, `4.5m x 16m`,
 /// `50-70m2`, `70 mét vuông`) into `{"min": ..., "max": ..., "unit": "m2"}` (`05-pipeline-rules.md §6.3`).
 pub fn extract_vn_area(text_norm: &str) -> Vec<ExtractionMatch> {
@@ -53,7 +86,7 @@ pub(crate) fn extract_vn_area_from_folded(
     let tf = folded.text_fold;
     let bytes = tf.as_bytes();
     let len = bytes.len();
-    if len < 2 {
+    if len < 2 || !has_area_cue(tf) {
         return Vec::new();
     }
 
@@ -68,26 +101,44 @@ pub(crate) fn extract_vn_area_from_folded(
         let tail_end = floor_utf8_boundary(tf, (d_pos + 96).min(len));
         let tail = &tf[d_pos..tail_end];
 
-        // Fast 1-byte guard: skip numbers not followed by 'm', 'x', '-', '~', 'd', or 't'
+        // Fast 2-byte guard: skip numbers not followed by `m2`/`met`/`m `, `x`, or `-`/`~`/`den `/`toi `
         let after_num = skip_number_token(tail.as_bytes());
         let tail_bytes = tail.as_bytes();
         let mut ws_idx = after_num;
         while ws_idx < tail_bytes.len() && tail_bytes[ws_idx] == b' ' {
             ws_idx += 1;
         }
-        let next_non_space = if ws_idx < tail_bytes.len() {
-            tail_bytes[ws_idx]
-        } else {
-            0
-        };
-        if !matches!(next_non_space, b'm' | b'x' | b'-' | b'~' | b'd' | b't') {
+        let after_slice = &tail_bytes[ws_idx..];
+        let b0 = after_slice.first().copied().unwrap_or(0);
+        let b1 = after_slice.get(1).copied().unwrap_or(0);
+
+        let is_m_unit = b0 == b'm'
+            && (b1 == b'2'
+                || b1 == b'e'
+                || b1 == b' '
+                || b1.is_ascii_digit()
+                || !b1.is_ascii_alphanumeric());
+        let is_x_dim = b0 == b'x';
+        let is_range_conn = b0 == b'-'
+            || b0 == b'~'
+            || after_slice.starts_with(b"den ")
+            || after_slice.starts_with(b"toi ");
+
+        if !is_m_unit && !is_x_dim && !is_range_conn {
             min_pos = d_pos + after_num.max(1);
             continue;
         }
 
-        if matches!(next_non_space, b'm' | b'-' | b'~' | b'd' | b't')
-            && AREA_RANGE_RE.is_match(tail)
-        {
+        let after_str = &tail[ws_idx..];
+        let can_match_range = (is_range_conn
+            || (is_m_unit
+                && (after_slice.contains(&b'-')
+                    || after_slice.contains(&b'~')
+                    || after_str.contains(" den ")
+                    || after_str.contains(" toi "))))
+            && after_slice.contains(&b'm');
+
+        if can_match_range && AREA_RANGE_RE.is_match(tail) {
             if let Some(caps) = AREA_RANGE_RE.captures(tail) {
                 let m0 = caps.get(0).unwrap();
                 let abs_end = d_pos + m0.end();
@@ -119,7 +170,7 @@ pub(crate) fn extract_vn_area_from_folded(
             }
         }
 
-        if matches!(next_non_space, b'm' | b'x') && AREA_DIM_RE.is_match(tail) {
+        if (is_x_dim || (is_m_unit && after_slice.contains(&b'x'))) && AREA_DIM_RE.is_match(tail) {
             if let Some(caps) = AREA_DIM_RE.captures(tail) {
                 let m0 = caps.get(0).unwrap();
                 let abs_end = d_pos + m0.end();
@@ -159,7 +210,7 @@ pub(crate) fn extract_vn_area_from_folded(
             }
         }
 
-        if next_non_space == b'm' {
+        if is_m_unit {
             if let Some(m0) = AREA_SINGLE_RE.find(tail) {
                 let abs_end = d_pos + m0.end();
                 if !has_alnum_at(tf, abs_end) {

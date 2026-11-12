@@ -48,8 +48,34 @@ const PHONE_BYTE_CLASS: [u8; 256] = {
     table
 };
 
+/// Fast `-O3` `libcore` SIMD `memchr` precheck: every valid Vietnamese phone candidate starts with
+/// `'0'`, `'o'`, `'O'`, or `"84"` (including `"+84"`) and has an ASCII digit within 8 bytes.
+fn has_phone_anchor(text_norm: &str) -> bool {
+    let bytes = text_norm.as_bytes();
+    let len = bytes.len();
+    if text_norm.contains("84") {
+        return true;
+    }
+    for anchor in ['0', 'o', 'O'] {
+        let mut from = 0usize;
+        while let Some(rel) = text_norm[from..].find(anchor) {
+            let pos = from + rel;
+            let look_end = (pos + 9).min(len);
+            let mut k = pos + 1;
+            while k < look_end {
+                if bytes[k].is_ascii_digit() {
+                    return true;
+                }
+                k += 1;
+            }
+            from = pos + 1;
+        }
+    }
+    false
+}
+
 fn extract_vn_phone_impl(text_norm: &str, first_only: bool) -> Vec<ExtractionMatch> {
-    if text_norm.len() < 9 {
+    if text_norm.len() < 9 || !has_phone_anchor(text_norm) {
         return Vec::new();
     }
 
