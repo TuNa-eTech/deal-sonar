@@ -1,0 +1,82 @@
+{
+  "radar_version_id": "01JCFEVALDICHVUGOLDENV1",
+  "id": "dich-vu.tim-tho.golden",
+  "industry": "Dịch vụ nhà cửa",
+  "name": "Khách hỏi tìm thợ sửa chữa nhà cửa (Golden Eval v1)",
+  "description": "Khách gia đình đang hỏi \"ai biết thợ...\" hoặc cần tìm thợ sửa chữa điện nước, điều hoà, máy giặt, chống thấm, sửa khoá, thông tắc tại Hà Nội và TP.HCM",
+  "user_profession": "thợ dịch vụ sửa chữa nhà cửa",
+  "language_hint": "vi",
+  "want_intent": "demand",
+  "exclude_roles": [
+    "peer"
+  ],
+  "match_policy": {
+    "want_intent": "demand",
+    "exclude_roles": [
+      "peer"
+    ],
+    "hard_filters": []
+  },
+  "seed_ruleset": null,
+  "fields": [
+    {
+      "key": "service_type",
+      "label": "Hạng mục sửa chữa",
+      "type": "enum",
+      "description": "Loại công việc sửa chữa/lắp đặt khách đang cần hỗ trợ",
+      "required": true,
+      "options": [
+        "điện nước",
+        "điều hoà",
+        "máy giặt",
+        "chống thấm",
+        "sửa khoá",
+        "thông tắc",
+        "sơn sửa"
+      ],
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Quận/huyện nơi khách cần thợ tới làm",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "urgent",
+      "label": "Cần gấp",
+      "type": "boolean",
+      "description": "Khách có cần thợ tới xử lý gấp ngay trong ngày không",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "budget",
+      "label": "Chi phí dự kiến",
+      "type": "money",
+      "description": "Mức công/chi phí khách dự kiến (nếu nêu trong bài)",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại liên hệ của khách chuẩn E.164",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    }
+  ],
+  "feedback_examples": []
+}

@@ -1,0 +1,1230 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-12T06:30:00Z",
+  "evaluator": "cargo run -p dealsonar-ai-bridge --bin eval",
+  "provider": "mock",
+  "batch_sizes_tested": [
+    5,
+    10,
+    20,
+    40
+  ],
+  "total_golden_posts": 185,
+  "h2_thresholds": {
+    "match_precision_min": 0.85,
+    "match_recall_min": 0.9,
+    "peer_precision_min": 0.75,
+    "peer_recall_min": 0.75,
+    "required_field_accuracy_min": 0.9,
+    "optional_field_accuracy_min": 0.8,
+    "hallucinated_raw_rate_max": 0.01,
+    "stability_flip_rate_max": 0.03
+  },
+  "all_thresholds_passed": true,
+  "suites": {
+    "bds": {
+      "dataset": "docs/eval/golden/bds.jsonl",
+      "radar": "docs/eval/golden/bds.radar.json",
+      "radar_version_id": "01JCFEVALBDSGOLDENV1",
+      "industry": "Bất động sản",
+      "want_intent": "demand",
+      "corpus_counts": {
+        "total": 65,
+        "positive_matches": 20,
+        "disguised_peers": 20,
+        "other_negatives": 25
+      },
+      "batch_runs": {
+        "5": {
+          "provider": "mock",
+          "batch_size": 5,
+          "total_posts": 65,
+          "evaluated_ok": 65,
+          "ai_failed_count": 0,
+          "match_tp": 20,
+          "match_fp": 0,
+          "match_fn": 0,
+          "match_tn": 45,
+          "match_precision": 1.0,
+          "match_recall": 1.0,
+          "match_f1": 1.0,
+          "peer_precision": 1.0,
+          "peer_recall": 0.95,
+          "field_stats": {
+            "area": {
+              "field_key": "area",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "bedrooms": {
+              "field_key": "bedrooms",
+              "required": false,
+              "total_labeled": 18,
+              "exact_matches": 18,
+              "accuracy": 1.0
+            },
+            "deal_type": {
+              "field_key": "deal_type",
+              "required": true,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            },
+            "location": {
+              "field_key": "location",
+              "required": true,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 19,
+              "exact_matches": 18,
+              "accuracy": 0.9473684210526315
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 20,
+              "exact_matches": 20,
+              "accuracy": 1.0
+            },
+            "property_type": {
+              "field_key": "property_type",
+              "required": false,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            }
+          },
+          "total_non_null_extractions": 316,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 13,
+          "avg_input_tokens_per_post": 263.18461538461537,
+          "avg_output_tokens_per_post": 224.27692307692308,
+          "avg_duration_ms_per_post": 18.46153846153846,
+          "total_cost_usd": 0.0
+        },
+        "10": {
+          "provider": "mock",
+          "batch_size": 10,
+          "total_posts": 65,
+          "evaluated_ok": 65,
+          "ai_failed_count": 0,
+          "match_tp": 20,
+          "match_fp": 0,
+          "match_fn": 0,
+          "match_tn": 45,
+          "match_precision": 1.0,
+          "match_recall": 1.0,
+          "match_f1": 1.0,
+          "peer_precision": 1.0,
+          "peer_recall": 0.95,
+          "field_stats": {
+            "area": {
+              "field_key": "area",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "bedrooms": {
+              "field_key": "bedrooms",
+              "required": false,
+              "total_labeled": 18,
+              "exact_matches": 18,
+              "accuracy": 1.0
+            },
+            "deal_type": {
+              "field_key": "deal_type",
+              "required": true,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            },
+            "location": {
+              "field_key": "location",
+              "required": true,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 19,
+              "exact_matches": 18,
+              "accuracy": 0.9473684210526315
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 20,
+              "exact_matches": 20,
+              "accuracy": 1.0
+            },
+            "property_type": {
+              "field_key": "property_type",
+              "required": false,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            }
+          },
+          "total_non_null_extractions": 316,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 7,
+          "avg_input_tokens_per_post": 187.7846153846154,
+          "avg_output_tokens_per_post": 224.0,
+          "avg_duration_ms_per_post": 18.384615384615383,
+          "total_cost_usd": 0.0
+        },
+        "20": {
+          "provider": "mock",
+          "batch_size": 20,
+          "total_posts": 65,
+          "evaluated_ok": 65,
+          "ai_failed_count": 0,
+          "match_tp": 20,
+          "match_fp": 0,
+          "match_fn": 0,
+          "match_tn": 45,
+          "match_precision": 1.0,
+          "match_recall": 1.0,
+          "match_f1": 1.0,
+          "peer_precision": 1.0,
+          "peer_recall": 0.95,
+          "field_stats": {
+            "area": {
+              "field_key": "area",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "bedrooms": {
+              "field_key": "bedrooms",
+              "required": false,
+              "total_labeled": 18,
+              "exact_matches": 18,
+              "accuracy": 1.0
+            },
+            "deal_type": {
+              "field_key": "deal_type",
+              "required": true,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            },
+            "location": {
+              "field_key": "location",
+              "required": true,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 19,
+              "exact_matches": 18,
+              "accuracy": 0.9473684210526315
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 20,
+              "exact_matches": 20,
+              "accuracy": 1.0
+            },
+            "property_type": {
+              "field_key": "property_type",
+              "required": false,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            }
+          },
+          "total_non_null_extractions": 316,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 4,
+          "avg_input_tokens_per_post": 150.06153846153848,
+          "avg_output_tokens_per_post": 223.86153846153846,
+          "avg_duration_ms_per_post": 18.6,
+          "total_cost_usd": 0.0
+        },
+        "40": {
+          "provider": "mock",
+          "batch_size": 40,
+          "total_posts": 65,
+          "evaluated_ok": 65,
+          "ai_failed_count": 0,
+          "match_tp": 20,
+          "match_fp": 0,
+          "match_fn": 0,
+          "match_tn": 45,
+          "match_precision": 1.0,
+          "match_recall": 1.0,
+          "match_f1": 1.0,
+          "peer_precision": 1.0,
+          "peer_recall": 0.95,
+          "field_stats": {
+            "area": {
+              "field_key": "area",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "bedrooms": {
+              "field_key": "bedrooms",
+              "required": false,
+              "total_labeled": 18,
+              "exact_matches": 18,
+              "accuracy": 1.0
+            },
+            "deal_type": {
+              "field_key": "deal_type",
+              "required": true,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            },
+            "location": {
+              "field_key": "location",
+              "required": true,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 19,
+              "exact_matches": 18,
+              "accuracy": 0.9473684210526315
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 20,
+              "exact_matches": 20,
+              "accuracy": 1.0
+            },
+            "property_type": {
+              "field_key": "property_type",
+              "required": false,
+              "total_labeled": 20,
+              "exact_matches": 19,
+              "accuracy": 0.95
+            }
+          },
+          "total_non_null_extractions": 316,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 2,
+          "avg_input_tokens_per_post": 124.92307692307692,
+          "avg_output_tokens_per_post": 223.7846153846154,
+          "avg_duration_ms_per_post": 18.215384615384615,
+          "total_cost_usd": 0.0
+        }
+      }
+    },
+    "dich-vu": {
+      "dataset": "docs/eval/golden/dich-vu.jsonl",
+      "radar": "docs/eval/golden/dich-vu.radar.json",
+      "radar_version_id": "01JCFEVALDICHVUGOLDENV1",
+      "industry": "Dịch vụ nhà cửa",
+      "want_intent": "demand",
+      "corpus_counts": {
+        "total": 45,
+        "positive_matches": 14,
+        "disguised_peers": 12,
+        "other_negatives": 19
+      },
+      "batch_runs": {
+        "5": {
+          "provider": "mock",
+          "batch_size": 5,
+          "total_posts": 45,
+          "evaluated_ok": 45,
+          "ai_failed_count": 0,
+          "match_tp": 13,
+          "match_fp": 0,
+          "match_fn": 1,
+          "match_tn": 31,
+          "match_precision": 1.0,
+          "match_recall": 0.9285714285714286,
+          "match_f1": 0.962962962962963,
+          "peer_precision": 1.0,
+          "peer_recall": 0.9166666666666666,
+          "field_stats": {
+            "budget": {
+              "field_key": "budget",
+              "required": false,
+              "total_labeled": 5,
+              "exact_matches": 5,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "service_type": {
+              "field_key": "service_type",
+              "required": true,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "urgent": {
+              "field_key": "urgent",
+              "required": false,
+              "total_labeled": 5,
+              "exact_matches": 5,
+              "accuracy": 1.0
+            }
+          },
+          "total_non_null_extractions": 122,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 9,
+          "avg_input_tokens_per_post": 246.88888888888889,
+          "avg_output_tokens_per_post": 185.04444444444445,
+          "avg_duration_ms_per_post": 12.11111111111111,
+          "total_cost_usd": 0.0
+        },
+        "10": {
+          "provider": "mock",
+          "batch_size": 10,
+          "total_posts": 45,
+          "evaluated_ok": 45,
+          "ai_failed_count": 0,
+          "match_tp": 13,
+          "match_fp": 0,
+          "match_fn": 1,
+          "match_tn": 31,
+          "match_precision": 1.0,
+          "match_recall": 0.9285714285714286,
+          "match_f1": 0.962962962962963,
+          "peer_precision": 1.0,
+          "peer_recall": 0.9166666666666666,
+          "field_stats": {
+            "budget": {
+              "field_key": "budget",
+              "required": false,
+              "total_labeled": 5,
+              "exact_matches": 5,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "service_type": {
+              "field_key": "service_type",
+              "required": true,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "urgent": {
+              "field_key": "urgent",
+              "required": false,
+              "total_labeled": 5,
+              "exact_matches": 5,
+              "accuracy": 1.0
+            }
+          },
+          "total_non_null_extractions": 122,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 5,
+          "avg_input_tokens_per_post": 176.8,
+          "avg_output_tokens_per_post": 184.8,
+          "avg_duration_ms_per_post": 12.088888888888889,
+          "total_cost_usd": 0.0
+        },
+        "20": {
+          "provider": "mock",
+          "batch_size": 20,
+          "total_posts": 45,
+          "evaluated_ok": 45,
+          "ai_failed_count": 0,
+          "match_tp": 13,
+          "match_fp": 0,
+          "match_fn": 1,
+          "match_tn": 31,
+          "match_precision": 1.0,
+          "match_recall": 0.9285714285714286,
+          "match_f1": 0.962962962962963,
+          "peer_precision": 1.0,
+          "peer_recall": 0.9166666666666666,
+          "field_stats": {
+            "budget": {
+              "field_key": "budget",
+              "required": false,
+              "total_labeled": 5,
+              "exact_matches": 5,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "service_type": {
+              "field_key": "service_type",
+              "required": true,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "urgent": {
+              "field_key": "urgent",
+              "required": false,
+              "total_labeled": 5,
+              "exact_matches": 5,
+              "accuracy": 1.0
+            }
+          },
+          "total_non_null_extractions": 122,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 3,
+          "avg_input_tokens_per_post": 141.77777777777777,
+          "avg_output_tokens_per_post": 184.6888888888889,
+          "avg_duration_ms_per_post": 11.88888888888889,
+          "total_cost_usd": 0.0
+        },
+        "40": {
+          "provider": "mock",
+          "batch_size": 40,
+          "total_posts": 45,
+          "evaluated_ok": 45,
+          "ai_failed_count": 0,
+          "match_tp": 13,
+          "match_fp": 0,
+          "match_fn": 1,
+          "match_tn": 31,
+          "match_precision": 1.0,
+          "match_recall": 0.9285714285714286,
+          "match_f1": 0.962962962962963,
+          "peer_precision": 1.0,
+          "peer_recall": 0.9166666666666666,
+          "field_stats": {
+            "budget": {
+              "field_key": "budget",
+              "required": false,
+              "total_labeled": 5,
+              "exact_matches": 5,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "service_type": {
+              "field_key": "service_type",
+              "required": true,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "urgent": {
+              "field_key": "urgent",
+              "required": false,
+              "total_labeled": 5,
+              "exact_matches": 5,
+              "accuracy": 1.0
+            }
+          },
+          "total_non_null_extractions": 122,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 2,
+          "avg_input_tokens_per_post": 124.24444444444444,
+          "avg_output_tokens_per_post": 184.6,
+          "avg_duration_ms_per_post": 12.28888888888889,
+          "total_cost_usd": 0.0
+        }
+      }
+    },
+    "xe-cu": {
+      "dataset": "docs/eval/golden/xe-cu.jsonl",
+      "radar": "docs/eval/golden/xe-cu.radar.json",
+      "radar_version_id": "01JCFEVALXECUGOLDENV1",
+      "industry": "Xe và đồ cũ",
+      "want_intent": "supply",
+      "corpus_counts": {
+        "total": 45,
+        "positive_matches": 14,
+        "disguised_peers": 12,
+        "other_negatives": 19
+      },
+      "batch_runs": {
+        "5": {
+          "provider": "mock",
+          "batch_size": 5,
+          "total_posts": 45,
+          "evaluated_ok": 45,
+          "ai_failed_count": 0,
+          "match_tp": 14,
+          "match_fp": 0,
+          "match_fn": 0,
+          "match_tn": 31,
+          "match_precision": 1.0,
+          "match_recall": 1.0,
+          "match_f1": 1.0,
+          "peer_precision": 1.0,
+          "peer_recall": 0.9166666666666666,
+          "field_stats": {
+            "brand": {
+              "field_key": "brand",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "chinh_chu": {
+              "field_key": "chinh_chu",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 13,
+              "accuracy": 0.9285714285714286
+            },
+            "model": {
+              "field_key": "model",
+              "required": true,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "year": {
+              "field_key": "year",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 12,
+              "accuracy": 0.8571428571428571
+            }
+          },
+          "total_non_null_extractions": 213,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 9,
+          "avg_input_tokens_per_post": 251.3111111111111,
+          "avg_output_tokens_per_post": 212.75555555555556,
+          "avg_duration_ms_per_post": 14.222222222222221,
+          "total_cost_usd": 0.0
+        },
+        "10": {
+          "provider": "mock",
+          "batch_size": 10,
+          "total_posts": 45,
+          "evaluated_ok": 45,
+          "ai_failed_count": 0,
+          "match_tp": 14,
+          "match_fp": 0,
+          "match_fn": 0,
+          "match_tn": 31,
+          "match_precision": 1.0,
+          "match_recall": 1.0,
+          "match_f1": 1.0,
+          "peer_precision": 1.0,
+          "peer_recall": 0.9166666666666666,
+          "field_stats": {
+            "brand": {
+              "field_key": "brand",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "chinh_chu": {
+              "field_key": "chinh_chu",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 13,
+              "accuracy": 0.9285714285714286
+            },
+            "model": {
+              "field_key": "model",
+              "required": true,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "year": {
+              "field_key": "year",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 12,
+              "accuracy": 0.8571428571428571
+            }
+          },
+          "total_non_null_extractions": 213,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 5,
+          "avg_input_tokens_per_post": 179.9111111111111,
+          "avg_output_tokens_per_post": 212.48888888888888,
+          "avg_duration_ms_per_post": 13.866666666666667,
+          "total_cost_usd": 0.0
+        },
+        "20": {
+          "provider": "mock",
+          "batch_size": 20,
+          "total_posts": 45,
+          "evaluated_ok": 45,
+          "ai_failed_count": 0,
+          "match_tp": 14,
+          "match_fp": 0,
+          "match_fn": 0,
+          "match_tn": 31,
+          "match_precision": 1.0,
+          "match_recall": 1.0,
+          "match_f1": 1.0,
+          "peer_precision": 1.0,
+          "peer_recall": 0.9166666666666666,
+          "field_stats": {
+            "brand": {
+              "field_key": "brand",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "chinh_chu": {
+              "field_key": "chinh_chu",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 13,
+              "accuracy": 0.9285714285714286
+            },
+            "model": {
+              "field_key": "model",
+              "required": true,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "year": {
+              "field_key": "year",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 12,
+              "accuracy": 0.8571428571428571
+            }
+          },
+          "total_non_null_extractions": 213,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 3,
+          "avg_input_tokens_per_post": 144.2,
+          "avg_output_tokens_per_post": 212.35555555555555,
+          "avg_duration_ms_per_post": 13.755555555555556,
+          "total_cost_usd": 0.0
+        },
+        "40": {
+          "provider": "mock",
+          "batch_size": 40,
+          "total_posts": 45,
+          "evaluated_ok": 45,
+          "ai_failed_count": 0,
+          "match_tp": 14,
+          "match_fp": 0,
+          "match_fn": 0,
+          "match_tn": 31,
+          "match_precision": 1.0,
+          "match_recall": 1.0,
+          "match_f1": 1.0,
+          "peer_precision": 1.0,
+          "peer_recall": 0.9166666666666666,
+          "field_stats": {
+            "brand": {
+              "field_key": "brand",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "chinh_chu": {
+              "field_key": "chinh_chu",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 13,
+              "accuracy": 0.9285714285714286
+            },
+            "model": {
+              "field_key": "model",
+              "required": true,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 13,
+              "exact_matches": 13,
+              "accuracy": 1.0
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 14,
+              "accuracy": 1.0
+            },
+            "year": {
+              "field_key": "year",
+              "required": false,
+              "total_labeled": 14,
+              "exact_matches": 12,
+              "accuracy": 0.8571428571428571
+            }
+          },
+          "total_non_null_extractions": 213,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 2,
+          "avg_input_tokens_per_post": 126.37777777777778,
+          "avg_output_tokens_per_post": 212.3111111111111,
+          "avg_duration_ms_per_post": 13.777777777777779,
+          "total_cost_usd": 0.0
+        }
+      }
+    },
+    "multilingual": {
+      "dataset": "docs/eval/golden/multilingual.jsonl",
+      "radar": "docs/eval/golden/multilingual.radar.json",
+      "radar_version_id": "01JCFEVALMULTIGOLDENV1",
+      "industry": "Bất động sản (Đa ngôn ngữ / Expat)",
+      "want_intent": "demand",
+      "corpus_counts": {
+        "total": 30,
+        "positive_matches": 10,
+        "disguised_peers": 9,
+        "other_negatives": 11
+      },
+      "batch_runs": {
+        "5": {
+          "provider": "mock",
+          "batch_size": 5,
+          "total_posts": 30,
+          "evaluated_ok": 30,
+          "ai_failed_count": 0,
+          "match_tp": 9,
+          "match_fp": 0,
+          "match_fn": 1,
+          "match_tn": 20,
+          "match_precision": 1.0,
+          "match_recall": 0.9,
+          "match_f1": 0.9473684210526316,
+          "peer_precision": 1.0,
+          "peer_recall": 0.8888888888888888,
+          "field_stats": {
+            "area": {
+              "field_key": "area",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "bedrooms": {
+              "field_key": "bedrooms",
+              "required": false,
+              "total_labeled": 9,
+              "exact_matches": 9,
+              "accuracy": 1.0
+            },
+            "deal_type": {
+              "field_key": "deal_type",
+              "required": true,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": true,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 9,
+              "accuracy": 0.9
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "property_type": {
+              "field_key": "property_type",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            }
+          },
+          "total_non_null_extractions": 132,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 6,
+          "avg_input_tokens_per_post": 249.3,
+          "avg_output_tokens_per_post": 216.73333333333332,
+          "avg_duration_ms_per_post": 20.133333333333333,
+          "total_cost_usd": 0.0
+        },
+        "10": {
+          "provider": "mock",
+          "batch_size": 10,
+          "total_posts": 30,
+          "evaluated_ok": 30,
+          "ai_failed_count": 0,
+          "match_tp": 9,
+          "match_fp": 0,
+          "match_fn": 1,
+          "match_tn": 20,
+          "match_precision": 1.0,
+          "match_recall": 0.9,
+          "match_f1": 0.9473684210526316,
+          "peer_precision": 1.0,
+          "peer_recall": 0.8888888888888888,
+          "field_stats": {
+            "area": {
+              "field_key": "area",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "bedrooms": {
+              "field_key": "bedrooms",
+              "required": false,
+              "total_labeled": 9,
+              "exact_matches": 9,
+              "accuracy": 1.0
+            },
+            "deal_type": {
+              "field_key": "deal_type",
+              "required": true,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": true,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 9,
+              "accuracy": 0.9
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "property_type": {
+              "field_key": "property_type",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            }
+          },
+          "total_non_null_extractions": 132,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 3,
+          "avg_input_tokens_per_post": 170.43333333333334,
+          "avg_output_tokens_per_post": 216.43333333333334,
+          "avg_duration_ms_per_post": 20.0,
+          "total_cost_usd": 0.0
+        },
+        "20": {
+          "provider": "mock",
+          "batch_size": 20,
+          "total_posts": 30,
+          "evaluated_ok": 30,
+          "ai_failed_count": 0,
+          "match_tp": 9,
+          "match_fp": 0,
+          "match_fn": 1,
+          "match_tn": 20,
+          "match_precision": 1.0,
+          "match_recall": 0.9,
+          "match_f1": 0.9473684210526316,
+          "peer_precision": 1.0,
+          "peer_recall": 0.8888888888888888,
+          "field_stats": {
+            "area": {
+              "field_key": "area",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "bedrooms": {
+              "field_key": "bedrooms",
+              "required": false,
+              "total_labeled": 9,
+              "exact_matches": 9,
+              "accuracy": 1.0
+            },
+            "deal_type": {
+              "field_key": "deal_type",
+              "required": true,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": true,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 9,
+              "accuracy": 0.9
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "property_type": {
+              "field_key": "property_type",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            }
+          },
+          "total_non_null_extractions": 132,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 2,
+          "avg_input_tokens_per_post": 144.1,
+          "avg_output_tokens_per_post": 216.33333333333334,
+          "avg_duration_ms_per_post": 19.866666666666667,
+          "total_cost_usd": 0.0
+        },
+        "40": {
+          "provider": "mock",
+          "batch_size": 40,
+          "total_posts": 30,
+          "evaluated_ok": 30,
+          "ai_failed_count": 0,
+          "match_tp": 9,
+          "match_fp": 0,
+          "match_fn": 1,
+          "match_tn": 20,
+          "match_precision": 1.0,
+          "match_recall": 0.9,
+          "match_f1": 0.9473684210526316,
+          "peer_precision": 1.0,
+          "peer_recall": 0.8888888888888888,
+          "field_stats": {
+            "area": {
+              "field_key": "area",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "bedrooms": {
+              "field_key": "bedrooms",
+              "required": false,
+              "total_labeled": 9,
+              "exact_matches": 9,
+              "accuracy": 1.0
+            },
+            "deal_type": {
+              "field_key": "deal_type",
+              "required": true,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "location": {
+              "field_key": "location",
+              "required": true,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "phone": {
+              "field_key": "phone",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 9,
+              "accuracy": 0.9
+            },
+            "price": {
+              "field_key": "price",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            },
+            "property_type": {
+              "field_key": "property_type",
+              "required": false,
+              "total_labeled": 10,
+              "exact_matches": 10,
+              "accuracy": 1.0
+            }
+          },
+          "total_non_null_extractions": 132,
+          "hallucinated_raw_count": 0,
+          "hallucinated_raw_rate": 0.0,
+          "total_calls": 1,
+          "avg_input_tokens_per_post": 117.83333333333333,
+          "avg_output_tokens_per_post": 216.23333333333332,
+          "avg_duration_ms_per_post": 19.7,
+          "total_cost_usd": 0.0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "radar_version_id": "01JCFEVALBDSGOLDENV1",
+  "id": "bds.khach-thue-mua.golden",
+  "industry": "Bất động sản",
+  "name": "Khách thực cần thuê/mua nhà đất (Golden Eval v1)",
+  "description": "Khách cá nhân đang cần thuê hoặc cần mua căn hộ chung cư, nhà nguyên căn, phòng trọ tại Hà Nội, TP.HCM và Đà Nẵng (loại trừ môi giới đăng tìm nguồn/câu khách và tin chính chủ bán/cho thuê)",
+  "user_profession": "môi giới bất động sản",
+  "language_hint": "vi",
+  "want_intent": "demand",
+  "exclude_roles": [
+    "peer"
+  ],
+  "match_policy": {
+    "want_intent": "demand",
+    "exclude_roles": [
+      "peer"
+    ],
+    "hard_filters": []
+  },
+  "seed_ruleset": "bds-vi-v1",
+  "fields": [
+    {
+      "key": "deal_type",
+      "label": "Loại giao dịch",
+      "type": "enum",
+      "description": "Khách muốn thuê (rent) hay mua (buy) bất động sản",
+      "required": true,
+      "options": [
+        "rent",
+        "buy"
+      ],
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "property_type",
+      "label": "Loại hình BĐS",
+      "type": "enum",
+      "description": "Loại hình bất động sản khách đang tìm",
+      "required": false,
+      "options": [
+        "apartment",
+        "house",
+        "room",
+        "commercial",
+        "land"
+      ],
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Tỉnh/thành và quận/huyện khách muốn tìm",
+      "required": true,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "price",
+      "label": "Ngân sách",
+      "type": "money",
+      "description": "Ngân sách thuê hoặc mua khách nêu trong bài",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "area",
+      "label": "Diện tích",
+      "type": "range",
+      "description": "Khoảng diện tích mong muốn (m2)",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    },
+    {
+      "key": "bedrooms",
+      "label": "Số phòng ngủ",
+      "type": "number",
+      "description": "Số phòng ngủ yêu cầu",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 6
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại liên hệ của khách chuẩn E.164",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 7
+    }
+  ],
+  "feedback_examples": []
+}
