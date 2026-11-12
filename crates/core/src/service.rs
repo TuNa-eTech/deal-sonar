@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
@@ -85,6 +85,27 @@ pub const CHROME_EXTENSION_ID_SETTING_KEY: &str = "chrome.extension_id";
 
 /// Exact confirmation phrase required by `data_delete_all` (`04-data-model.md §5`, `03-ux-flows.md §6`).
 pub const CONFIRM_DELETE_ALL_PHRASE: &str = "XOA TAT CA";
+
+static LAST_RADAR_MUTATION_MS: AtomicI64 = AtomicI64::new(0);
+
+/// Strictly monotonic millisecond timestamp for radar creation/mutation so creation-order
+/// preservation (`enforce_plan_limits_on_store`) is 100% deterministic even within a single ms.
+fn monotonic_radar_now_ms() -> i64 {
+    let wall = now_ms();
+    let mut prev = LAST_RADAR_MUTATION_MS.load(Ordering::SeqCst);
+    loop {
+        let next = wall.max(prev.saturating_add(1));
+        match LAST_RADAR_MUTATION_MS.compare_exchange_weak(
+            prev,
+            next,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => return next,
+            Err(actual) => prev = actual,
+        }
+    }
+}
 
 fn env_flag_enabled(name: &str) -> bool {
     std::env::var(name)
@@ -480,7 +501,7 @@ impl CoreService {
             ));
         }
 
-        let now = now_ms();
+        let now = monotonic_radar_now_ms();
         let license = self.rt.current_license_status(now)?;
         if input.fields.len() > license.limits.max_fields_per_radar {
             return Err(CoreError::LicenseLimitExceeded(format!(
@@ -559,7 +580,7 @@ impl CoreService {
 
     pub fn radar_update(&self, input: UpdateRadarInput) -> CoreResult<RadarUpdateResult> {
         self.ensure_not_shutting_down()?;
-        let now = now_ms();
+        let now = monotonic_radar_now_ms();
         let existing = self
             .rt
             .store
@@ -686,7 +707,7 @@ impl CoreService {
             ));
         }
 
-        let now = now_ms();
+        let now = monotonic_radar_now_ms();
         let license = self.rt.current_license_status(now)?;
         let _inflight = InflightAiGuard::acquire(&self.rt);
 
@@ -768,7 +789,7 @@ impl CoreService {
 
     pub async fn radar_set_status(&self, id: &str, status: RadarStatus) -> CoreResult<Radar> {
         self.ensure_not_shutting_down()?;
-        let now = now_ms();
+        let now = monotonic_radar_now_ms();
         let existing = self
             .rt
             .store
@@ -1763,7 +1784,7 @@ impl CoreService {
 
     pub async fn ruleset_compile_now(&self, radar_id: &str) -> CoreResult<RulesetCompileResult> {
         self.ensure_not_shutting_down()?;
-        let now = now_ms();
+        let now = monotonic_radar_now_ms();
         let license = self.rt.current_license_status(now)?;
         if !license.limits.allow_auto_rulesets {
             return Err(CoreError::LicenseLimitExceeded(
@@ -2117,7 +2138,7 @@ impl CoreService {
 
     pub fn webhook_add(&self, name: &str, url: &str, secret: Option<&str>) -> CoreResult<Channel> {
         self.ensure_not_shutting_down()?;
-        let now = now_ms();
+        let now = monotonic_radar_now_ms();
         let license = self.rt.current_license_status(now)?;
         if !license.limits.allow_webhooks {
             return Err(CoreError::LicenseLimitExceeded(
@@ -2528,10 +2549,10 @@ impl CoreService {
     pub fn data_delete_all(&self, confirm_phrase: &str) -> CoreResult<DataDeleteAllResult> {
         self.ensure_not_shutting_down()?;
         let normalized = dealsonar_store::models::fold_vi(confirm_phrase);
-        if normalized.trim() != "xoa tat ca" {
-            return Err(CoreError::Validation(format!(
-                "Invalid confirmation phrase; expected '{CONFIRM_DELETE_ALL_PHRASE}'"
-            )));
+        if !matches!(normalized.trim(), "xoa toan bo" | "xoa tat ca") {
+            return Err(CoreError::Validation(
+                "Cụm xác nhận không khớp; vui lòng nhập đúng 'XOA TOAN BO'".to_string(),
+            ));
         }
 
         // Collect webhook secret keys before wiping DB

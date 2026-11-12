@@ -15,7 +15,7 @@ pub mod tray;
 use std::sync::Arc;
 
 use dealsonar_core::{CoreEvent, OsNotification, OsNotificationHook};
-use tauri::{Emitter, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as AutostartManagerExt};
 use tauri_plugin_notification::NotificationExt;
 use tokio::sync::broadcast::error::RecvError;
@@ -26,20 +26,19 @@ use crate::state::{
     DesktopState,
 };
 use crate::tray::{
-    format_tray_status_label, setup_system_tray, show_and_focus_main_window, MAIN_WINDOW_LABEL,
+    format_tray_status_label, setup_system_tray, show_and_focus_main_window, ExitCoordinator,
+    MAIN_WINDOW_LABEL,
 };
 
 /// Launches the Tauri v2 DealSonar desktop application (`03-desktop.md`).
 pub fn run() {
     let start_minimized = is_minimized_startup(std::env::args());
-    let data_dir = resolve_data_dir();
-    let native_host_bin = resolve_native_host_binary_path();
-
-    let state = DesktopState::open_production(data_dir, native_host_bin, None)
-        .expect("failed to initialize DealSonar desktop core service");
+    let exit_coord = ExitCoordinator::new();
+    let exit_coord_for_setup = exit_coord.clone();
 
     let builder = tauri::Builder::default()
-        // 1. Single-instance lock (`03-desktop.md §2`): focus & un-hide existing window on 2nd launch
+        // 1. Single-instance lock (`03-desktop.md §2` Step 1): runs BEFORE `.setup(...)`,
+        //    so a 2nd launch focuses the existing window and exits `0` before touching SQLite or `ipc.sock`.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_and_focus_main_window(app);
         }))
@@ -50,7 +49,6 @@ pub fn run() {
         ))
         // 3. Native OS notifications (`07-notifications-export.md §4`)
         .plugin(tauri_plugin_notification::init())
-        .manage(state.clone())
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
@@ -72,7 +70,14 @@ pub fn run() {
                     );
                 }
             });
-            state.core().set_os_notification_hook(Some(os_hook));
+
+            // Initialize `DesktopState` (`CoreService`, rotating logs, SQLite WAL, IPC socket, manifest refresh)
+            // inside `.setup(...)` so secondary instances never contend on `dealsonar.db` or `ipc.sock`.
+            let data_dir = resolve_data_dir();
+            let native_host_bin = resolve_native_host_binary_path();
+            let state = DesktopState::open_production(data_dir, native_host_bin, Some(os_hook))
+                .map_err(|err| Box::<dyn std::error::Error>::from(err.to_string()))?;
+            app.manage(state.clone());
 
             // Wire autostart sync hook (`03-desktop.md §2.5`)
             let autostart_app = app_handle.clone();
@@ -121,7 +126,8 @@ pub fn run() {
             }
 
             // Set up Vietnamese System Tray (`03-desktop.md §2`)
-            let status_menu_item = setup_system_tray(&app_handle, state.clone())?;
+            let status_menu_item =
+                setup_system_tray(&app_handle, state.clone(), exit_coord_for_setup)?;
 
             // Forward all 6 `CoreEvent` variants to WebView & update tray status on `HealthChanged`
             let mut event_rx = state.core().subscribe_events();
@@ -212,7 +218,19 @@ pub fn run() {
             commands::open_external_url,
         ]);
 
-    builder
-        .run(tauri::generate_context!())
-        .expect("error while running DealSonar Tauri application");
+    let app = builder
+        .build(tauri::generate_context!())
+        .expect("error while building DealSonar Tauri application");
+
+    app.run(move |app_handle, event| {
+        if let RunEvent::ExitRequested { api, code, .. } = event {
+            if code.is_none()
+                && !exit_coord.should_allow_exit()
+                && app_handle.try_state::<DesktopState>().is_some()
+            {
+                api.prevent_exit();
+                exit_coord.trigger_graceful_exit(app_handle.clone());
+            }
+        }
+    });
 }

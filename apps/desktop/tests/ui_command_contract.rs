@@ -1034,16 +1034,25 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
     let ok_del = invoke_command_json(
         &state_v2,
         "data_delete_all",
-        json!({ "confirm_phrase": "XÓA TẤT CẢ" }),
+        json!({ "confirm_phrase": "XOA TOAN BO" }),
     )
     .await
-    .expect("data_delete_all with Vietnamese phrase");
+    .expect("data_delete_all with exact UI phrase 'XOA TOAN BO'");
     assert_eq!(ok_del["deleted"], json!(true));
 
     let radars_after_wipe = invoke_command_json(&state_v2, "radar_list", json!({}))
         .await
         .expect("radar_list after wipe");
     assert!(radars_after_wipe.as_array().unwrap().is_empty());
+
+    let ok_del_legacy = invoke_command_json(
+        &state_v2,
+        "data_delete_all",
+        json!({ "confirm_phrase": "XÓA TẤT CẢ" }),
+    )
+    .await
+    .expect("data_delete_all also accepts 'XÓA TẤT CẢ'");
+    assert_eq!(ok_del_legacy["deleted"], json!(true));
 
     state_v2.shutdown().await.expect("graceful shutdown v2");
     tg_server.abort();

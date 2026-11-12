@@ -9,6 +9,7 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
@@ -70,7 +71,12 @@ pub fn init_logging(logs_dir: &Path) -> io::Result<WorkerGuard> {
     fs::create_dir_all(logs_dir)?;
     let _ = prune_old_logs(logs_dir, LOG_RETENTION_DAYS);
 
-    let file_appender = tracing_appender::rolling::daily(logs_dir, LOG_FILE_PREFIX);
+    let file_appender = RollingFileAppender::builder()
+        .rotation(Rotation::DAILY)
+        .filename_prefix(LOG_FILE_PREFIX)
+        .max_log_files(LOG_RETENTION_DAYS as usize)
+        .build(logs_dir)
+        .map_err(|err| io::Error::other(err.to_string()))?;
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     let env_filter = EnvFilter::try_from_env("DEALSONAR_LOG")

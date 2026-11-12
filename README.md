@@ -106,13 +106,12 @@ Startup flags supported by the `dealsonar` binary:
 
 1. Build the extension (`pnpm ext:build`) and open `chrome://extensions` in Google Chrome / Brave / Edge.
 2. Enable **Developer mode**, click **Load unpacked**, and select `apps/extension/dist`.
-3. Copy the 32-character **Extension ID** shown on the card.
-4. In the DealSonar Desktop App, open **Cài đặt → Kết nối Chrome** (or Onboarding Step 2), paste the Extension ID, and click **Kết nối Chrome**.
-   - DealSonar automatically writes `com.dealsonar.host.json` pointing to `dealsonar-native-host` and refreshes it on future app updates if the binary path moves.
-   - Alternatively, from a terminal during development:
-     ```bash
-     ./scripts/install-native-host-dev.sh <YOUR_32_CHAR_EXTENSION_ID>
-     ```
+3. Copy the 32-character **Extension ID** shown on the card and register the Native Messaging Host manifest for that unpacked ID:
+   ```bash
+   ./scripts/install-native-host-dev.sh <YOUR_32_CHAR_EXTENSION_ID>
+   ```
+4. In the DealSonar Desktop App, click **Kiểm tra lại** in **Onboarding — Bước 1: Kết nối Chrome Extension** (or verify connection status in **Sức khoẻ**).
+   - DealSonar preserves your paired `chrome-extension://<ID>/` origin in `com.dealsonar.host.json` and automatically refreshes the `dealsonar-native-host` binary path on future app updates (`refresh_native_host_manifest_if_paired`).
 
 ---
 

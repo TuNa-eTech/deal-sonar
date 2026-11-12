@@ -1,11 +1,66 @@
 //! Vietnamese System Tray menu, live status item & window visibility helpers (`03-desktop.md §2`).
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
 use dealsonar_core::dto::{AiHealthState, FacebookSessionState, HealthStatus};
 use tauri::menu::{MenuBuilder, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::state::DesktopState;
+
+/// Coordinates graceful shutdown (`DesktopState::shutdown`) across both the system tray
+/// `"Thoát DealSonar"` action and OS/Dock quit events (`RunEvent::ExitRequested` / `Cmd+Q`).
+#[derive(Clone, Default)]
+pub struct ExitCoordinator {
+    shutdown_started: Arc<AtomicBool>,
+    allow_immediate_exit: Arc<AtomicBool>,
+}
+
+impl ExitCoordinator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns `true` once `DesktopState::shutdown()` has completed and the event loop
+    /// may exit immediately without interception.
+    pub fn should_allow_exit(&self) -> bool {
+        self.allow_immediate_exit.load(Ordering::SeqCst)
+    }
+
+    /// Marks graceful shutdown as started; returns `true` only on the first call so
+    /// concurrent quit signals never spawn duplicate shutdown tasks.
+    pub fn begin_shutdown_once(&self) -> bool {
+        !self.shutdown_started.swap(true, Ordering::SeqCst)
+    }
+
+    /// Marks graceful shutdown as finished so the subsequent `app.exit(0)` proceeds cleanly.
+    pub fn mark_shutdown_complete(&self) {
+        self.allow_immediate_exit.store(true, Ordering::SeqCst);
+    }
+
+    /// Runs `DesktopState::shutdown().await` once (waiting up to 10s for in-flight AI calls,
+    /// closing IPC & flushing logs) before calling `app_handle.exit(0)`.
+    pub fn trigger_graceful_exit<R: Runtime>(&self, app_handle: AppHandle<R>) {
+        if !self.begin_shutdown_once() {
+            return;
+        }
+        let coord = self.clone();
+        let state_opt = app_handle
+            .try_state::<DesktopState>()
+            .map(|s| s.inner().clone());
+        tauri::async_runtime::spawn(async move {
+            if let Some(state) = state_opt {
+                if let Err(err) = state.shutdown().await {
+                    tracing::warn!(error = %err, "error during graceful shutdown");
+                }
+            }
+            coord.mark_shutdown_complete();
+            app_handle.exit(0);
+        });
+    }
+}
 
 pub const MAIN_WINDOW_LABEL: &str = "main";
 pub const TRAY_ID: &str = "dealsonar-tray";
@@ -55,6 +110,7 @@ pub fn show_and_focus_main_window<R: Runtime>(app: &AppHandle<R>) {
 pub fn setup_system_tray<R: Runtime>(
     app: &AppHandle<R>,
     state: DesktopState,
+    exit_coord: ExitCoordinator,
 ) -> tauri::Result<MenuItem<R>> {
     let initial_status = state
         .core()
@@ -104,14 +160,7 @@ pub fn setup_system_tray<R: Runtime>(
                 }
             },
             MENU_ID_QUIT => {
-                let app_for_quit = app_handle.clone();
-                let state_for_quit = state_for_menu.clone();
-                tauri::async_runtime::spawn(async move {
-                    if let Err(err) = state_for_quit.shutdown().await {
-                        tracing::warn!(error = %err, "error during graceful shutdown");
-                    }
-                    app_for_quit.exit(0);
-                });
+                exit_coord.trigger_graceful_exit(app_handle.clone());
             }
             _ => {}
         })
@@ -185,5 +234,19 @@ mod tests {
             format_tray_status_label(&h),
             "Trạng thái: Đang tạm dừng quét"
         );
+    }
+
+    #[test]
+    fn exit_coordinator_deduplicates_concurrent_quit_signals() {
+        let coord = ExitCoordinator::new();
+        assert!(!coord.should_allow_exit());
+        assert!(coord.begin_shutdown_once());
+        assert!(
+            !coord.begin_shutdown_once(),
+            "second quit signal must not start a duplicate shutdown"
+        );
+        assert!(!coord.should_allow_exit());
+        coord.mark_shutdown_complete();
+        assert!(coord.should_allow_exit());
     }
 }

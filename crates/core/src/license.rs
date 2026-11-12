@@ -340,10 +340,11 @@ pub fn enforce_plan_limits_on_store(
         return Ok(Vec::new());
     }
 
-    // Keep oldest active radars running (`created_at ASC, id ASC`); pause excess newest ones.
+    // Keep oldest active radars running (`created_at ASC, updated_at ASC, id ASC`); pause excess newest ones.
     active_radars.sort_by(|a, b| {
         a.created_at
             .cmp(&b.created_at)
+            .then_with(|| a.updated_at.cmp(&b.updated_at))
             .then_with(|| a.id.cmp(&b.id))
     });
 
