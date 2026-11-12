@@ -47,7 +47,7 @@ Các tệp trong `golden/` tương thích 100% với trình chạy `cargo run -p
 
 ## 3. Ngưỡng Nghiệm thu Giả thuyết H2 (`02-validation-plan.md §3.2`)
 
-Trình chạy `eval` tự động kiểm tra và trả mã thoát `0` khi đạt đồng thời tất cả các ngưỡng sau (trả mã thoát `2` nếu vi phạm bất kỳ ngưỡng nào):
+Trình chạy `eval` (`crates/ai-bridge/src/bin/eval.rs`) đối chiếu từng chỉ số với ngưỡng H2 dưới đây, in nhãn `[ĐẠT]` hoặc `[CHƯA ĐẠT]` trực tiếp trên từng dòng báo cáo (kèm xuất JSON đầy đủ của `EvalSummary` khi truyền cờ `--json`), trả mã thoát `0` khi hoàn tất lượt đánh giá và trả mã thoát `1` nếu có lỗi tham số CLI, lỗi đọc/phân tích tệp hoặc lỗi nhà cung cấp:
 
 | Chỉ số | Ngưỡng bắt buộc | Ý nghĩa nghiệp vụ |
 |---|---|---|
