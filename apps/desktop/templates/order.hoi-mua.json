@@ -1,0 +1,70 @@
+{
+  "id": "order.hoi-mua",
+  "industry": "Order, bán hàng",
+  "name": "Bài hỏi mua một loại sản phẩm",
+  "description_template": "Khách đang hỏi mua {sản phẩm}, số lượng {số lượng} tại {khu vực}",
+  "placeholders": [
+    { "key": "sản phẩm", "hint": "đồ mẹ và bé, bàn ghế văn phòng, quà Tết, mỹ phẩm chính hãng…" },
+    { "key": "số lượng", "hint": "lẻ 1–2 món, sỉ từ 20 chiếc…" },
+    { "key": "khu vực", "hint": "Hà Nội, TP.HCM, giao toàn quốc…" }
+  ],
+  "user_profession": "người bán hàng và nhận order",
+  "fields": [
+    {
+      "key": "product_name",
+      "label": "Sản phẩm",
+      "type": "text",
+      "description": "Tên mặt hàng hoặc mẫu mã khách đang tìm mua",
+      "required": true,
+      "options": null,
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "quantity",
+      "label": "Số lượng",
+      "type": "number",
+      "description": "Số lượng sản phẩm khách cần mua",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "budget",
+      "label": "Ngân sách",
+      "type": "money",
+      "description": "Tầm giá hoặc ngân sách khách sẵn sàng chi trả",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Địa điểm nhận hàng của khách",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại của người mua (nếu có)",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    }
+  ],
+  "match_policy": {
+    "want_intent": "demand",
+    "exclude_roles": ["peer"],
+    "hard_filters": []
+  },
+  "seed_ruleset": null
+}

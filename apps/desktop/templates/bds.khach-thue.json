@@ -1,0 +1,90 @@
+{
+  "id": "bds.khach-thue",
+  "industry": "Bất động sản",
+  "name": "Khách cần thuê/mua theo khu vực và tầm giá",
+  "description_template": "Người đang cần thuê hoặc mua {loại nhà} ở {khu vực}, ngân sách {tầm giá}",
+  "placeholders": [
+    { "key": "loại nhà", "hint": "căn hộ 2 phòng ngủ, nhà nguyên căn…" },
+    { "key": "khu vực", "hint": "Cầu Giấy, Thủ Đức…" },
+    { "key": "tầm giá", "hint": "dưới 15 triệu/tháng, 3–4 tỷ…" }
+  ],
+  "user_profession": "môi giới bất động sản",
+  "fields": [
+    {
+      "key": "deal_type",
+      "label": "Loại giao dịch",
+      "type": "enum",
+      "description": "Khách muốn thuê hay mua bất động sản",
+      "required": true,
+      "options": ["thuê", "mua"],
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "property_type",
+      "label": "Loại nhà",
+      "type": "enum",
+      "description": "Loại hình bất động sản khách đang tìm",
+      "required": false,
+      "options": ["căn hộ", "nhà nguyên căn", "phòng trọ", "mặt bằng", "đất nền", "khác"],
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Quận, phường hoặc khu vực khách muốn tìm",
+      "required": true,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "price",
+      "label": "Giá / Ngân sách",
+      "type": "money",
+      "description": "Ngân sách thuê hoặc mua khách nêu trong bài",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "area",
+      "label": "Diện tích",
+      "type": "range",
+      "description": "Diện tích mong muốn (m2)",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    },
+    {
+      "key": "bedrooms",
+      "label": "Số phòng ngủ",
+      "type": "number",
+      "description": "Số phòng ngủ khách cần",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 6
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại liên hệ của khách trong bài",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 7
+    }
+  ],
+  "match_policy": {
+    "want_intent": "demand",
+    "exclude_roles": ["peer"],
+    "hard_filters": []
+  },
+  "seed_ruleset": "bds-vi-v1"
+}

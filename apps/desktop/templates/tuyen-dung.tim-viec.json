@@ -1,0 +1,70 @@
+{
+  "id": "tuyen-dung.tim-viec",
+  "industry": "Tuyển dụng",
+  "name": "Người tìm việc",
+  "description_template": "Ứng viên đang chủ động tìm việc {vị trí} tại {khu vực}, mức lương {tầm lương}",
+  "placeholders": [
+    { "key": "vị trí", "hint": "kế toán tổng hợp, nhân viên kinh doanh, pha chế, tài xế…" },
+    { "key": "khu vực", "hint": "Quận 1, Cầu Giấy, Đà Nẵng…" },
+    { "key": "tầm lương", "hint": "8–15 triệu/tháng, thoả thuận…" }
+  ],
+  "user_profession": "nhà tuyển dụng nhân sự",
+  "fields": [
+    {
+      "key": "position",
+      "label": "Vị trí",
+      "type": "text",
+      "description": "Công việc hoặc vị trí ứng viên đang ứng tuyển",
+      "required": true,
+      "options": null,
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "experience",
+      "label": "Kinh nghiệm",
+      "type": "text",
+      "description": "Số năm hoặc mô tả kinh nghiệm làm việc của ứng viên",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Khu vực ứng viên mong muốn làm việc",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "expected_salary",
+      "label": "Mức lương mong muốn",
+      "type": "money",
+      "description": "Mức thu nhập ứng viên kỳ vọng",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại liên hệ của ứng viên",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    }
+  ],
+  "match_policy": {
+    "want_intent": "supply",
+    "exclude_roles": ["peer"],
+    "hard_filters": []
+  },
+  "seed_ruleset": null
+}

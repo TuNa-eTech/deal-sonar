@@ -1,0 +1,90 @@
+{
+  "id": "xe-cu.duoi-gia",
+  "industry": "Xe và đồ cũ",
+  "name": "Tin bán dưới giá thị trường",
+  "description_template": "Người dùng cá nhân cần bán gấp {dòng hàng} ở {khu vực}, tầm giá {tầm giá}",
+  "placeholders": [
+    { "key": "dòng hàng", "hint": "ô tô Vios/Accent, xe máy SH, MacBook cũ…" },
+    { "key": "khu vực", "hint": "Hà Nội, TP.HCM, miền Bắc…" },
+    { "key": "tầm giá", "hint": "dưới 400 triệu, dưới 50 triệu…" }
+  ],
+  "user_profession": "người buôn xe và đồ cũ",
+  "fields": [
+    {
+      "key": "brand",
+      "label": "Hãng",
+      "type": "text",
+      "description": "Hãng sản xuất (Toyota, Honda, Apple…)",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "model",
+      "label": "Dòng",
+      "type": "text",
+      "description": "Tên dòng xe hoặc mẫu sản phẩm cụ thể",
+      "required": true,
+      "options": null,
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "year",
+      "label": "Đời",
+      "type": "number",
+      "description": "Năm sản xuất hoặc đời máy",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "price",
+      "label": "Giá bán",
+      "type": "money",
+      "description": "Giá người bán đưa ra trong bài",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "mileage_km",
+      "label": "Số km",
+      "type": "number",
+      "description": "Số km đã đi (ODO) nếu là phương tiện",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Tỉnh/thành hoặc quận xem hàng",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 6
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại người bán",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 7
+    }
+  ],
+  "match_policy": {
+    "want_intent": "supply",
+    "exclude_roles": ["peer"],
+    "hard_filters": []
+  },
+  "seed_ruleset": null
+}

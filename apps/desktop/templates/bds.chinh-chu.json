@@ -1,0 +1,81 @@
+{
+  "id": "bds.chinh-chu",
+  "industry": "Bất động sản",
+  "name": "Tin chính chủ cho thuê/bán",
+  "description_template": "Chính chủ đang {nhu cầu} {loại nhà} ở {khu vực}, tầm giá {tầm giá}",
+  "placeholders": [
+    { "key": "nhu cầu", "hint": "cho thuê, bán gấp…" },
+    { "key": "loại nhà", "hint": "nhà riêng, căn hộ chung cư…" },
+    { "key": "khu vực", "hint": "Đống Đa, Bình Thạnh…" },
+    { "key": "tầm giá", "hint": "dưới 20 triệu/tháng, dưới 5 tỷ…" }
+  ],
+  "user_profession": "môi giới bất động sản",
+  "fields": [
+    {
+      "key": "deal_type",
+      "label": "Loại giao dịch",
+      "type": "enum",
+      "description": "Hình thức giao dịch chủ nhà đăng (cho thuê, bán, sang nhượng)",
+      "required": true,
+      "options": ["cho thuê", "bán", "sang nhượng"],
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Địa chỉ, quận hoặc phường của bất động sản",
+      "required": true,
+      "options": null,
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "price",
+      "label": "Giá chào",
+      "type": "money",
+      "description": "Mức giá cho thuê hoặc bán chủ nhà đưa ra",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "area",
+      "label": "Diện tích",
+      "type": "range",
+      "description": "Diện tích bất động sản (m2)",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "is_owner",
+      "label": "Chính chủ",
+      "type": "boolean",
+      "description": "Bài viết xác nhận chính chủ đăng trực tiếp không qua trung gian",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại chủ nhà",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 6
+    }
+  ],
+  "match_policy": {
+    "want_intent": "supply",
+    "exclude_roles": ["peer"],
+    "hard_filters": []
+  },
+  "seed_ruleset": "bds-vi-v1"
+}

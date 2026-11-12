@@ -1,0 +1,59 @@
+{
+  "id": "dich-vu.tim-tho",
+  "industry": "Dịch vụ nhà cửa",
+  "name": "Bài hỏi \"ai biết thợ…\"",
+  "description_template": "Khách đang hỏi tìm thợ {loại việc} ở {khu vực}",
+  "placeholders": [
+    { "key": "loại việc", "hint": "sửa điện nước, vệ sinh điều hoà, chống thấm, sửa khoá…" },
+    { "key": "khu vực", "hint": "Hà Đông, Gò Vấp, nội thành Hà Nội…" }
+  ],
+  "user_profession": "thợ dịch vụ sửa chữa nhà cửa",
+  "fields": [
+    {
+      "key": "job_type",
+      "label": "Loại việc",
+      "type": "text",
+      "description": "Hạng mục sửa chữa hoặc lắp đặt khách đang cần hỗ trợ",
+      "required": true,
+      "options": null,
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Địa chỉ, toà nhà hoặc quận nơi cần thợ tới làm",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "urgency",
+      "label": "Mức gấp",
+      "type": "enum",
+      "description": "Mức độ khẩn cấp của công việc",
+      "required": false,
+      "options": ["gấp ngay", "trong ngày", "trong tuần", "không nêu rõ"],
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại liên hệ của khách",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    }
+  ],
+  "match_policy": {
+    "want_intent": "demand",
+    "exclude_roles": ["peer"],
+    "hard_filters": []
+  },
+  "seed_ruleset": null
+}
