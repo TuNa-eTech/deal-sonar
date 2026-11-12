@@ -32,6 +32,11 @@ use crate::tray::{
 
 /// Launches the Tauri v2 DealSonar desktop application (`03-desktop.md`).
 pub fn run() {
+    // Ensure Tauri's Tokio runtime context is entered on the main thread so any
+    // background worker spawn, socket listener bind, or async primitives invoked
+    // during startup or UI event loops have an active reactor context.
+    let _runtime_guard = tauri::async_runtime::handle().inner().enter();
+
     let start_minimized = is_minimized_startup(std::env::args());
     let exit_coord = ExitCoordinator::new();
     let exit_coord_for_setup = exit_coord.clone();
@@ -50,6 +55,7 @@ pub fn run() {
         // 3. Native OS notifications (`07-notifications-export.md §4`)
         .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
+            let _runtime_guard = tauri::async_runtime::handle().inner().enter();
             let app_handle = app.handle().clone();
 
             // Wire native OS notification hook (`07-notifications-export.md §4`)

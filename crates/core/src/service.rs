@@ -251,6 +251,12 @@ impl CoreServiceBuilder {
     /// Start `CoreService`, binding `IpcListener` (if `config.ipc_endpoint` is set), enforcing
     /// license limits on startup, and spawning background workers (if `config.spawn_background_workers`).
     pub fn start(self) -> CoreResult<CoreService> {
+        if tokio::runtime::Handle::try_current().is_err() {
+            return Err(CoreError::Internal(
+                "CoreService must be started within the context of a Tokio 1.x runtime (enter a runtime handle or run inside an async task)".to_string(),
+            ));
+        }
+
         let ai_bridge = match self.ai_bridge {
             Some(b) => b,
             None => Arc::new(AiBridge::new(Arc::new(MockAiProvider::new()))),

@@ -153,6 +153,7 @@ impl DesktopState {
         native_host_binary_path: PathBuf,
         os_notify_hook: Option<OsNotificationHook>,
     ) -> CoreResult<Self> {
+        let _runtime_guard = tauri::async_runtime::handle().inner().enter();
         let config = build_core_config(data_dir.clone(), native_host_binary_path.clone());
         let logs_dir = config
             .logs_dir
@@ -192,6 +193,7 @@ impl DesktopState {
         telegram_api_base_url: Option<String>,
         os_notify_hook: Option<OsNotificationHook>,
     ) -> CoreResult<Self> {
+        let _runtime_guard = tauri::async_runtime::handle().inner().enter();
         let data_dir = config.data_dir.clone();
         let native_host_bin = config
             .native_host_binary_path
