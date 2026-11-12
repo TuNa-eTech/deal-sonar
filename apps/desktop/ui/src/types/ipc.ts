@@ -541,6 +541,13 @@ export interface LicenseStatus {
   };
 }
 
+export interface AiModelOption {
+  id: string;
+  label: string;
+  recommended_tier?: "fast" | "smart" | null;
+  source: string;
+}
+
 export interface ProbeResult {
   provider: AiProviderId;
   binary_name: "claude" | "codex" | "agy";
@@ -552,6 +559,9 @@ export interface ProbeResult {
   error: string | null;
   install_hint: string;
   login_command: string;
+  available_models?: AiModelOption[];
+  recommended_fast_model?: string | null;
+  recommended_smart_model?: string | null;
 }
 
 export interface Channel {

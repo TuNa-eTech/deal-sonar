@@ -768,6 +768,40 @@ function createInitialState(): MockState {
       error: null,
       install_hint: "npm install -g @anthropic-ai/claude-code",
       login_command: "claude login",
+      available_models: [
+        {
+          id: "haiku",
+          label: "haiku — Bí danh tự động (claude-haiku-5-5)",
+          recommended_tier: "fast",
+          source: "local_cli",
+        },
+        {
+          id: "sonnet",
+          label: "sonnet — Bí danh tự động (claude-sonnet-5-5)",
+          recommended_tier: "smart",
+          source: "local_cli",
+        },
+        {
+          id: "opus",
+          label: "opus — Bí danh tự động (claude-opus-5-5)",
+          recommended_tier: "smart",
+          source: "local_cli",
+        },
+        {
+          id: "claude-haiku-4-5",
+          label: "Claude Haiku 4.5 (claude-haiku-4-5)",
+          recommended_tier: "fast",
+          source: "local_cli",
+        },
+        {
+          id: "claude-sonnet-4-5",
+          label: "Claude Sonnet 4.5 (claude-sonnet-4-5)",
+          recommended_tier: "smart",
+          source: "local_cli",
+        },
+      ],
+      recommended_fast_model: "haiku",
+      recommended_smart_model: "sonnet",
     },
     codex_cli: {
       provider: "codex_cli",
@@ -780,6 +814,34 @@ function createInitialState(): MockState {
       error: "Chưa đăng nhập tài khoản OpenAI trên Codex CLI",
       install_hint: "npm install -g @openai/codex",
       login_command: "codex login",
+      available_models: [
+        {
+          id: "gpt-6-luna",
+          label: "GPT-6-Luna (gpt-6-luna) — Fast and affordable model",
+          recommended_tier: "fast",
+          source: "local_cli",
+        },
+        {
+          id: "gpt-6.1-sol",
+          label: "GPT-6.1-Sol (gpt-6.1-sol) — Latest workhorse model",
+          recommended_tier: "smart",
+          source: "local_cli",
+        },
+        {
+          id: "codex-mini-latest",
+          label: "Codex Mini Latest (codex-mini-latest)",
+          recommended_tier: "fast",
+          source: "builtin",
+        },
+        {
+          id: "gpt-5-codex",
+          label: "GPT-5 Codex (gpt-5-codex)",
+          recommended_tier: "smart",
+          source: "builtin",
+        },
+      ],
+      recommended_fast_model: "gpt-6-luna",
+      recommended_smart_model: "gpt-6.1-sol",
     },
     agy_cli: {
       provider: "agy_cli",
@@ -792,6 +854,34 @@ function createInitialState(): MockState {
       error: "Không tìm thấy tệp chạy `agy` trong PATH",
       install_hint: "Cài đặt Google Antigravity CLI (agy >= 1.5.4)",
       login_command: "agy auth login",
+      available_models: [
+        {
+          id: "gemini-3.8-flash-medium",
+          label: "Gemini 3.8 Flash (Medium) (gemini-3.8-flash-medium)",
+          recommended_tier: "fast",
+          source: "builtin",
+        },
+        {
+          id: "gemini-4-carbon-medium",
+          label: "Gemini 4 Carbon (Medium) (gemini-4-carbon-medium)",
+          recommended_tier: "smart",
+          source: "builtin",
+        },
+        {
+          id: "gemini-2.5-flash",
+          label: "Gemini 2.5 Flash (gemini-2.5-flash)",
+          recommended_tier: "fast",
+          source: "builtin",
+        },
+        {
+          id: "gemini-2.5-pro",
+          label: "Gemini 2.5 Pro (gemini-2.5-pro)",
+          recommended_tier: "smart",
+          source: "builtin",
+        },
+      ],
+      recommended_fast_model: "gemini-3.8-flash-medium",
+      recommended_smart_model: "gemini-4-carbon-medium",
     },
   };
 

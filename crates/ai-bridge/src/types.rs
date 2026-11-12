@@ -220,6 +220,25 @@ pub enum ProbeMode {
     Full,
 }
 
+/// A model option discovered from the local CLI installation or built-in provider catalog.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AiModelOption {
+    /// Concrete model identifier or alias passed to `--model <id>`.
+    pub id: String,
+    /// Human-friendly display label for UI selectors.
+    pub label: String,
+    /// Suggested capability tier (`fast` or `smart`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recommended_tier: Option<ModelTier>,
+    /// Origin of this model option (`"local_cli"` or `"builtin"`).
+    #[serde(default = "default_model_source")]
+    pub source: String,
+}
+
+fn default_model_source() -> String {
+    "builtin".to_string()
+}
+
 /// Result of probing an `AiProvider` (`06-ai-bridge.md §2, §3.5`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProbeResult {
@@ -229,6 +248,8 @@ pub struct ProbeResult {
     pub flags_supported: bool,
     pub latency_ms: Option<u64>,
     pub error: Option<String>,
+    #[serde(default)]
+    pub available_models: Vec<AiModelOption>,
 }
 
 impl ProbeResult {

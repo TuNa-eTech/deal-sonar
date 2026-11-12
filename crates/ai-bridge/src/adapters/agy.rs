@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::adapters::{
-    build_probe_smoke_request, combine_system_and_prompt, fetch_cli_version,
+    build_probe_smoke_request, combine_system_and_prompt, discover_agy_models, fetch_cli_version,
     unwrap_cli_json_envelope, verify_mandatory_flags, CliAdapterConfig, SharedWorkdir,
     WorkdirHandle,
 };
@@ -31,7 +31,7 @@ pub const AGY_MANDATORY_FLAGS: &[&str] = &[
 pub struct AgyCliProvider {
     config: CliAdapterConfig,
     workdir: SharedWorkdir,
-    verified_flags: Arc<RwLock<Option<Result<(), AiError>>>>,
+    verified_flags: Arc<RwLock<Option<Result<bool, AiError>>>>,
 }
 
 impl Default for AgyCliProvider {
@@ -66,6 +66,8 @@ impl AgyCliProvider {
         let started = Instant::now();
         let expanded_path = self.config.effective_path();
         if resolve_binary_in_path(&self.config.binary_path, &expanded_path).is_none() {
+            let available_models =
+                discover_agy_models(&self.config, self.workdir.path(), &expanded_path, false).await;
             return ProbeResult {
                 installed: false,
                 version: None,
@@ -73,34 +75,55 @@ impl AgyCliProvider {
                 flags_supported: false,
                 latency_ms: None,
                 error: Some(AiError::NotInstalled.to_string()),
+                available_models,
             };
         }
 
-        let version =
-            match fetch_cli_version(&self.config, self.workdir.path(), &expanded_path).await {
-                Ok(v) => v,
-                Err(e) => {
-                    return ProbeResult {
-                        installed: !matches!(e, AiError::NotInstalled),
-                        version: None,
-                        authenticated: false,
-                        flags_supported: false,
-                        latency_ms: Some(started.elapsed().as_millis() as u64),
-                        error: Some(e.to_string()),
-                    };
-                }
-            };
+        let version = match fetch_cli_version(&self.config, self.workdir.path(), &expanded_path)
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                let available_models =
+                    discover_agy_models(&self.config, self.workdir.path(), &expanded_path, false)
+                        .await;
+                return ProbeResult {
+                    installed: !matches!(e, AiError::NotInstalled),
+                    version: None,
+                    authenticated: false,
+                    flags_supported: false,
+                    latency_ms: Some(started.elapsed().as_millis() as u64),
+                    error: Some(e.to_string()),
+                    available_models,
+                };
+            }
+        };
 
-        if let Err(flag_err) = self.verify_and_cache_flags(&expanded_path).await {
-            return ProbeResult {
-                installed: true,
-                version,
-                authenticated: false,
-                flags_supported: false,
-                latency_ms: Some(started.elapsed().as_millis() as u64),
-                error: Some(flag_err.to_string()),
-            };
-        }
+        let supports_models = match self.verify_and_cache_flags(&expanded_path).await {
+            Ok(has_models_cmd) => has_models_cmd,
+            Err(flag_err) => {
+                let available_models =
+                    discover_agy_models(&self.config, self.workdir.path(), &expanded_path, false)
+                        .await;
+                return ProbeResult {
+                    installed: true,
+                    version,
+                    authenticated: false,
+                    flags_supported: false,
+                    latency_ms: Some(started.elapsed().as_millis() as u64),
+                    error: Some(flag_err.to_string()),
+                    available_models,
+                };
+            }
+        };
+
+        let available_models = discover_agy_models(
+            &self.config,
+            self.workdir.path(),
+            &expanded_path,
+            supports_models,
+        )
+        .await;
 
         if mode == ProbeMode::Quick {
             return ProbeResult {
@@ -110,11 +133,28 @@ impl AgyCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: None,
+                available_models,
             };
         }
 
         let smoke_req = build_probe_smoke_request(self.config.probe_timeout);
-        match self.execute_request(&smoke_req, &expanded_path).await {
+        let mut smoke_res = self.execute_request(&smoke_req, &expanded_path, true).await;
+        if matches!(smoke_res, Err(AiError::Process { .. }))
+            && self
+                .config
+                .model_tiers
+                .resolve(ProviderId::AgyCli, smoke_req.tier)
+                .is_some()
+        {
+            let retry_res = self
+                .execute_request(&smoke_req, &expanded_path, false)
+                .await;
+            if retry_res.is_ok() || matches!(retry_res, Err(AiError::RateLimited { .. })) {
+                smoke_res = retry_res;
+            }
+        }
+
+        match smoke_res {
             Ok(resp) => ProbeResult {
                 installed: true,
                 version,
@@ -122,6 +162,7 @@ impl AgyCliProvider {
                 flags_supported: true,
                 latency_ms: Some(resp.duration.as_millis() as u64),
                 error: None,
+                available_models,
             },
             Err(AiError::NotAuthenticated) => ProbeResult {
                 installed: true,
@@ -130,6 +171,7 @@ impl AgyCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: Some(AiError::NotAuthenticated.to_string()),
+                available_models,
             },
             Err(err @ AiError::RateLimited { .. }) => ProbeResult {
                 installed: true,
@@ -138,6 +180,7 @@ impl AgyCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: Some(format!("rate_limited: {err}")),
+                available_models,
             },
             Err(other) => ProbeResult {
                 installed: true,
@@ -146,18 +189,22 @@ impl AgyCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: Some(other.to_string()),
+                available_models,
             },
         }
     }
 
     async fn ensure_flags_verified(&self, expanded_path: &std::ffi::OsStr) -> Result<(), AiError> {
         if let Some(cached) = self.verified_flags.read().await.clone() {
-            return cached;
+            return cached.map(|_| ());
         }
-        self.verify_and_cache_flags(expanded_path).await
+        self.verify_and_cache_flags(expanded_path).await.map(|_| ())
     }
 
-    async fn verify_and_cache_flags(&self, expanded_path: &std::ffi::OsStr) -> Result<(), AiError> {
+    async fn verify_and_cache_flags(
+        &self,
+        expanded_path: &std::ffi::OsStr,
+    ) -> Result<bool, AiError> {
         let out = run_cli_subprocess(
             &self.config.binary_path,
             &["--help".to_string()],
@@ -170,12 +217,14 @@ impl AgyCliProvider {
         .await?;
 
         let help_text = format!("{}\n{}", out.stdout, out.stderr);
+        let has_models_cmd = help_text.contains("models");
         let check = verify_mandatory_flags(
             ProviderId::AgyCli,
             AGY_MIN_TESTED_VERSION,
             &help_text,
             AGY_MANDATORY_FLAGS,
-        );
+        )
+        .map(|()| has_models_cmd);
         *self.verified_flags.write().await = Some(check.clone());
         check
     }
@@ -184,6 +233,7 @@ impl AgyCliProvider {
         &self,
         req: &AiRequest,
         expanded_path: &std::ffi::OsStr,
+        use_configured_model: bool,
     ) -> Result<AiResponse, AiError> {
         // Per-call temp directory holding `schema.json`, cleaned up automatically on `Drop`.
         let call_tmp = ScopedTempDir::new("dealsonar-agy-call-").map_err(|e| AiError::Process {
@@ -200,11 +250,14 @@ impl AgyCliProvider {
                 stderr: format!("failed to write agy schema file: {e}"),
             })?;
 
-        let resolved_model = self
-            .config
-            .model_tiers
-            .resolve(ProviderId::AgyCli, req.tier)
-            .map(ToOwned::to_owned);
+        let resolved_model = if use_configured_model {
+            self.config
+                .model_tiers
+                .resolve(ProviderId::AgyCli, req.tier)
+                .map(ToOwned::to_owned)
+        } else {
+            None
+        };
 
         let timeout_secs = req.timeout.as_secs().max(1);
         let mut args = vec![
@@ -275,6 +328,6 @@ impl AiProvider for AgyCliProvider {
             return Err(AiError::NotInstalled);
         }
         self.ensure_flags_verified(&expanded_path).await?;
-        self.execute_request(&req, &expanded_path).await
+        self.execute_request(&req, &expanded_path, true).await
     }
 }

@@ -6,8 +6,8 @@ use serde_json::Value;
 use tokio::sync::RwLock;
 
 use crate::adapters::{
-    build_probe_smoke_request, combine_system_and_prompt, fetch_cli_version, help_contains_flag,
-    verify_mandatory_flags, CliAdapterConfig, SharedWorkdir, WorkdirHandle,
+    build_probe_smoke_request, combine_system_and_prompt, discover_codex_models, fetch_cli_version,
+    help_contains_flag, verify_mandatory_flags, CliAdapterConfig, SharedWorkdir, WorkdirHandle,
 };
 use crate::classify::classify_cli_failure;
 use crate::schema::{extract_json_value, validate_json_schema};
@@ -72,6 +72,7 @@ impl CodexCliProvider {
     pub async fn probe_with_mode(&self, mode: ProbeMode) -> ProbeResult {
         let started = Instant::now();
         let expanded_path = self.config.effective_path();
+        let available_models = discover_codex_models(&self.config);
         if resolve_binary_in_path(&self.config.binary_path, &expanded_path).is_none() {
             return ProbeResult {
                 installed: false,
@@ -80,6 +81,7 @@ impl CodexCliProvider {
                 flags_supported: false,
                 latency_ms: None,
                 error: Some(AiError::NotInstalled.to_string()),
+                available_models,
             };
         }
 
@@ -94,6 +96,7 @@ impl CodexCliProvider {
                         flags_supported: false,
                         latency_ms: Some(started.elapsed().as_millis() as u64),
                         error: Some(e.to_string()),
+                        available_models,
                     };
                 }
             };
@@ -108,6 +111,7 @@ impl CodexCliProvider {
                     flags_supported: false,
                     latency_ms: Some(started.elapsed().as_millis() as u64),
                     error: Some(flag_err.to_string()),
+                    available_models,
                 };
             }
         };
@@ -120,12 +124,13 @@ impl CodexCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: None,
+                available_models,
             };
         }
 
         let smoke_req = build_probe_smoke_request(self.config.probe_timeout);
         let mut smoke_res = self
-            .execute_request(&smoke_req, &expanded_path, &caps)
+            .execute_request(&smoke_req, &expanded_path, &caps, true)
             .await;
 
         // Per `06-ai-bridge.md §3.3`: if `--ignore-user-config` strips Codex auth credentials,
@@ -133,10 +138,27 @@ impl CodexCliProvider {
         if matches!(smoke_res, Err(AiError::NotAuthenticated)) && caps.use_ignore_user_config {
             caps.use_ignore_user_config = false;
             let retry_res = self
-                .execute_request(&smoke_req, &expanded_path, &caps)
+                .execute_request(&smoke_req, &expanded_path, &caps, true)
                 .await;
             if retry_res.is_ok() || matches!(retry_res, Err(AiError::RateLimited { .. })) {
                 *self.capabilities.write().await = Some(Ok(caps.clone()));
+                smoke_res = retry_res;
+            }
+        }
+
+        // If configured model is not recognized on the user's Codex account, retry smoke check
+        // using the CLI's default model so auth probe does not fail on stale model names.
+        if matches!(smoke_res, Err(AiError::Process { .. }))
+            && self
+                .config
+                .model_tiers
+                .resolve(ProviderId::CodexCli, smoke_req.tier)
+                .is_some()
+        {
+            let retry_res = self
+                .execute_request(&smoke_req, &expanded_path, &caps, false)
+                .await;
+            if retry_res.is_ok() || matches!(retry_res, Err(AiError::RateLimited { .. })) {
                 smoke_res = retry_res;
             }
         }
@@ -149,6 +171,7 @@ impl CodexCliProvider {
                 flags_supported: true,
                 latency_ms: Some(resp.duration.as_millis() as u64),
                 error: None,
+                available_models,
             },
             Err(AiError::NotAuthenticated) => ProbeResult {
                 installed: true,
@@ -157,6 +180,7 @@ impl CodexCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: Some(AiError::NotAuthenticated.to_string()),
+                available_models,
             },
             Err(err @ AiError::RateLimited { .. }) => ProbeResult {
                 installed: true,
@@ -165,6 +189,7 @@ impl CodexCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: Some(format!("rate_limited: {err}")),
+                available_models,
             },
             Err(other) => ProbeResult {
                 installed: true,
@@ -173,6 +198,7 @@ impl CodexCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: Some(other.to_string()),
+                available_models,
             },
         }
     }
@@ -252,6 +278,7 @@ impl CodexCliProvider {
         req: &AiRequest,
         expanded_path: &std::ffi::OsStr,
         caps: &CodexCapabilities,
+        use_configured_model: bool,
     ) -> Result<AiResponse, AiError> {
         // Per-call temp directory holding `schema.json` and `last_message.json`.
         // Automatically deleted when `call_tmp` drops on any return/error/timeout path!
@@ -272,11 +299,14 @@ impl CodexCliProvider {
                 stderr: format!("failed to write codex schema file: {e}"),
             })?;
 
-        let resolved_model = self
-            .config
-            .model_tiers
-            .resolve(ProviderId::CodexCli, req.tier)
-            .map(ToOwned::to_owned);
+        let resolved_model = if use_configured_model {
+            self.config
+                .model_tiers
+                .resolve(ProviderId::CodexCli, req.tier)
+                .map(ToOwned::to_owned)
+        } else {
+            None
+        };
 
         let mut args = vec![
             "exec".to_string(),
@@ -478,6 +508,7 @@ impl AiProvider for CodexCliProvider {
             return Err(AiError::NotInstalled);
         }
         let caps = self.ensure_capabilities(&expanded_path).await?;
-        self.execute_request(&req, &expanded_path, &caps).await
+        self.execute_request(&req, &expanded_path, &caps, true)
+            .await
     }
 }

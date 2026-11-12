@@ -1277,6 +1277,16 @@ pub struct LicenseStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AiModelOption {
+    pub id: String,
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recommended_tier: Option<String>,
+    #[serde(default)]
+    pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProbeResult {
     pub provider: AiProviderId,
     pub binary_name: String,
@@ -1288,6 +1298,12 @@ pub struct ProbeResult {
     pub error: Option<String>,
     pub install_hint: String,
     pub login_command: String,
+    #[serde(default)]
+    pub available_models: Vec<AiModelOption>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recommended_fast_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recommended_smart_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

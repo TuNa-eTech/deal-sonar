@@ -1936,6 +1936,7 @@ impl CoreService {
         if let Some(v) = patch.launch_at_login {
             settings.launch_at_login = v;
         }
+        let ai_config_changed = patch.ai_provider.is_some() || patch.model_tiers.is_some();
         if let Some(v) = patch.ai_provider {
             settings.ai_provider = v;
         }
@@ -2002,6 +2003,15 @@ impl CoreService {
         }
 
         self.rt.save_settings(&settings)?;
+        if ai_config_changed
+            && self.rt.ai_bridge.provider_id() != dealsonar_ai_bridge::ProviderId::Mock
+        {
+            if let Some(active_pid) = settings.ai_provider {
+                let adapter =
+                    build_cli_provider_for_settings(active_pid, &settings, &self.rt.config);
+                self.rt.ai_bridge.set_provider(adapter);
+            }
+        }
         if crawl_changed {
             let _ = self.rt.bump_and_push_config()?;
         }
@@ -2013,7 +2023,9 @@ impl CoreService {
         &self,
         provider: Option<AiProviderId>,
     ) -> CoreResult<BTreeMap<AiProviderId, ProbeResult>> {
-        let settings = self.rt.load_settings()?;
+        let mut settings = self.rt.load_settings()?;
+        let default_settings = Settings::default();
+        let mut settings_updated = false;
         let targets = match provider {
             Some(p) => vec![p],
             None => vec![
@@ -2035,6 +2047,64 @@ impl CoreService {
                 adapter.probe().await
             };
 
+            let bridge_models =
+                if self.rt.ai_bridge.provider_id() == dealsonar_ai_bridge::ProviderId::Mock {
+                    let cfg = CliAdapterConfig::new(pid.binary_name());
+                    match pid {
+                        AiProviderId::ClaudeCli => {
+                            dealsonar_ai_bridge::discover_claude_models(&cfg, None)
+                        }
+                        AiProviderId::CodexCli => dealsonar_ai_bridge::discover_codex_models(&cfg),
+                        AiProviderId::AgyCli => raw_probe.available_models.clone(),
+                    }
+                } else {
+                    raw_probe.available_models.clone()
+                };
+
+            let (recommended_fast_model, recommended_smart_model) =
+                dealsonar_ai_bridge::recommended_models_for_provider(
+                    pid.to_bridge_id(),
+                    &bridge_models,
+                );
+
+            let has_local_cli_models = bridge_models.iter().any(|m| m.source == "local_cli");
+            if has_local_cli_models {
+                if let (Some(cur_tier), Some(def_tier)) = (
+                    settings.model_tiers.get_mut(&pid),
+                    default_settings.model_tiers.get(&pid),
+                ) {
+                    if cur_tier.fast == def_tier.fast
+                        && !bridge_models.iter().any(|m| m.id == cur_tier.fast)
+                    {
+                        if let Some(ref rec_f) = recommended_fast_model {
+                            cur_tier.fast = rec_f.clone();
+                            settings_updated = true;
+                        }
+                    }
+                    if cur_tier.smart == def_tier.smart
+                        && !bridge_models.iter().any(|m| m.id == cur_tier.smart)
+                    {
+                        if let Some(ref rec_s) = recommended_smart_model {
+                            cur_tier.smart = rec_s.clone();
+                            settings_updated = true;
+                        }
+                    }
+                }
+            }
+
+            let available_models = bridge_models
+                .into_iter()
+                .map(|m| crate::dto::AiModelOption {
+                    id: m.id,
+                    label: m.label,
+                    recommended_tier: m.recommended_tier.map(|t| match t {
+                        BridgeModelTier::Fast => "fast".to_string(),
+                        BridgeModelTier::Smart => "smart".to_string(),
+                    }),
+                    source: m.source,
+                })
+                .collect();
+
             out.insert(
                 pid,
                 ProbeResult {
@@ -2048,9 +2118,24 @@ impl CoreService {
                     error: raw_probe.error,
                     install_hint: pid.install_hint().to_string(),
                     login_command: pid.login_command().to_string(),
+                    available_models,
+                    recommended_fast_model,
+                    recommended_smart_model,
                 },
             );
         }
+
+        if settings_updated {
+            let _ = self.rt.save_settings(&settings);
+            if self.rt.ai_bridge.provider_id() != dealsonar_ai_bridge::ProviderId::Mock {
+                if let Some(active_pid) = settings.ai_provider {
+                    let adapter =
+                        build_cli_provider_for_settings(active_pid, &settings, &self.rt.config);
+                    self.rt.ai_bridge.set_provider(adapter);
+                }
+            }
+        }
+
         Ok(out)
     }
 

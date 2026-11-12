@@ -1,9 +1,10 @@
 // Popup status UI (`03-ux-flows.md §4` & `02-extension.md §1, §7`).
 // Strictly uses `textContent` (never `innerHTML`) per `03-risks-compliance.md §4`.
 
+import { DEFAULT_QUICK_SCAN_OPTIONS, isQuickScanOptions, type QuickScanOptions } from "../scan-options";
 import { extractGroupSlugOrIdFromUrl } from "../content/extract";
-import type { PageContextResponse, PopupStatusSnapshot } from "../messages";
-import type { SessionState, SourceInfo } from "../protocol";
+import type { PageContextResponse, PopupScanResponse, PopupStatusSnapshot } from "../messages";
+import type { SessionState, SourceInfo, SourceRef } from "../protocol";
 
 const SESSION_BADGE_MAP: Record<
   SessionState,
@@ -71,6 +72,102 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
 
 let currentGroupCandidate: SourceInfo | null = null;
 let latestStatus: PopupStatusSnapshot | null = null;
+let scanPending = false;
+let optionsLoaded = false;
+let optionsSaving = false;
+let optionsUnsaved = false;
+let selectedSources: SourceRef[] = [];
+let cleanupPanel: (() => void) | null = null;
+
+export function disposePanel(): void {
+  cleanupPanel?.();
+  cleanupPanel = null;
+}
+
+function showError(error: unknown): void {
+  const el = byId("panel-error");
+  el.textContent = error instanceof Error ? error.message : String(error);
+  el.classList.remove("hidden");
+}
+
+function readScanOptions(): QuickScanOptions {
+  return {
+    mode: byId<HTMLSelectElement>("scan-mode").value as QuickScanOptions["mode"],
+    maxPosts: byId<HTMLInputElement>("scan-max-posts").valueAsNumber,
+    maxScrollSteps: byId<HTMLInputElement>("scan-max-scrolls").valueAsNumber,
+  };
+}
+
+function renderScanControls(status: PopupStatusSnapshot): void {
+  if (!optionsLoaded) {
+    const saved = status.scanOptions ?? DEFAULT_QUICK_SCAN_OPTIONS;
+    byId<HTMLSelectElement>("scan-mode").value = saved.mode;
+    byId<HTMLInputElement>("scan-max-posts").value = String(saved.maxPosts);
+    byId<HTMLInputElement>("scan-max-scrolls").value = String(saved.maxScrollSteps);
+    optionsLoaded = true;
+  }
+  const preferences = readScanOptions();
+  const validOptions = isQuickScanOptions(preferences);
+  const background = preferences.mode === "background";
+  const select = byId<HTMLSelectElement>("scan-source");
+  const previous = select.value;
+  selectedSources = [];
+  const options: HTMLOptionElement[] = [];
+  const addSource = (source: SourceRef, label: string) => {
+    if (selectedSources.some((s) => s.external_id === source.external_id)) return;
+    selectedSources.push(source);
+    options.push(new Option(label, source.external_id));
+  };
+  if (currentGroupCandidate) addSource(currentGroupCandidate, `Đang xem · ${currentGroupCandidate.name}`);
+  for (const source of status.scanSources ?? []) addSource(source, `Nhóm · ${source.external_id}`);
+  if (!options.length) options.push(new Option("Chưa có nhóm để quét", ""));
+  const unchanged = select.options.length === options.length && options.every((option, index) =>
+    select.options[index]?.value === option.value && select.options[index]?.text === option.text);
+  if (!unchanged) select.replaceChildren(...options);
+  if (selectedSources.some((source) => source.external_id === previous)) select.value = previous;
+  const running = scanPending || Boolean(status.activeCrawl);
+  select.disabled = running || !selectedSources.length;
+  byId<HTMLSelectElement>("scan-mode").disabled = running || optionsSaving;
+  byId<HTMLInputElement>("scan-max-posts").disabled = running || optionsSaving;
+  byId<HTMLInputElement>("scan-max-scrolls").disabled = running || optionsSaving || !background;
+  byId("scan-mode-help").textContent = background
+    ? "Mở tab riêng, tự cuộn trong giới hạn rồi đóng khi xong."
+    : "Đọc bài đã tải ở tab hiện tại, không tự cuộn trang.";
+  byId("scan-options-summary").textContent = validOptions
+    ? `${background ? "Tab nền" : "Tab hiện tại"} · ${preferences.maxPosts} bài${background ? ` · ${preferences.maxScrollSteps} cuộn` : ""}`
+    : "Kiểm tra giới hạn";
+  const wrongTab = !background && (!currentGroupCandidate ||
+    select.value.toLowerCase() !== currentGroupCandidate.external_id.toLowerCase());
+  const button = byId<HTMLButtonElement>("btn-scan-now");
+  button.disabled = running || optionsSaving || optionsUnsaved || !validOptions || wrongTab || !selectedSources.length || !status.connected || !status.desktopAvailable ||
+    status.session.state !== "ok" || status.pause.paused || status.pause.requiresDesktopResume;
+  button.textContent = running ? "Đang quét…" : "Quét ngay";
+  button.setAttribute("aria-busy", String(running));
+  byId("scan-scope").textContent = background
+    ? `Tab nền · tối đa ${validOptions ? preferences.maxPosts : "—"} bài, ${preferences.maxScrollSteps} lần cuộn. Có thể dừng sớm.`
+    : `Tab hiện tại · tối đa ${validOptions ? preferences.maxPosts : "—"} bài đã tải, không cuộn trang.`;
+  byId("scan-feedback").textContent = running ? "Đang đọc bài viết. Bạn có thể tiếp tục duyệt web."
+    : !status.connected || !status.desktopAvailable ? "Mở DealSonar Desktop để bắt đầu."
+    : status.pause.paused || status.pause.requiresDesktopResume ? "Đang tạm dừng · xem mục Tạm dừng & khôi phục."
+    : status.session.state !== "ok" ? "Kiểm tra phiên Facebook ở phần Kết nối."
+    : !selectedSources.length ? "Mở một nhóm Facebook để bắt đầu."
+    : !validOptions ? "Số bài từ 1–100, số lần cuộn từ 0–5."
+    : optionsSaving ? "Đang lưu tùy chọn…"
+    : optionsUnsaved ? "Tùy chọn chưa lưu · kiểm tra phần Tùy chọn quét."
+    : wrongTab ? "Mở đúng nhóm đã chọn hoặc chuyển sang quét bằng tab nền."
+    : "Sẵn sàng · không cần chờ lịch quét";
+  byId<HTMLInputElement>("automatic-scanning").checked = status.automaticScanning ?? false;
+  byId("stat-queued").textContent = `${status.queuedPostsCount} bài`;
+  const result = byId("last-scan-result");
+  result.classList.toggle("hidden", !status.lastScan);
+  if (status.lastScan) {
+    const scan = status.lastScan;
+    const failed = scan.status === "error" || scan.status === "blocked";
+    result.classList.toggle("err", failed);
+    result.textContent = failed ? `Quét chưa thành công: ${scan.error || "Kiểm tra phiên Facebook và thử lại."}`
+      : `Lượt gần nhất · ${scan.postsSeen} bài đã đọc · ${scan.postsNew} bài mới`;
+  }
+}
 
 function isGroupAlreadyFollowed(
   group: SourceInfo,
@@ -128,6 +225,8 @@ function renderGroupContext(
 function renderStatus(status: PopupStatusSnapshot): void {
   latestStatus = status;
   const now = Date.now();
+
+  renderScanControls(status);
 
   // 1. Desktop connection lamp & status
   const lamp = byId("desktop-lamp");
@@ -190,7 +289,8 @@ function renderStatus(status: PopupStatusSnapshot): void {
   );
   byId("stat-next-crawl").textContent = status.pause.paused
     ? "Đang tạm dừng"
-    : formatRelativeVietnameseTime(status.nextCrawlAt, now, "future");
+    : status.automaticScanning ? formatRelativeVietnameseTime(status.nextCrawlAt, now, "future")
+    : "Đã tắt · chỉ quét khi bạn yêu cầu";
   byId("stat-groups-count").textContent = `${status.followedGroupsCount} nhóm`;
   byId("stat-hourly-loads").textContent = `${status.loadsLastHour} / ${status.maxLoadsPerHour}`;
 
@@ -284,99 +384,164 @@ async function detectActiveTabGroup(): Promise<{
 }
 
 export async function initPopup(): Promise<void> {
+  disposePanel();
   if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) return;
-
+  currentGroupCandidate = null;
+  latestStatus = null;
+  scanPending = false;
+  optionsLoaded = false;
+  optionsSaving = false;
+  optionsUnsaved = false;
+  let disposed = false;
+  let refreshing = false;
+  const removers: (() => void)[] = [];
+  const bind = (id: string, event: string, action: () => void | Promise<void>) => {
+    const element = byId(id);
+    const handler = () => {
+      byId("panel-error").classList.add("hidden");
+      void Promise.resolve().then(action).catch(showError);
+    };
+    element.addEventListener(event, handler);
+    removers.push(() => element.removeEventListener(event, handler));
+  };
+  const renderResponse = (response: PopupStatusSnapshot & { error?: string }) => {
+    if (response.error) throw new Error(response.error);
+    renderStatus(response);
+    renderGroupContext(currentGroupCandidate, currentGroupCandidate ? extractGroupSlugOrIdFromUrl(currentGroupCandidate.url) : null, response);
+  };
+  const refresh = async () => {
+    if (refreshing || disposed) return;
+    refreshing = true;
+    try {
+      const [context, status] = await Promise.all([
+        detectActiveTabGroup(),
+        chrome.runtime.sendMessage({ kind: "popup:get-status" }) as Promise<PopupStatusSnapshot>,
+      ]);
+      if (disposed) return;
+      currentGroupCandidate = context.group;
+      renderResponse(status);
+    } finally { refreshing = false; }
+  };
   try {
-    const ver = chrome.runtime.getManifest().version;
-    if (ver) byId("ext-version").textContent = `v${ver}`;
-  } catch {
-    // Ignore
-  }
+    byId("ext-version").textContent = `v${chrome.runtime.getManifest().version}`;
+    await refresh();
+  } catch (error) { showError(error); }
 
-  const [{ group, slug }, status] = await Promise.all([
-    detectActiveTabGroup(),
-    chrome.runtime.sendMessage({ kind: "popup:get-status" }) as Promise<PopupStatusSnapshot>,
-  ]);
-
-  currentGroupCandidate = group;
-  if (status) {
-    renderStatus(status);
-    renderGroupContext(group, slug, status);
-  }
-
-  byId("btn-reconnect").addEventListener("click", async () => {
-    const btn = byId<HTMLButtonElement>("btn-reconnect");
-    btn.disabled = true;
-    try {
-      const next = (await chrome.runtime.sendMessage({
-        kind: "popup:reconnect",
-      })) as PopupStatusSnapshot;
-      renderStatus(next);
-    } finally {
-      btn.disabled = false;
-    }
+  const reconnect = async () => {
+    const status = await chrome.runtime.sendMessage({ kind: "popup:reconnect" });
+    renderResponse(status);
+  };
+  bind("btn-reconnect", "click", reconnect);
+  bind("btn-open-desktop", "click", reconnect);
+  bind("btn-open-fb", "click", async () => { await chrome.tabs.create({ url: "https://www.facebook.com/" }); });
+  bind("btn-pause-1h", "click", async () => {
+    renderResponse(await chrome.runtime.sendMessage({ kind: "popup:pause", durationMs: 60 * 60 * 1000 }));
   });
-
-  byId("btn-open-desktop").addEventListener("click", async () => {
-    const btn = byId<HTMLButtonElement>("btn-open-desktop");
-    btn.disabled = true;
-    try {
-      const next = (await chrome.runtime.sendMessage({
-        kind: "popup:reconnect",
-      })) as PopupStatusSnapshot;
-      renderStatus(next);
-    } finally {
-      btn.disabled = false;
-    }
+  bind("btn-pause-indef", "click", async () => {
+    renderResponse(await chrome.runtime.sendMessage({ kind: "popup:pause", durationMs: null }));
   });
-
-  byId("btn-open-fb").addEventListener("click", () => {
-    void chrome.tabs.create({ url: "https://www.facebook.com/" });
+  bind("btn-resume", "click", async () => {
+    renderResponse(await chrome.runtime.sendMessage({ kind: "popup:resume" }));
   });
-
-  byId("btn-pause-1h").addEventListener("click", async () => {
-    const next = (await chrome.runtime.sendMessage({
-      kind: "popup:pause",
-      durationMs: 60 * 60 * 1000,
-    })) as PopupStatusSnapshot;
-    renderStatus(next);
-  });
-
-  byId("btn-pause-indef").addEventListener("click", async () => {
-    const next = (await chrome.runtime.sendMessage({
-      kind: "popup:pause",
-      durationMs: null,
-    })) as PopupStatusSnapshot;
-    renderStatus(next);
-  });
-
-  byId("btn-resume").addEventListener("click", async () => {
-    const next = (await chrome.runtime.sendMessage({
-      kind: "popup:resume",
-    })) as PopupStatusSnapshot;
-    renderStatus(next);
-  });
-
-  byId("btn-follow-group").addEventListener("click", async () => {
+  bind("btn-follow-group", "click", async () => {
     if (!currentGroupCandidate) return;
-    const btn = byId<HTMLButtonElement>("btn-follow-group");
-    btn.disabled = true;
+    const button = byId<HTMLButtonElement>("btn-follow-group");
+    button.disabled = true;
     try {
-      const res = (await chrome.runtime.sendMessage({
-        kind: "popup:follow-group",
-        group: currentGroupCandidate,
-      })) as { ok: boolean; status: PopupStatusSnapshot };
-      if (res?.status) {
-        renderStatus(res.status);
-      } else if (latestStatus) {
-        renderStatus(latestStatus);
-      }
+      const response = await chrome.runtime.sendMessage({ kind: "popup:follow-group", group: currentGroupCandidate });
+      if (!response?.ok) throw new Error(response?.error || "Chưa thể theo dõi nhóm. Hãy thử lại.");
+      renderResponse(response.status);
+    } finally { button.disabled = false; }
+  });
+  let saveOptionsTimer: ReturnType<typeof setTimeout> | undefined;
+  const saveScanOptions = async () => {
+    clearTimeout(saveOptionsTimer);
+    if (!optionsUnsaved || optionsSaving) return;
+    const options = readScanOptions();
+    if (!isQuickScanOptions(options)) {
+      byId("scan-options-feedback").textContent = "Chưa lưu · số bài 1–100, số lần cuộn 0–5, dùng số nguyên.";
+      if (latestStatus) renderScanControls(latestStatus);
+      return;
+    }
+    optionsSaving = true;
+    byId("scan-options-feedback").textContent = "Đang lưu…";
+    if (latestStatus) renderScanControls(latestStatus);
+    try {
+      const status = await chrome.runtime.sendMessage({ kind: "popup:set-scan-options", options });
+      if (disposed) return;
+      renderResponse(status);
+      optionsUnsaved = false;
+      byId("scan-options-feedback").textContent = "Đã lưu · áp dụng cho những lần quét sau.";
+    } catch (error) {
+      if (disposed) return;
+      byId("scan-options-feedback").textContent = "Chưa lưu được. Hãy thay đổi tùy chọn để thử lại.";
+      throw error;
     } finally {
-      btn.disabled = false;
+      optionsSaving = false;
+      if (!disposed && latestStatus) renderScanControls(latestStatus);
+    }
+  };
+  for (const id of ["scan-mode", "scan-max-posts", "scan-max-scrolls"]) {
+    bind(id, "input", () => {
+      optionsUnsaved = true;
+      byId("scan-options-feedback").textContent = "Đang chỉnh… tự lưu sau khi nhập.";
+      if (latestStatus) renderScanControls(latestStatus);
+      clearTimeout(saveOptionsTimer);
+      saveOptionsTimer = setTimeout(() => { void saveScanOptions().catch(showError); }, 400);
+    });
+    bind(id, "change", async () => {
+      optionsUnsaved = true;
+      await saveScanOptions();
+    });
+  }
+  bind("scan-source", "change", () => { if (latestStatus) renderScanControls(latestStatus); });
+  bind("automatic-scanning", "change", async () => {
+    const toggle = byId<HTMLInputElement>("automatic-scanning");
+    toggle.disabled = true;
+    try {
+      renderResponse(await chrome.runtime.sendMessage({ kind: "popup:set-automatic", enabled: toggle.checked }));
+    } catch (error) {
+      toggle.checked = latestStatus?.automaticScanning ?? false;
+      throw error;
+    } finally { toggle.disabled = false; }
+  });
+  bind("btn-scan-now", "click", async () => {
+    const source = selectedSources.find((s) => s.external_id === byId<HTMLSelectElement>("scan-source").value);
+    if (!source || scanPending || optionsSaving || optionsUnsaved || !isQuickScanOptions(readScanOptions())) return;
+    scanPending = true;
+    if (latestStatus) renderScanControls(latestStatus);
+    try {
+      const response = await chrome.runtime.sendMessage({ kind: "popup:scan-now", source, options: readScanOptions() }) as PopupScanResponse;
+      if (response.status) renderResponse(response.status);
+      if (!response.ok) throw new Error(response.error || "Chưa thể quét. Vui lòng thử lại.");
+    } finally {
+      scanPending = false;
+      if (latestStatus) renderScanControls(latestStatus);
     }
   });
+  const onTabChanged = () => { void refresh().catch(showError); };
+  chrome.tabs.onActivated?.addListener(onTabChanged);
+  chrome.tabs.onUpdated?.addListener(onTabChanged);
+  const timer = setInterval(onTabChanged, 2500);
+  cleanupPanel = () => {
+    // Flush valid edits if the panel closes before the debounce fires.
+    if (optionsUnsaved && !optionsSaving) {
+      const options = readScanOptions();
+      if (isQuickScanOptions(options)) {
+        void chrome.runtime.sendMessage({ kind: "popup:set-scan-options", options }).catch(() => {});
+      }
+    }
+    disposed = true;
+    clearInterval(timer);
+    clearTimeout(saveOptionsTimer);
+    chrome.tabs.onActivated?.removeListener(onTabChanged);
+    chrome.tabs.onUpdated?.removeListener(onTabChanged);
+    for (const remove of removers) remove();
+    window.removeEventListener("pagehide", disposePanel);
+  };
+  window.addEventListener("pagehide", disposePanel, { once: true });
 }
 
 if (typeof document !== "undefined" && document.getElementById("desktop-lamp")) {
-  void initPopup();
+  void initPopup().catch(showError);
 }

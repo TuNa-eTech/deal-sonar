@@ -62,9 +62,16 @@ describe("All 7 Main Screens Coverage (Radar, Nguồn, Danh bạ, Sức khoẻ, 
     await user.click(screen.getByRole("button", { name: /Tạo gói chẩn đoán/i }));
     expect(await screen.findByText(/Đã tạo gói chẩn đoán/i)).toBeInTheDocument();
 
-    // 6. Cài đặt Screen: Double-confirm Delete All Data
+    // 6. Cài đặt Screen: Auto-scanned model dropdowns & Double-confirm Delete All Data
     await user.click(screen.getByRole("button", { name: "Cài đặt" }));
     await screen.findByRole("heading", { name: "Cài đặt hệ thống" });
+
+    const fastModelSelect = await screen.findByLabelText("Chọn mô hình tầng Fast");
+    const smartModelSelect = await screen.findByLabelText("Chọn mô hình tầng Smart");
+    await user.selectOptions(fastModelSelect, "haiku");
+    await user.selectOptions(smartModelSelect, "sonnet");
+    await user.click(screen.getByRole("button", { name: "Lưu cấu hình AI" }));
+
     await user.click(screen.getByRole("button", { name: /Xoá toàn bộ dữ liệu/i }));
 
     const delDialog = await screen.findByRole("dialog", {

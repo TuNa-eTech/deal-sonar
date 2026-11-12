@@ -38,6 +38,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [selectedProvider, setSelectedProvider] = useState<AiProviderId>(
     settings.ai_provider ?? "claude_cli"
   );
+  const [modelTiersDraft, setModelTiersDraft] = useState(settings.model_tiers);
   const [aiSkipped, setAiSkipped] = useState(false);
 
   const [botToken, setBotToken] = useState("");
@@ -67,8 +68,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const runAiProbe = async () => {
     setProbingAi(true);
     try {
-      const res = await api.aiProbe();
+      const [res, refreshedSettings] = await Promise.all([
+        api.aiProbe(),
+        api.settingsGet(),
+      ]);
       setProbes(res);
+      setModelTiersDraft(refreshedSettings.model_tiers);
+      onSettingsUpdated(refreshedSettings);
       const ready = (["claude_cli", "codex_cli", "agy_cli"] as AiProviderId[]).find(
         (id) => res[id]?.installed && res[id]?.authenticated
       );
@@ -126,6 +132,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       onboarding_completed: true,
       launch_at_login: launchAtLogin,
       ai_provider: aiSkipped ? null : selectedProvider,
+      model_tiers: modelTiersDraft,
     });
     onSettingsUpdated(updated);
     onComplete(openRadarWizard);
@@ -437,6 +444,71 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   );
                 })}
               </div>
+
+              {currentProbe?.available_models && currentProbe.available_models.length > 0 && (
+                <div className="card" style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <strong>
+                      Chọn mô hình cho {currentProbe.binary_name} (đã quét{" "}
+                      {currentProbe.available_models.length} model)
+                    </strong>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div className="field-group" style={{ marginBottom: 0 }}>
+                      <label className="field-label">Mô hình tầng Fast (Chấm bài)</label>
+                      <select
+                        aria-label="Chọn mô hình Fast trong Onboarding"
+                        className="select"
+                        value={modelTiersDraft[selectedProvider]?.fast ?? ""}
+                        onChange={(e) => {
+                          const nextFast = e.target.value;
+                          const nextTier = {
+                            ...modelTiersDraft[selectedProvider],
+                            fast: nextFast,
+                          };
+                          setModelTiersDraft((prev) => ({
+                            ...prev,
+                            [selectedProvider]: nextTier,
+                          }));
+                          void api.aiSetProvider(selectedProvider, nextTier);
+                        }}
+                      >
+                        {currentProbe.available_models.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field-group" style={{ marginBottom: 0 }}>
+                      <label className="field-label">Mô hình tầng Smart (Đề xuất & Bộ luật)</label>
+                      <select
+                        aria-label="Chọn mô hình Smart trong Onboarding"
+                        className="select"
+                        value={modelTiersDraft[selectedProvider]?.smart ?? ""}
+                        onChange={(e) => {
+                          const nextSmart = e.target.value;
+                          const nextTier = {
+                            ...modelTiersDraft[selectedProvider],
+                            smart: nextSmart,
+                          };
+                          setModelTiersDraft((prev) => ({
+                            ...prev,
+                            [selectedProvider]: nextTier,
+                          }));
+                          void api.aiSetProvider(selectedProvider, nextTier);
+                        }}
+                      >
+                        {currentProbe.available_models.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {currentProbe && (!currentProbe.installed || !currentProbe.authenticated) && (
                 <div className="card" style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>

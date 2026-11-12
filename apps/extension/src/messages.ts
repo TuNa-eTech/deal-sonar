@@ -1,5 +1,7 @@
 // Internal Chrome runtime/tab messaging contracts between content scripts, popup, and background SW.
 
+import type { QuickScanOptions } from "./scan-options";
+
 import type {
   CrawlStatus,
   ExtractionStrategy,
@@ -128,7 +130,26 @@ export type PopupStatusSnapshot = {
     requiresDesktopResume: boolean;
   };
   queuedPostsCount: number;
+  automaticScanning?: boolean;
+  scanOptions?: QuickScanOptions;
+  activeCrawl?: { sourceExternalId: string } | null;
+  lastScan?: ScanSummary | null;
+  scanSources?: SourceRef[];
 };
+
+export type ScanSummary = {
+  sourceExternalId: string;
+  status: CrawlStatus;
+  postsSeen: number;
+  postsNew: number;
+  endedAt: number;
+  error?: string;
+};
+
+export type PopupScanMessage = { kind: "popup:scan-now"; source: SourceRef; options?: QuickScanOptions };
+export type PopupSetScanOptionsMessage = { kind: "popup:set-scan-options"; options: QuickScanOptions };
+export type PopupAutoScanMessage = { kind: "popup:set-automatic"; enabled: boolean };
+export type PopupScanResponse = { ok: boolean; error?: string; status: PopupStatusSnapshot };
 
 export type PopupGetStatusMessage = {
   kind: "popup:get-status";
@@ -153,6 +174,9 @@ export type PopupFollowGroupMessage = {
 };
 
 export type PopupToBgMessage =
+  | PopupSetScanOptionsMessage
+  | PopupScanMessage
+  | PopupAutoScanMessage
   | PopupGetStatusMessage
   | PopupReconnectMessage
   | PopupPauseMessage

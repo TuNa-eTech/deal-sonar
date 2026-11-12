@@ -1351,3 +1351,108 @@ fn eval_cli_binary_supports_help_and_dataset_flags() {
     assert!(stdout.contains("100.00%"));
     assert!(stdout.contains("\"hallucinated_raw_count\": 0"));
 }
+
+#[test]
+fn auto_discovers_local_cli_models_for_claude_codex_and_agy() {
+    let tmp = ScopedTempDir::new("test-model-scan-").unwrap();
+    let home = tmp.path();
+
+    // 1. Seed fake `~/.claude/cache/model-catalog/org-cc.json`
+    let claude_cat_dir = home.join(".claude").join("cache").join("model-catalog");
+    std::fs::create_dir_all(&claude_cat_dir).unwrap();
+    std::fs::write(
+        claude_cat_dir.join("org-cc.json"),
+        serde_json::to_string(&json!({
+            "version": 2,
+            "fetchedAt": 1794492525889u64,
+            "catalog": {
+                "surface": "cc",
+                "config": {
+                    "id": "cc",
+                    "provider_alias_targets": {
+                        "haiku": { "default": "claude-haiku-5-5" },
+                        "sonnet": { "default": "claude-sonnet-5-5" }
+                    },
+                    "models": [
+                        {
+                            "id": "claude-haiku-5-5",
+                            "name": "Haiku 5.5",
+                            "short_name": "Haiku",
+                            "description": "Fastest for quick answers"
+                        },
+                        {
+                            "id": "claude-sonnet-5-5",
+                            "name": "Sonnet 5.5",
+                            "short_name": "Sonnet",
+                            "description": "Most efficient for simpler tasks"
+                        }
+                    ]
+                }
+            }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let claude_cfg =
+        CliAdapterConfig::new("claude").with_env("HOME", home.to_string_lossy().to_string());
+    let claude_models = dealsonar_ai_bridge::discover_claude_models(&claude_cfg, None);
+    assert!(claude_models
+        .iter()
+        .any(|m| m.id == "haiku" && m.source == "local_cli"));
+    assert!(claude_models.iter().any(|m| m.id == "claude-haiku-5-5"));
+    assert!(claude_models.iter().any(|m| m.id == "claude-sonnet-5-5"));
+    let (c_fast, c_smart) =
+        dealsonar_ai_bridge::recommended_models_for_provider(ProviderId::ClaudeCli, &claude_models);
+    assert_eq!(c_fast.as_deref(), Some("haiku"));
+    assert_eq!(c_smart.as_deref(), Some("sonnet"));
+
+    // 2. Seed fake `~/.codex/models_cache.json`
+    let codex_dir = home.join(".codex");
+    std::fs::create_dir_all(&codex_dir).unwrap();
+    std::fs::write(
+        codex_dir.join("models_cache.json"),
+        serde_json::to_string(&json!({
+            "models": [
+                {
+                    "slug": "gpt-6.1-sol",
+                    "display_name": "GPT-6.1-Sol",
+                    "description": "Latest workhorse model",
+                    "visibility": "list"
+                },
+                {
+                    "slug": "gpt-6-luna",
+                    "display_name": "GPT-6-Luna",
+                    "description": "Fast and affordable model for easier tasks",
+                    "visibility": "list"
+                },
+                {
+                    "slug": "gpt-reserve",
+                    "display_name": "GPT-Reserve",
+                    "visibility": "hide"
+                }
+            ]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let codex_cfg =
+        CliAdapterConfig::new("codex").with_env("HOME", home.to_string_lossy().to_string());
+    let codex_models = dealsonar_ai_bridge::discover_codex_models(&codex_cfg);
+    assert_eq!(codex_models.len(), 2);
+    assert!(!codex_models.iter().any(|m| m.id == "gpt-reserve"));
+    let (x_fast, x_smart) =
+        dealsonar_ai_bridge::recommended_models_for_provider(ProviderId::CodexCli, &codex_models);
+    assert_eq!(x_fast.as_deref(), Some("gpt-6-luna"));
+    assert_eq!(x_smart.as_deref(), Some("gpt-6.1-sol"));
+
+    // 3. Parse `agy models` stdout with spinner carriage returns
+    let agy_stdout = "\r⠋ Fetching available models...\r⠙ Fetching available models...\rgemini-4-carbon-medium    Gemini 4 Carbon (Medium)\ngemini-3.8-flash-medium   Gemini 3.8 Flash (Medium)\nclaude-sonnet-4-6         Claude Sonnet 4.6 (Thinking)\n";
+    let agy_models = dealsonar_ai_bridge::parse_agy_models_stdout(agy_stdout);
+    assert_eq!(agy_models.len(), 3);
+    let (a_fast, a_smart) =
+        dealsonar_ai_bridge::recommended_models_for_provider(ProviderId::AgyCli, &agy_models);
+    assert_eq!(a_fast.as_deref(), Some("gemini-3.8-flash-medium"));
+    assert_eq!(a_smart.as_deref(), Some("gemini-4-carbon-medium"));
+}

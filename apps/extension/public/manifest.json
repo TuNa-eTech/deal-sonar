@@ -11,7 +11,8 @@
     "alarms",
     "tabs",
     "scripting",
-    "idle"
+    "idle",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://www.facebook.com/groups/*"
@@ -21,20 +22,30 @@
     "type": "module"
   },
   "action": {
-    "default_title": "DealSonar",
-    "default_popup": "src/popup/index.html"
+    "default_title": "Mở DealSonar"
   },
   "content_scripts": [
     {
-      "matches": ["https://www.facebook.com/groups/*"],
-      "js": ["tap.js"],
+      "matches": [
+        "https://www.facebook.com/groups/*"
+      ],
+      "js": [
+        "tap.js"
+      ],
       "world": "MAIN",
       "run_at": "document_start"
     },
     {
-      "matches": ["https://www.facebook.com/groups/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://www.facebook.com/groups/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "side_panel": {
+    "default_path": "src/popup/index.html"
+  }
 }

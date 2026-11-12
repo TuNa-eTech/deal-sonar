@@ -33,6 +33,10 @@ describe("MV3 Extension Build & Security Invariants", () => {
       }>;
     };
 
+    const panelManifest = JSON.parse(manifestRaw);
+    expect(panelManifest.action.default_popup).toBeUndefined();
+    expect(panelManifest.side_panel.default_path).toBe("src/popup/index.html");
+    expect(existsSync(resolve(distDir, panelManifest.side_panel.default_path))).toBe(true);
     expect(manifest.manifest_version).toBe(3);
     expect(manifest.minimum_chrome_version).toBe("116");
     expect(manifest.permissions).toEqual([
@@ -42,6 +46,7 @@ describe("MV3 Extension Build & Security Invariants", () => {
       "tabs",
       "scripting",
       "idle",
+      "sidePanel",
     ]);
     expect(manifest.host_permissions).toEqual(["https://www.facebook.com/groups/*"]);
 

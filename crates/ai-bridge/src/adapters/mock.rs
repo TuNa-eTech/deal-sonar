@@ -174,6 +174,7 @@ impl AiProvider for MockAiProvider {
             flags_supported: true,
             latency_ms: Some(1),
             error: None,
+            available_models: crate::adapters::discover_mock_models(),
         }
     }
 

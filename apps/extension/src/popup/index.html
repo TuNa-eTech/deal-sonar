@@ -3,101 +3,80 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DealSonar</title>
+    <title>DealSonar · Trợ lý quét nhóm</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="popup-shell">
+    <main class="panel-shell">
+      <div class="panel-top">
       <header class="header">
-        <div class="brand">
-          <span class="brand-mark">DS</span>
-          <h1 class="brand-title">DealSonar</h1>
-        </div>
+        <div class="brand"><span class="brand-mark" aria-hidden="true">◎</span><div><h1>DealSonar</h1><p>Trợ lý quét nhóm Facebook</p></div></div>
         <span id="ext-version" class="version-pill">v0.2.0</span>
       </header>
 
-      <!-- Kết nối Desktop & Phiên Facebook -->
-      <section class="card">
-        <div class="status-row">
-          <span class="status-label">Ứng dụng Desktop</span>
-          <span class="lamp-wrap">
-            <span id="desktop-lamp" class="lamp"></span>
-            <span id="desktop-status-text">Đang kiểm tra…</span>
-          </span>
-        </div>
+      <section class="connection-card" aria-label="Trạng thái kết nối">
+        <div class="status-row"><span class="status-label">DealSonar Desktop</span><span class="lamp-wrap"><span id="desktop-lamp" class="lamp"></span><span id="desktop-status-text">Đang kiểm tra…</span></span></div>
+        <div id="desktop-help" class="help-box error hidden"><div id="desktop-help-msg"></div><div class="help-actions"><button id="btn-open-desktop" type="button">Kết nối Desktop</button><button id="btn-reconnect" type="button">Thử lại</button></div></div>
+        <div class="status-row"><span class="status-label">Facebook</span><span id="fb-session-badge" class="badge warn">Đang kiểm tra…</span></div>
+        <div id="fb-session-help" class="help-box hidden"><div id="fb-session-msg"></div><div id="fb-session-actions" class="help-actions hidden"><button id="btn-open-fb" type="button">Mở Facebook</button></div></div>
+      </section>
+      </div>
 
-        <div id="desktop-help" class="help-box error hidden">
-          <div id="desktop-help-msg">
-            Hãy mở ứng dụng DealSonar trên máy tính (kiểm tra biểu tượng ở khay hệ thống), sau đó bấm thử lại.
-          </div>
-          <div class="help-actions">
-            <button id="btn-open-desktop" type="button" class="primary">Mở DealSonar</button>
-            <button id="btn-reconnect" type="button">Thử lại</button>
-          </div>
-        </div>
+      <div class="panel-content">
+      <p id="panel-error" class="help-box error hidden" role="alert"></p>
 
-        <div class="status-row">
-          <span class="status-label">Phiên Facebook</span>
-          <span id="fb-session-badge" class="badge ok">Đang hoạt động</span>
-        </div>
-
-        <div id="fb-session-help" class="help-box hidden">
-          <div id="fb-session-msg"></div>
-          <div id="fb-session-actions" class="help-actions hidden">
-            <button id="btn-open-fb" type="button">Mở Facebook</button>
+      <section class="scan-card" aria-labelledby="scan-title">
+        <h2 id="scan-title">Quét nhanh</h2>
+        <label for="scan-source">Nhóm cần quét</label>
+        <select id="scan-source" aria-describedby="scan-scope"><option value="">Đang tìm nhóm…</option></select>
+        <p id="scan-scope" class="scan-scope">Mở một nhóm Facebook hoặc chọn nhóm đã theo dõi.</p>
+        <details id="scan-options" class="scan-options">
+          <summary>Tùy chọn quét <span id="scan-options-summary">Tab hiện tại · 30 bài</span></summary>
+          <div class="scan-options-fields">
+            <label for="scan-mode">Cách quét</label>
+            <select id="scan-mode" aria-describedby="scan-mode-help">
+              <option value="current_tab">Đọc tab hiện tại</option>
+              <option value="background">Quét bằng tab nền</option>
+            </select>
+            <p id="scan-mode-help" class="option-help">Đọc bài đã tải, không tự cuộn trang.</p>
+            <div class="scan-limits">
+              <div><label for="scan-max-posts">Số bài tối đa</label><input id="scan-max-posts" type="number" min="1" max="100" step="1" value="30" required inputmode="numeric" aria-describedby="scan-posts-help" /><p id="scan-posts-help" class="option-help">1–100 bài / lượt</p></div>
+              <div><label for="scan-max-scrolls">Số lần cuộn</label><input id="scan-max-scrolls" type="number" min="0" max="5" step="1" value="3" required inputmode="numeric" aria-describedby="scan-scrolls-help" /><p id="scan-scrolls-help" class="option-help">Chỉ dùng cho tab nền</p></div>
+            </div>
+            <p id="scan-options-feedback" class="option-help" role="status" aria-live="polite">Tự lưu cho những lần quét sau.</p>
           </div>
-        </div>
+        </details>
+        <button id="btn-scan-now" class="scan-button" type="button" disabled><span aria-hidden="true">⌕</span> Quét ngay</button>
+        <p id="scan-feedback" class="scan-feedback" role="status" aria-live="polite">Đang kiểm tra kết nối…</p>
       </section>
 
-      <!-- Thao tác theo ngữ cảnh khi đang mở trang Group -->
-      <section id="group-context-card" class="card group-card hidden">
+      <section id="group-context-card" class="card group-card hidden" aria-label="Nhóm đang xem">
+        <div class="eyebrow">BẠN ĐANG XEM</div>
         <div id="group-context-name" class="group-name"></div>
         <div id="group-context-meta" class="group-meta"></div>
-        <div id="group-action-container">
-          <button id="btn-follow-group" type="button" class="primary">
-            Theo dõi group này
-          </button>
-          <span id="badge-following-group" class="followed-badge hidden">
-            Đang theo dõi ✓
-          </span>
-        </div>
+        <div id="group-action-container"><button id="btn-follow-group" type="button">Theo dõi group này</button><span id="badge-following-group" class="followed-badge hidden">Đang theo dõi ✓</span></div>
       </section>
 
-      <!-- Thống kê lịch quét -->
-      <section class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-title">Lần quét gần nhất</div>
-          <div id="stat-last-crawl" class="stat-value">Chưa quét</div>
+      <section aria-labelledby="activity-title">
+        <div class="section-heading"><h2 id="activity-title">Hoạt động</h2><span>Cập nhật trực tiếp</span></div>
+        <div class="stats-grid">
+          <div class="stat-item"><div class="stat-title">Quét gần nhất</div><div id="stat-last-crawl" class="stat-value">Chưa quét</div></div>
+          <div class="stat-item"><div class="stat-title">Đang theo dõi</div><div id="stat-groups-count" class="stat-value">0 nhóm</div></div>
+          <div class="stat-item"><div class="stat-title">Bài chờ đồng bộ</div><div id="stat-queued" class="stat-value">0 bài</div></div>
+          <div class="stat-item"><div class="stat-title">Tải trang giờ qua</div><div id="stat-hourly-loads" class="stat-value">0 / 60</div></div>
         </div>
-        <div class="stat-item">
-          <div class="stat-title">Lần quét kế tiếp</div>
-          <div id="stat-next-crawl" class="stat-value">Đang chờ lịch</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-title">Group đang theo dõi</div>
-          <div id="stat-groups-count" class="stat-value">0 nhóm</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-title">Tải trang giờ qua</div>
-          <div id="stat-hourly-loads" class="stat-value">0 / 60</div>
-        </div>
+        <div id="last-scan-result" class="result hidden" role="status"></div>
       </section>
 
-      <!-- Tạm dừng / Tiếp tục quét -->
-      <section class="card">
-        <div id="pause-status-label" class="pause-section-title">
-          Điều khiển quét tự động
-        </div>
-        <div id="pause-active-controls" class="btn-row">
-          <button id="btn-pause-1h" type="button">Tạm dừng 1 giờ</button>
-          <button id="btn-pause-indef" type="button">Tạm dừng tới khi bật lại</button>
-        </div>
-        <div id="pause-resumed-controls" class="btn-row hidden">
-          <button id="btn-resume" type="button" class="primary">Tiếp tục quét</button>
-        </div>
+
+      <section class="card" aria-labelledby="automatic-title">
+        <div class="auto-row"><div><h2 id="automatic-title" class="card-title">Quét tự động</h2><p class="muted">Quét nền theo lịch từ Desktop</p></div><label class="switch"><input id="automatic-scanning" type="checkbox" role="switch" aria-label="Quét tự động" /><span aria-hidden="true"></span></label></div>
+        <p id="stat-next-crawl" class="schedule-note">Đã tắt · chỉ quét khi bạn yêu cầu</p>
+        <details class="pause-details"><summary>Tạm dừng &amp; khôi phục</summary><p id="pause-status-label" class="muted">Tạm dừng quét</p><div id="pause-active-controls" class="btn-row"><button id="btn-pause-1h" type="button">Dừng 1 giờ</button><button id="btn-pause-indef" type="button">Dừng đến khi bật lại</button></div><div id="pause-resumed-controls" class="btn-row hidden"><button id="btn-resume" type="button" class="primary">Tiếp tục quét</button></div></details>
       </section>
+      <footer>Quét tại trình duyệt · Xử lý trong DealSonar Desktop</footer>
+      </div>
     </main>
-
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

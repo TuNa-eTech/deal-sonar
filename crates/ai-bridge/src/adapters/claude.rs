@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::adapters::{
-    build_probe_smoke_request, fetch_cli_version, unwrap_cli_json_envelope, verify_mandatory_flags,
-    CliAdapterConfig, SharedWorkdir, WorkdirHandle,
+    build_probe_smoke_request, discover_claude_models, fetch_cli_version, unwrap_cli_json_envelope,
+    verify_mandatory_flags, CliAdapterConfig, SharedWorkdir, WorkdirHandle,
 };
 use crate::classify::classify_cli_failure;
 use crate::subprocess::{resolve_binary_in_path, run_cli_subprocess};
@@ -65,6 +65,7 @@ impl ClaudeCliProvider {
     pub async fn probe_with_mode(&self, mode: ProbeMode) -> ProbeResult {
         let started = Instant::now();
         let expanded_path = self.config.effective_path();
+        let available_models = discover_claude_models(&self.config, None);
         if resolve_binary_in_path(&self.config.binary_path, &expanded_path).is_none() {
             return ProbeResult {
                 installed: false,
@@ -73,6 +74,7 @@ impl ClaudeCliProvider {
                 flags_supported: false,
                 latency_ms: None,
                 error: Some(AiError::NotInstalled.to_string()),
+                available_models,
             };
         }
 
@@ -87,6 +89,7 @@ impl ClaudeCliProvider {
                         flags_supported: false,
                         latency_ms: Some(started.elapsed().as_millis() as u64),
                         error: Some(e.to_string()),
+                        available_models,
                     };
                 }
             };
@@ -99,6 +102,7 @@ impl ClaudeCliProvider {
                 flags_supported: false,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: Some(flag_err.to_string()),
+                available_models,
             };
         }
 
@@ -110,11 +114,28 @@ impl ClaudeCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: None,
+                available_models,
             };
         }
 
         let smoke_req = build_probe_smoke_request(self.config.probe_timeout);
-        match self.execute_request(&smoke_req, &expanded_path).await {
+        let mut smoke_res = self.execute_request(&smoke_req, &expanded_path, true).await;
+        if matches!(smoke_res, Err(AiError::Process { .. }))
+            && self
+                .config
+                .model_tiers
+                .resolve(ProviderId::ClaudeCli, smoke_req.tier)
+                .is_some()
+        {
+            let retry_res = self
+                .execute_request(&smoke_req, &expanded_path, false)
+                .await;
+            if retry_res.is_ok() || matches!(retry_res, Err(AiError::RateLimited { .. })) {
+                smoke_res = retry_res;
+            }
+        }
+
+        match smoke_res {
             Ok(resp) => ProbeResult {
                 installed: true,
                 version,
@@ -122,6 +143,7 @@ impl ClaudeCliProvider {
                 flags_supported: true,
                 latency_ms: Some(resp.duration.as_millis() as u64),
                 error: None,
+                available_models,
             },
             Err(AiError::NotAuthenticated) => ProbeResult {
                 installed: true,
@@ -130,6 +152,7 @@ impl ClaudeCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: Some(AiError::NotAuthenticated.to_string()),
+                available_models,
             },
             Err(err @ AiError::RateLimited { .. }) => ProbeResult {
                 installed: true,
@@ -138,6 +161,7 @@ impl ClaudeCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: Some(format!("rate_limited: {err}")),
+                available_models,
             },
             Err(other) => ProbeResult {
                 installed: true,
@@ -146,6 +170,7 @@ impl ClaudeCliProvider {
                 flags_supported: true,
                 latency_ms: Some(started.elapsed().as_millis() as u64),
                 error: Some(other.to_string()),
+                available_models,
             },
         }
     }
@@ -184,15 +209,19 @@ impl ClaudeCliProvider {
         &self,
         req: &AiRequest,
         expanded_path: &std::ffi::OsStr,
+        use_configured_model: bool,
     ) -> Result<AiResponse, AiError> {
         let schema_json = serde_json::to_string(&req.schema)
             .map_err(|e| AiError::InvalidOutput(format!("invalid request schema JSON: {e}")))?;
 
-        let resolved_model = self
-            .config
-            .model_tiers
-            .resolve(ProviderId::ClaudeCli, req.tier)
-            .map(ToOwned::to_owned);
+        let resolved_model = if use_configured_model {
+            self.config
+                .model_tiers
+                .resolve(ProviderId::ClaudeCli, req.tier)
+                .map(ToOwned::to_owned)
+        } else {
+            None
+        };
 
         let mut args = vec![
             "--print".to_string(),
@@ -263,6 +292,6 @@ impl AiProvider for ClaudeCliProvider {
             return Err(AiError::NotInstalled);
         }
         self.ensure_flags_verified(&expanded_path).await?;
-        self.execute_request(&req, &expanded_path).await
+        self.execute_request(&req, &expanded_path, true).await
     }
 }

@@ -49,7 +49,7 @@ apps/
     templates/           7 built-in Radar JSON templates (BĐS, Tuyển dụng, Dịch vụ, Xe cũ, B2B, ...)
     tests/               UI <-> Desktop contract suite & real binary-to-binary E2E suite
     ui/                  React 18 + TypeScript + Vite Vietnamese desktop interface
-  extension/             Chrome Manifest V3 extension (GraphQL/Comet network tap, DOM fallback, popup)
+  extension/             Chrome Manifest V3 extension (GraphQL/Comet network tap, DOM fallback, native side panel)
 crates/
   protocol/              Protocol v2 envelopes, 4-byte LE framing, Unix/NamedPipe IPC, Native Host manifest
   native-host/           `dealsonar-native-host` stdio <-> local IPC relay binary
@@ -112,6 +112,11 @@ Startup flags supported by the `dealsonar` binary:
    ```
 4. In the DealSonar Desktop App, click **Kiểm tra lại** in **Onboarding — Bước 1: Kết nối Chrome Extension** (or verify connection status in **Sức khoẻ**).
    - DealSonar preserves your paired `chrome-extension://<ID>/` origin in `com.dealsonar.host.json` and automatically refreshes the `dealsonar-native-host` binary path on future app updates (`refresh_native_host_manifest_if_paired`).
+
+5. Click the DealSonar toolbar icon to open the **side panel** beside Facebook. After updating an unpacked install, click **Reload** on its `chrome://extensions` card first.
+   - Select the current Facebook group or a group from the Desktop crawl plan, then click **Quét ngay**. Each click scans one group. Expand **Tùy chọn quét** to set **1–100 posts** (default 30), **0–5 scroll steps** (default 3), and choose **Đọc tab hiện tại** or **Quét bằng tab nền**. Preferences save automatically in this browser profile and persist across panel/browser restarts. Current-tab mode requires the selected group in the active tab and never scrolls; background mode always opens its own temporary tab, scrolls up to the chosen limit, then closes it. Scans can stop early when encountering known posts, session issues, or the execution deadline.
+   - Automatic scanning is **off by default**, including the first upgrade to the side panel. Turn on **Quét tự động** to use the Desktop plan. This preference persists across browser restarts; Facebook session checks, safety pauses, and load limits apply to manual scans too.
+   - The panel updates when you switch tabs and shows scan progress, the latest result, queued posts, and connection status. DealSonar Desktop must be running and connected for scanning.
 
 ---
 

@@ -22,7 +22,10 @@ pub use adapters::agy::AgyCliProvider;
 pub use adapters::claude::ClaudeCliProvider;
 pub use adapters::codex::CodexCliProvider;
 pub use adapters::mock::MockAiProvider;
-pub use adapters::CliAdapterConfig;
+pub use adapters::{
+    discover_agy_models, discover_claude_models, discover_codex_models, discover_mock_models,
+    parse_agy_models_stdout, recommended_models_for_provider, CliAdapterConfig,
+};
 pub use bridge::{AiBridge, JudgeBatchReport, PostEvalOutcome, TaskResult};
 pub use classify::{classify_cli_failure, parse_retry_after};
 pub use prompts::{
@@ -42,10 +45,10 @@ pub use subprocess::{
     run_cli_subprocess, ScopedTempDir, SubprocessOutput,
 };
 pub use types::{
-    AiCallRecord, AiCallStatus, AiError, AiFieldCandidate, AiProvider, AiRequest, AiResponse,
-    AuthorRole, CompileRulesInput, DetectedIntent, ExtractedField, FeedbackExample, FieldDef,
-    FieldSource, FieldType, HardFilter, JudgeExtractOutput, JudgeItemResult, LabeledSample,
-    ModelTier, ModelTierMap, PostPromptInput, PrefilterHint, ProbeMode, ProbeResult, ProviderId,
-    ProviderTierModels, RadarPromptContext, SuggestFieldsInput, SuggestFieldsOutput,
+    AiCallRecord, AiCallStatus, AiError, AiFieldCandidate, AiModelOption, AiProvider, AiRequest,
+    AiResponse, AuthorRole, CompileRulesInput, DetectedIntent, ExtractedField, FeedbackExample,
+    FieldDef, FieldSource, FieldType, HardFilter, JudgeExtractOutput, JudgeItemResult,
+    LabeledSample, ModelTier, ModelTierMap, PostPromptInput, PrefilterHint, ProbeMode, ProbeResult,
+    ProviderId, ProviderTierModels, RadarPromptContext, SuggestFieldsInput, SuggestFieldsOutput,
     SuggestedField, TaskKind, Usage, WantIntent,
 };

@@ -1,12 +1,106 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type {
+  AiModelOption,
   AiProviderId,
   Channel,
   LicenseStatus,
   ProbeResult,
   Settings,
 } from "../types/ipc";
+
+const FALLBACK_MODELS_BY_PROVIDER: Record<AiProviderId, AiModelOption[]> = {
+  claude_cli: [
+    {
+      id: "haiku",
+      label: "haiku — Claude Haiku mới nhất (Nhanh, tiết kiệm)",
+      recommended_tier: "fast",
+      source: "builtin",
+    },
+    {
+      id: "sonnet",
+      label: "sonnet — Claude Sonnet mới nhất (Cân bằng, thông minh)",
+      recommended_tier: "smart",
+      source: "builtin",
+    },
+    {
+      id: "opus",
+      label: "opus — Claude Opus mới nhất (Suy luận sâu)",
+      recommended_tier: "smart",
+      source: "builtin",
+    },
+    {
+      id: "claude-haiku-4-5-20251001",
+      label: "Claude Haiku 4.5 (claude-haiku-4-5-20251001)",
+      recommended_tier: "fast",
+      source: "builtin",
+    },
+    {
+      id: "claude-sonnet-4-6",
+      label: "Claude Sonnet 4.6 (claude-sonnet-4-6)",
+      recommended_tier: "smart",
+      source: "builtin",
+    },
+    {
+      id: "claude-opus-4-6",
+      label: "Claude Opus 4.6 (claude-opus-4-6)",
+      recommended_tier: "smart",
+      source: "builtin",
+    },
+  ],
+  codex_cli: [
+    {
+      id: "gpt-6-luna",
+      label: "GPT-6-Luna (gpt-6-luna) — Nhanh, tiết kiệm",
+      recommended_tier: "fast",
+      source: "builtin",
+    },
+    {
+      id: "gpt-6.1-sol",
+      label: "GPT-6.1-Sol (gpt-6.1-sol) — Suy luận & tạo bộ luật",
+      recommended_tier: "smart",
+      source: "builtin",
+    },
+    {
+      id: "codex-mini-latest",
+      label: "Codex Mini Latest (codex-mini-latest)",
+      recommended_tier: "fast",
+      source: "builtin",
+    },
+    {
+      id: "gpt-5-codex",
+      label: "GPT-5 Codex (gpt-5-codex)",
+      recommended_tier: "smart",
+      source: "builtin",
+    },
+  ],
+  agy_cli: [
+    {
+      id: "gemini-3.8-flash-medium",
+      label: "Gemini 3.8 Flash (Medium) (gemini-3.8-flash-medium)",
+      recommended_tier: "fast",
+      source: "builtin",
+    },
+    {
+      id: "gemini-4-carbon-medium",
+      label: "Gemini 4 Carbon (Medium) (gemini-4-carbon-medium)",
+      recommended_tier: "smart",
+      source: "builtin",
+    },
+    {
+      id: "gemini-2.5-flash",
+      label: "Gemini 2.5 Flash (gemini-2.5-flash)",
+      recommended_tier: "fast",
+      source: "builtin",
+    },
+    {
+      id: "gemini-2.5-pro",
+      label: "Gemini 2.5 Pro (gemini-2.5-pro)",
+      recommended_tier: "smart",
+      source: "builtin",
+    },
+  ],
+};
 
 interface SettingsScreenProps {
   settings: Settings;
@@ -27,6 +121,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 }) => {
   const [draft, setDraft] = useState<Settings>(settings);
   const [probes, setProbes] = useState<Record<AiProviderId, ProbeResult> | null>(null);
+  const [probingAi, setProbingAi] = useState(false);
+  const [customFastMode, setCustomFastMode] = useState(false);
+  const [customSmartMode, setCustomSmartMode] = useState(false);
   const [channels, setChannels] = useState<Channel[]>([]);
 
   const [tgToken, setTgToken] = useState("");
@@ -46,9 +143,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   }, [settings]);
 
   const loadAux = async () => {
-    const [p, ch] = await Promise.all([api.aiProbe(), api.channelList()]);
-    setProbes(p);
-    setChannels(ch);
+    setProbingAi(true);
+    try {
+      const [p, ch, refreshedSettings] = await Promise.all([
+        api.aiProbe(),
+        api.channelList(),
+        api.settingsGet(),
+      ]);
+      setProbes(p);
+      setChannels(ch);
+      setDraft(refreshedSettings);
+      onSettingsUpdated(refreshedSettings);
+    } finally {
+      setProbingAi(false);
+    }
   };
 
   useEffect(() => {
@@ -68,6 +176,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const activeProvider: AiProviderId = draft.ai_provider ?? "claude_cli";
   const tierMap = draft.model_tiers[activeProvider];
+  const activeProbe = probes?.[activeProvider];
+  const availableModels: AiModelOption[] =
+    activeProbe?.available_models && activeProbe.available_models.length > 0
+      ? activeProbe.available_models
+      : FALLBACK_MODELS_BY_PROVIDER[activeProvider];
+  const hasScannedLocalModels = availableModels.some((m) => m.source === "local_cli");
+
+  const fastInCatalog = availableModels.some((m) => m.id === tierMap.fast);
+  const smartInCatalog = availableModels.some((m) => m.id === tierMap.smart);
+  const showCustomFastInput = customFastMode || !fastInCatalog;
+  const showCustomSmartInput = customSmartMode || !smartInCatalog;
+
+  const fastRecommendedOptions = availableModels.filter((m) => m.recommended_tier === "fast");
+  const fastOtherOptions = availableModels.filter((m) => m.recommended_tier !== "fast");
+  const smartRecommendedOptions = availableModels.filter((m) => m.recommended_tier === "smart");
+  const smartOtherOptions = availableModels.filter((m) => m.recommended_tier !== "smart");
 
   return (
     <div>
@@ -95,13 +219,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* 1. AI Provider & Daily Cap (`06-ai-bridge.md §2, §6, §7`) */}
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>1. Nhà cung cấp CLI AI & Trần hạn mức ngày</h3>
-          <p className="field-hint">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <h3 style={{ marginTop: 0, marginBottom: 4 }}>
+              1. Nhà cung cấp CLI AI & Trần hạn mức ngày
+            </h3>
+            <span className={`badge ${hasScannedLocalModels ? "badge-success" : "badge-neutral"}`}>
+              {probingAi
+                ? "Đang quét danh sách model…"
+                : hasScannedLocalModels
+                  ? `✓ Đã tự quét ${availableModels.length} model từ CLI trên máy`
+                  : `Danh sách ${availableModels.length} model mặc định`}
+            </span>
+          </div>
+          <p className="field-hint" style={{ marginTop: 0 }}>
             Lưu ý riêng tư: Nội dung bài viết, tên group và tên hiển thị người đăng được gửi tới CLI
             AI bạn chọn để chấm khớp. ID tài khoản và đường dẫn bài không được gửi.
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.35fr 1.35fr 0.8fr", gap: 10 }}>
             <div className="field-group">
               <label className="field-label">CLI AI đang dùng</label>
               <select
@@ -110,6 +245,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 value={activeProvider}
                 onChange={async (e) => {
                   const p = e.target.value as AiProviderId;
+                  setCustomFastMode(false);
+                  setCustomSmartMode(false);
                   const s = await api.aiSetProvider(p);
                   setDraft(s);
                   onSettingsUpdated(s);
@@ -119,10 +256,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <option value="codex_cli">OpenAI Codex (`codex`)</option>
                 <option value="agy_cli">Antigravity (`agy`)</option>
               </select>
-              {probes?.[activeProvider] && (
+              {activeProbe && (
                 <span className="field-hint">
-                  {probes[activeProvider].installed
-                    ? `Đã cài (${probes[activeProvider].version})`
+                  {activeProbe.installed
+                    ? `Đã cài (${activeProbe.version ?? activeProbe.binary_name})`
                     : "Chưa cài trên máy"}
                 </span>
               )}
@@ -130,38 +267,136 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
             <div className="field-group">
               <label className="field-label">Mô hình tầng Fast (Chấm bài)</label>
-              <input
-                type="text"
-                className="input"
-                value={tierMap.fast}
-                onChange={(e) =>
+              <select
+                aria-label="Chọn mô hình tầng Fast"
+                className="select"
+                value={showCustomFastInput ? "__custom__" : tierMap.fast}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "__custom__") {
+                    setCustomFastMode(true);
+                    return;
+                  }
+                  setCustomFastMode(false);
                   setDraft((d) => ({
                     ...d,
                     model_tiers: {
                       ...d.model_tiers,
-                      [activeProvider]: { ...tierMap, fast: e.target.value },
+                      [activeProvider]: { ...tierMap, fast: val },
                     },
-                  }))
-                }
-              />
+                  }));
+                }}
+              >
+                {fastRecommendedOptions.length > 0 && (
+                  <optgroup label="★ Khuyến nghị cho tầng Fast (Nhanh & Tiết kiệm)">
+                    {fastRecommendedOptions.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {fastOtherOptions.length > 0 && (
+                  <optgroup label="Các model khác trên CLI">
+                    {fastOtherOptions.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <option value="__custom__">✍️ Tự nhập tên model khác…</option>
+              </select>
+              {showCustomFastInput ? (
+                <input
+                  type="text"
+                  aria-label="Nhập tên mô hình tầng Fast tuỳ chỉnh"
+                  className="input"
+                  style={{ marginTop: 6 }}
+                  placeholder="Nhập mã model (VD: claude-haiku-4-5)"
+                  value={tierMap.fast}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      model_tiers: {
+                        ...d.model_tiers,
+                        [activeProvider]: { ...tierMap, fast: e.target.value },
+                      },
+                    }))
+                  }
+                />
+              ) : (
+                <span className="field-hint">
+                  Mã CLI: <code>{tierMap.fast}</code>
+                </span>
+              )}
             </div>
 
             <div className="field-group">
               <label className="field-label">Mô hình tầng Smart (Đề xuất & Bộ luật)</label>
-              <input
-                type="text"
-                className="input"
-                value={tierMap.smart}
-                onChange={(e) =>
+              <select
+                aria-label="Chọn mô hình tầng Smart"
+                className="select"
+                value={showCustomSmartInput ? "__custom__" : tierMap.smart}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "__custom__") {
+                    setCustomSmartMode(true);
+                    return;
+                  }
+                  setCustomSmartMode(false);
                   setDraft((d) => ({
                     ...d,
                     model_tiers: {
                       ...d.model_tiers,
-                      [activeProvider]: { ...tierMap, smart: e.target.value },
+                      [activeProvider]: { ...tierMap, smart: val },
                     },
-                  }))
-                }
-              />
+                  }));
+                }}
+              >
+                {smartRecommendedOptions.length > 0 && (
+                  <optgroup label="★ Khuyến nghị cho tầng Smart (Suy luận & Bộ luật)">
+                    {smartRecommendedOptions.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {smartOtherOptions.length > 0 && (
+                  <optgroup label="Các model khác trên CLI">
+                    {smartOtherOptions.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <option value="__custom__">✍️ Tự nhập tên model khác…</option>
+              </select>
+              {showCustomSmartInput ? (
+                <input
+                  type="text"
+                  aria-label="Nhập tên mô hình tầng Smart tuỳ chỉnh"
+                  className="input"
+                  style={{ marginTop: 6 }}
+                  placeholder="Nhập mã model (VD: claude-sonnet-4-6)"
+                  value={tierMap.smart}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      model_tiers: {
+                        ...d.model_tiers,
+                        [activeProvider]: { ...tierMap, smart: e.target.value },
+                      },
+                    }))
+                  }
+                />
+              ) : (
+                <span className="field-hint">
+                  Mã CLI: <code>{tierMap.smart}</code>
+                </span>
+              )}
             </div>
 
             <div className="field-group">
@@ -179,7 +414,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -196,14 +431,51 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <button
               type="button"
               className="btn btn-sm"
+              disabled={probingAi}
               onClick={async () => {
-                const p = await api.aiProbe();
-                setProbes(p);
-                setBanner({ kind: "ok", text: "Đã dò lại trạng thái các CLI AI." });
+                setProbingAi(true);
+                try {
+                  const p = await api.aiProbe();
+                  const s = await api.settingsGet();
+                  setProbes(p);
+                  setDraft(s);
+                  onSettingsUpdated(s);
+                  setCustomFastMode(false);
+                  setCustomSmartMode(false);
+                  const count = p[activeProvider]?.available_models?.length ?? 0;
+                  setBanner({
+                    kind: "ok",
+                    text: `Đã dò lại các CLI AI và quét được ${count} model cho ${p[activeProvider]?.binary_name ?? activeProvider}.`,
+                  });
+                } finally {
+                  setProbingAi(false);
+                }
               }}
             >
-              Dò lại CLI
+              {probingAi ? "Đang dò CLI & model…" : "Dò lại CLI & Quét model"}
             </button>
+            {activeProbe?.recommended_fast_model && activeProbe?.recommended_smart_model && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => {
+                  const recFast = activeProbe.recommended_fast_model!;
+                  const recSmart = activeProbe.recommended_smart_model!;
+                  setCustomFastMode(false);
+                  setCustomSmartMode(false);
+                  setDraft((d) => ({
+                    ...d,
+                    model_tiers: {
+                      ...d.model_tiers,
+                      [activeProvider]: { fast: recFast, smart: recSmart },
+                    },
+                  }));
+                }}
+              >
+                Chọn model khuyến nghị ({activeProbe.recommended_fast_model} /{" "}
+                {activeProbe.recommended_smart_model})
+              </button>
+            )}
           </div>
         </div>
 

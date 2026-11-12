@@ -1,6 +1,8 @@
 // Durable Service Worker state persisted in `chrome.storage.local` (`02-extension.md §8–9`).
 // Never relies solely on in-memory globals so SW termination/restart is seamless.
 
+import { restoreQuickScanOptions, type QuickScanOptions } from "../scan-options";
+import type { ScanSummary } from "../messages";
 import { DEFAULT_EXTRACTOR_PROFILE } from "../content/extract";
 import {
   generateUlid,
@@ -68,6 +70,9 @@ export type ActiveCrawlRecord = {
 };
 
 export type ExtensionStorageState = {
+  quick_scan_options: QuickScanOptions;
+  automatic_scanning: boolean;
+  last_scan: ScanSummary | null;
   profile_id: string;
   config: ConfigUpdatePayload;
   load_timestamps: number[];
@@ -85,6 +90,9 @@ export type ExtensionStorageState = {
 export function createInitialStorageState(now: number = Date.now()): ExtensionStorageState {
   const ulidSuffix = generateUlid(now).slice(-8).toLowerCase();
   return {
+    quick_scan_options: restoreQuickScanOptions(null),
+    automatic_scanning: false,
+    last_scan: null,
     profile_id: `p_${ulidSuffix}`,
     config: {
       rev: 0,
@@ -206,6 +214,7 @@ export class StorageManager {
       ...base,
       ...partial,
       config: partial.config ?? base.config,
+      quick_scan_options: restoreQuickScanOptions(partial.quick_scan_options),
       pause: { ...base.pause, ...(partial.pause ?? {}) },
       session: { ...base.session, ...(partial.session ?? {}) },
       anomalies: { ...base.anomalies, ...(partial.anomalies ?? {}) },

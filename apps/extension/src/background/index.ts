@@ -13,6 +13,7 @@ import type {
   ContentInitResponse,
   CrawlPageResult,
   PopupStatusSnapshot,
+  PageContextResponse,
   RuntimeMessage,
 } from "../messages";
 import {
@@ -30,6 +31,7 @@ import {
   type SessionState,
   type SourceRef,
 } from "../protocol";
+import { isQuickScanOptions, type QuickScanOptions } from "../scan-options";
 import { OutboundQueue } from "./queue";
 import {
   applyConfigUpdate,
@@ -518,6 +520,23 @@ async function findExistingUserGroupTab(
   return null;
 }
 
+// Explicit current-tab mode must never select another open tab or silently create one.
+async function findCurrentGroupTab(externalId: string): Promise<chrome.tabs.Tab | null> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id === undefined || !tab.url) return null;
+  const slug = extractGroupSlugOrIdFromUrl(tab.url);
+  if (!slug) return null;
+  if (slug.toLowerCase() === externalId.toLowerCase()) return tab;
+  try {
+    const context = await chrome.tabs.sendMessage(tab.id, {
+      kind: "dealsonar:get-page-context",
+    }) as PageContextResponse | undefined;
+    // Facebook can expose a numeric group ID on a tab with a vanity slug URL.
+    if (context?.groupInfo?.external_id.toLowerCase() === externalId.toLowerCase()) return tab;
+  } catch { /* Content script unavailable: fail without touching a different tab. */ }
+  return null;
+}
+
 async function waitForTabComplete(
   tabId: number,
   timeoutMs: number,
@@ -567,23 +586,47 @@ async function cleanupOrphanedCrawlTab(now: number = Date.now()): Promise<void> 
   }
 }
 
+function crawlBlockMessage(reason: string | undefined): string {
+  const messages: Record<string, string> = {
+    desktop_disconnected: "Hãy mở DealSonar trên máy tính và kết nối lại.",
+    session_not_ok: "Hãy kiểm tra đăng nhập hoặc xác minh trên Facebook.",
+    checkpoint_requires_desktop_resume: "Hãy tiếp tục quét trong ứng dụng DealSonar sau khi xác minh.",
+    paused: "Đang tạm dừng. Hãy bấm Tiếp tục quét trước.",
+    network_backoff: "Kết nối đang gặp lỗi. Vui lòng thử lại sau.",
+    already_crawling: "Đang có một lượt quét khác. Vui lòng chờ.",
+    hourly_cap_reached: "Đã đạt giới hạn tải trang trong giờ. Vui lòng thử lại sau.",
+    daily_cap_reached: "Đã đạt giới hạn tải trang trong ngày. Vui lòng thử lại sau.",
+    source_min_interval: "Nhóm này vừa được quét. Hãy chờ ít nhất 4 phút giữa các lần tải mới.",
+  };
+  return messages[reason ?? ""] ?? "Chưa thể quét lúc này. Vui lòng thử lại sau.";
+}
+
 async function executeActiveCrawl(params: {
   sourceRef: SourceRef;
   reason: CrawlReason;
   maxPosts: number;
   bypassScheduleWindow: boolean;
-}): Promise<void> {
-  if (activeCrawlAbort !== null) return;
+  manualOptions?: QuickScanOptions;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (activeCrawlAbort !== null) return { ok: false, error: "Đang có một lượt quét khác. Vui lòng chờ." };
 
   const startedAt = Date.now();
   const runId = generateUlid(startedAt);
   const extId = params.sourceRef.external_id;
 
-  const existingTab = await findExistingUserGroupTab(extId);
+  const existingTab = params.manualOptions?.mode === "background" ? null
+    : params.manualOptions?.mode === "current_tab" ? await findCurrentGroupTab(extId)
+    : await findExistingUserGroupTab(extId);
+  if (params.manualOptions?.mode === "current_tab" && !existingTab) {
+    return { ok: false, error: "Hãy mở đúng nhóm đã chọn ở tab hiện tại hoặc chọn quét bằng tab nền." };
+  }
   const ownedTab = existingTab === null;
   const isIdle = await queryUserIdleState();
 
   const reservation = await storage.update((state) => {
+    if (params.reason === "scheduled" && !state.automatic_scanning) {
+      return { allowed: false as const, state, reason: "automatic_disabled" };
+    }
     const eligibility = checkCrawlEligibility(state, startedAt, {
       bypassScheduleWindow: params.bypassScheduleWindow,
       sourceExternalId: extId,
@@ -591,7 +634,7 @@ async function executeActiveCrawl(params: {
       isIdle,
     });
     if (!eligibility.allowed) {
-      return { allowed: false as const, state };
+      return { allowed: false as const, state, reason: eligibility.reason };
     }
     if (ownedTab) {
       recordPageLoad(state, startedAt);
@@ -608,7 +651,7 @@ async function executeActiveCrawl(params: {
 
   if (!reservation.allowed) {
     await syncSchedulerAlarm(reservation.state, startedAt);
-    return;
+    return { ok: false, error: crawlBlockMessage(reservation.reason) };
   }
 
   const abortController = new AbortController();
@@ -676,7 +719,7 @@ async function executeActiveCrawl(params: {
           },
           networkError: false,
         });
-        return;
+        return { ok: true };
       }
 
       // Wait random 2–5s jitter after document_idle (`02-extension.md §5.4`)
@@ -690,7 +733,7 @@ async function executeActiveCrawl(params: {
 
     // Reusing a user's open tab never scrolls their viewport (`maxScrollSteps: 0`)
     const maxScrollSteps = ownedTab
-      ? Math.max(0, Math.min(configSnapshot.policy.max_scroll_steps, 5))
+      ? Math.max(0, Math.min(params.manualOptions?.maxScrollSteps ?? configSnapshot.policy.max_scroll_steps, 5))
       : 0;
 
     const execMsg: BgCrawlExecuteMessage = {
@@ -790,6 +833,7 @@ async function executeActiveCrawl(params: {
     await updateActionBadge(finalState);
     await syncSchedulerAlarm(finalState, Date.now());
   }
+  return { ok: true };
 }
 
 async function finalizeCrawlResult(args: {
@@ -825,6 +869,11 @@ async function finalizeCrawlResult(args: {
       endedAt,
     );
 
+    state.last_scan = {
+      sourceExternalId: extId, status: outcomeSummary.reportStatus,
+      postsSeen: result.posts.length, postsNew: freshPosts.length,
+      endedAt, error: result.error,
+    };
     return { summary: outcomeSummary, newPosts: freshPosts };
   }, endedAt);
 
@@ -866,7 +915,7 @@ async function syncSchedulerAlarm(
   now: number,
 ): Promise<void> {
   if (typeof chrome === "undefined" || !chrome.alarms) return;
-  const nextTs = getNextScheduledTimestamp(state, now);
+  const nextTs = state.automatic_scanning ? getNextScheduledTimestamp(state, now) : null;
   if (nextTs === null) {
     await chrome.alarms.clear(ALARM_SCHEDULER);
     return;
@@ -885,6 +934,8 @@ async function runSchedulerTick(): Promise<void> {
     refreshExpiredPauseState(s, now);
     return s;
   }, now);
+
+  if (!state.automatic_scanning) return;
 
   const eligibility = checkCrawlEligibility(state, now, { isIdle });
   if (!eligibility.allowed) {
@@ -942,7 +993,12 @@ async function buildPopupStatus(now: number = Date.now()): Promise<PopupStatusSn
       updatedAt: state.session.updated_at,
     },
     lastCrawlAt: state.last_crawl_at,
-    nextCrawlAt: getNextScheduledTimestamp(state, now),
+    nextCrawlAt: state.automatic_scanning ? getNextScheduledTimestamp(state, now) : null,
+    automaticScanning: state.automatic_scanning,
+    scanOptions: state.quick_scan_options,
+    activeCrawl: state.active_crawl ? { sourceExternalId: state.active_crawl.source_external_id } : null,
+    lastScan: state.last_scan,
+    scanSources: state.config.plan.entries.map((entry) => entry.source_ref),
     followedGroupsCount: allFollowedIds.length,
     followedExternalIds: allFollowedIds,
     loadsLastHour: countLoadsInLastHour(state.load_timestamps, now),
@@ -1109,6 +1165,43 @@ async function handleRuntimeMessage(
       return { ok: true, acceptedNew };
     }
 
+    case "popup:set-automatic": {
+      if (typeof msg.enabled !== "boolean") throw new Error("Chế độ quét không hợp lệ");
+      const state = await storage.update((s) => { s.automatic_scanning = msg.enabled; return s; });
+      await syncSchedulerAlarm(state, now);
+      return buildPopupStatus(now);
+    }
+
+    case "popup:set-scan-options": {
+      if (!isQuickScanOptions(msg.options)) {
+        throw new Error("Tùy chọn không hợp lệ: số bài từ 1–100, số lần cuộn từ 0–5.");
+      }
+      await storage.update((state) => {
+        state.quick_scan_options = {
+          mode: msg.options.mode, maxPosts: msg.options.maxPosts, maxScrollSteps: msg.options.maxScrollSteps,
+        };
+      });
+      return buildPopupStatus();
+    }
+
+    case "popup:scan-now": {
+      const source = msg.source;
+      if (source?.platform !== "facebook" || source.kind !== "group" ||
+          typeof source.external_id !== "string" || !/^[a-zA-Z0-9._-]{1,200}$/.test(source.external_id)) {
+        return { ok: false, error: "Hãy chọn một nhóm Facebook hợp lệ.", status: await buildPopupStatus() };
+      }
+      if (msg.options !== undefined && !isQuickScanOptions(msg.options)) {
+        return { ok: false, error: "Tùy chọn quét không hợp lệ.", status: await buildPopupStatus() };
+      }
+      // Capture visible settings for this run, even if another panel saves different defaults.
+      const options = msg.options ?? (await storage.read()).quick_scan_options;
+      const result = await executeActiveCrawl({
+        sourceRef: source, reason: "manual", maxPosts: options.maxPosts,
+        bypassScheduleWindow: true, manualOptions: options,
+      });
+      return { ...result, status: await buildPopupStatus() };
+    }
+
     case "popup:get-status": {
       if (!nativePort) {
         void ensureNativeConnected(false);
@@ -1175,6 +1268,8 @@ async function handleRuntimeMessage(
 
 function bootstrapServiceWorker(): void {
   if (typeof chrome === "undefined" || !chrome.runtime) return;
+
+  void chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(console.error);
 
   const setupKeepaliveAlarm = () => {
     chrome.alarms?.create(ALARM_KEEPALIVE, { periodInMinutes: 1 });
