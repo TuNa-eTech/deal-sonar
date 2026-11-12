@@ -1,0 +1,15 @@
+{
+  "name": "dealsonar",
+  "private": true,
+  "packageManager": "pnpm@9.12.3",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "ext:dev": "pnpm --filter @dealsonar/extension dev",
+    "ext:build": "pnpm --filter @dealsonar/extension build",
+    "ext:typecheck": "pnpm --filter @dealsonar/extension typecheck",
+    "rust:check": "cargo check --workspace",
+    "rust:test": "cargo test --workspace",
+    "rust:lint": "cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check",
+    "desktop": "cargo run -p dealsonar-desktop"
+  }
+}

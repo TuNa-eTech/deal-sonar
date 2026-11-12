@@ -1,0 +1,16 @@
+[package]
+name = "dealsonar-native-host"
+description = "Chrome Native Messaging host: bridges the extension (stdio) to the desktop app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "dealsonar-native-host"
+path = "src/main.rs"
+
+[dependencies]
+dealsonar-protocol.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
