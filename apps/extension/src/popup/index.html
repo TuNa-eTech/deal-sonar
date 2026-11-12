@@ -1,13 +1,103 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DealSonar</title>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body style="width: 280px; font-family: system-ui, sans-serif">
-    <h3>DealSonar</h3>
-    <button id="ping">Ping desktop app</button>
-    <pre id="out"></pre>
+  <body>
+    <main class="popup-shell">
+      <header class="header">
+        <div class="brand">
+          <span class="brand-mark">DS</span>
+          <h1 class="brand-title">DealSonar</h1>
+        </div>
+        <span id="ext-version" class="version-pill">v0.2.0</span>
+      </header>
+
+      <!-- Kết nối Desktop & Phiên Facebook -->
+      <section class="card">
+        <div class="status-row">
+          <span class="status-label">Ứng dụng Desktop</span>
+          <span class="lamp-wrap">
+            <span id="desktop-lamp" class="lamp"></span>
+            <span id="desktop-status-text">Đang kiểm tra…</span>
+          </span>
+        </div>
+
+        <div id="desktop-help" class="help-box error hidden">
+          <div id="desktop-help-msg">
+            Hãy mở ứng dụng DealSonar trên máy tính (kiểm tra biểu tượng ở khay hệ thống), sau đó bấm thử lại.
+          </div>
+          <div class="help-actions">
+            <button id="btn-open-desktop" type="button" class="primary">Mở DealSonar</button>
+            <button id="btn-reconnect" type="button">Thử lại</button>
+          </div>
+        </div>
+
+        <div class="status-row">
+          <span class="status-label">Phiên Facebook</span>
+          <span id="fb-session-badge" class="badge ok">Đang hoạt động</span>
+        </div>
+
+        <div id="fb-session-help" class="help-box hidden">
+          <div id="fb-session-msg"></div>
+          <div id="fb-session-actions" class="help-actions hidden">
+            <button id="btn-open-fb" type="button">Mở Facebook</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Thao tác theo ngữ cảnh khi đang mở trang Group -->
+      <section id="group-context-card" class="card group-card hidden">
+        <div id="group-context-name" class="group-name"></div>
+        <div id="group-context-meta" class="group-meta"></div>
+        <div id="group-action-container">
+          <button id="btn-follow-group" type="button" class="primary">
+            Theo dõi group này
+          </button>
+          <span id="badge-following-group" class="followed-badge hidden">
+            Đang theo dõi ✓
+          </span>
+        </div>
+      </section>
+
+      <!-- Thống kê lịch quét -->
+      <section class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-title">Lần quét gần nhất</div>
+          <div id="stat-last-crawl" class="stat-value">Chưa quét</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-title">Lần quét kế tiếp</div>
+          <div id="stat-next-crawl" class="stat-value">Đang chờ lịch</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-title">Group đang theo dõi</div>
+          <div id="stat-groups-count" class="stat-value">0 nhóm</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-title">Tải trang giờ qua</div>
+          <div id="stat-hourly-loads" class="stat-value">0 / 60</div>
+        </div>
+      </section>
+
+      <!-- Tạm dừng / Tiếp tục quét -->
+      <section class="card">
+        <div id="pause-status-label" class="pause-section-title">
+          Điều khiển quét tự động
+        </div>
+        <div id="pause-active-controls" class="btn-row">
+          <button id="btn-pause-1h" type="button">Tạm dừng 1 giờ</button>
+          <button id="btn-pause-indef" type="button">Tạm dừng tới khi bật lại</button>
+        </div>
+        <div id="pause-resumed-controls" class="btn-row hidden">
+          <button id="btn-resume" type="button" class="primary">Tiếp tục quét</button>
+        </div>
+      </section>
+    </main>
+
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
