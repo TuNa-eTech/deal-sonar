@@ -186,6 +186,7 @@ impl CoreServiceBuilder {
             previews: Mutex::new(std::collections::HashMap::new()),
             latest_preview_by_radar: Mutex::new(std::collections::HashMap::new()),
             last_emitted_health: Mutex::new(None),
+            outbox_tracker: Mutex::new(BTreeMap::new()),
             os_notify_hook: RwLock::new(self.os_notify_hook),
             event_tx,
             job_wake: Arc::new(Notify::new()),
@@ -198,6 +199,9 @@ impl CoreServiceBuilder {
             inflight_ai_notify: Arc::new(Notify::new()),
             started_at_ms,
         });
+
+        // Restore persisted outbox pending/failed state across restarts
+        rt.restore_outbox_tracker()?;
 
         // Enforce license limits on startup (e.g. if a Pro license expired while app was closed)
         let boot_license = rt.current_license_status(started_at_ms)?;
@@ -1178,9 +1182,10 @@ impl CoreService {
 
         // If `label == Missed` on a rejected evaluation (`origin == App`), promote to Inbox lead silently
         let mut target_lead_id = input.lead_id.clone();
+        let mut created_new_lead = false;
         if input.label == FeedbackLabel::Missed && target_lead_id.is_none() {
             if let Some(ver) = self.rt.store.radar_get_version(&fb_rec.radar_version_id)? {
-                let (created_lead, _) = self.rt.store.create_lead(&CreateLeadInput {
+                let (created_lead, was_created) = self.rt.store.create_lead(&CreateLeadInput {
                     id: None,
                     radar_id: ver.radar_id,
                     radar_version_id: ver.id,
@@ -1199,6 +1204,7 @@ impl CoreService {
                     now_ms: now,
                 })?;
                 target_lead_id = Some(created_lead.id);
+                created_new_lead = was_created;
             }
         }
 
@@ -1224,7 +1230,11 @@ impl CoreService {
             None => None,
         };
         if let Some(l) = &updated_lead {
-            self.rt.emit(CoreEvent::LeadUpdated(l.clone()));
+            if created_new_lead {
+                self.rt.emit(CoreEvent::LeadNew(l.clone()));
+            } else {
+                self.rt.emit(CoreEvent::LeadUpdated(l.clone()));
+            }
         }
 
         Ok(LeadFeedbackResult {
@@ -2014,6 +2024,9 @@ impl CoreService {
         self.ensure_not_shutting_down()?;
         let existing = self.rt.store.channel_get(id)?;
         let removed = self.rt.store.channel_delete(id)?;
+        if removed {
+            self.rt.remove_channel_from_outbox_tracker(id)?;
+        }
         if let Some(ch) = existing {
             if ch.kind == "webhook" {
                 let _ = self.rt.secrets.delete_secret(&webhook_channel_key(&ch.id));
@@ -2305,8 +2318,7 @@ impl CoreService {
             }
         }
 
-        self.rt.outbox_pending.store(0, Ordering::Relaxed);
-        self.rt.outbox_failed.store(0, Ordering::Relaxed);
+        self.rt.clear_outbox_tracker_in_memory();
         self.rt.previews.lock().expect("previews lock").clear();
         self.rt
             .latest_preview_by_radar

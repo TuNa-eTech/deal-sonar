@@ -400,13 +400,13 @@ fn handle_body(
                 }
             }
 
-            // Detect 3 consecutive `empty` crawls across distinct sources (`02-extension.md §4`)
+            // Detect 3 consecutive `empty` crawls across distinct sources while session is `ok` (`02-extension.md §4`)
             let mut alert_broken_count: Option<usize> = None;
             let mut alert_recovered = false;
             {
                 let mut hub = rt.ipc_hub.state.lock().expect("ipc state lock");
                 match status {
-                    CrawlStatus::Empty => {
+                    CrawlStatus::Empty if hub.facebook_session == FacebookSessionState::Ok => {
                         if !hub
                             .consecutive_empty_sources
                             .iter()

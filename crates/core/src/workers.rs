@@ -354,7 +354,7 @@ async fn deliver_single_outbox_item(
         let updated =
             rt.store
                 .retry_or_drop_outbox(&item.id, "channel_deleted", None, 1, -1, now)?;
-        reconcile_outbox_counters_after_update(rt, &updated.state);
+        rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
         return Ok(());
     };
 
@@ -372,7 +372,7 @@ async fn deliver_single_outbox_item(
                     MAX_OUTBOX_QUEUE_AGE_MS,
                     now,
                 )?;
-                reconcile_outbox_counters_after_update(rt, &updated.state);
+                rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
                 return Ok(());
             };
 
@@ -390,7 +390,7 @@ async fn deliver_single_outbox_item(
                         Some(&message_id.to_string()),
                         finished_now,
                     )?;
-                    decrement_saturating(&rt.outbox_pending);
+                    rt.update_outbox_tracked_state(&item.id, &item.channel_id, "sent")?;
                     if let Some(lid) = &item.lead_id {
                         if let Some(dto) = load_lead_dto(rt, lid)? {
                             rt.emit(CoreEvent::LeadUpdated(dto));
@@ -407,7 +407,7 @@ async fn deliver_single_outbox_item(
                         MAX_OUTBOX_QUEUE_AGE_MS,
                         finished_now,
                     )?;
-                    reconcile_outbox_counters_after_update(rt, &updated.state);
+                    rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
                 }
                 TelegramDeliveryOutcome::RetryableNetwork { next_delay_s } => {
                     let next_ts = finished_now.saturating_add((next_delay_s as i64) * 1000);
@@ -419,7 +419,7 @@ async fn deliver_single_outbox_item(
                         MAX_OUTBOX_QUEUE_AGE_MS,
                         finished_now,
                     )?;
-                    reconcile_outbox_counters_after_update(rt, &updated.state);
+                    rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
                 }
                 TelegramDeliveryOutcome::AuthRevoked => {
                     rt.store.channel_set_state(&channel.id, "error")?;
@@ -431,7 +431,7 @@ async fn deliver_single_outbox_item(
                         MAX_OUTBOX_QUEUE_AGE_MS,
                         finished_now,
                     )?;
-                    reconcile_outbox_counters_after_update(rt, &updated.state);
+                    rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
                     rt.emit_health_if_changed(finished_now)?;
                 }
                 TelegramDeliveryOutcome::Dropped { reason } => {
@@ -443,7 +443,7 @@ async fn deliver_single_outbox_item(
                         -1, // Force `dropped` state
                         finished_now,
                     )?;
-                    reconcile_outbox_counters_after_update(rt, &updated.state);
+                    rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
                 }
                 TelegramDeliveryOutcome::PermanentFailure {
                     status_code,
@@ -458,7 +458,7 @@ async fn deliver_single_outbox_item(
                         MAX_OUTBOX_QUEUE_AGE_MS,
                         finished_now,
                     )?;
-                    reconcile_outbox_counters_after_update(rt, &updated.state);
+                    rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
                 }
             }
         }
@@ -480,7 +480,7 @@ async fn deliver_single_outbox_item(
                     MAX_OUTBOX_QUEUE_AGE_MS,
                     now,
                 )?;
-                reconcile_outbox_counters_after_update(rt, &updated.state);
+                rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
                 return Ok(());
             };
 
@@ -499,7 +499,7 @@ async fn deliver_single_outbox_item(
                         Some(&format!("http:{status_code}")),
                         finished_now,
                     )?;
-                    decrement_saturating(&rt.outbox_pending);
+                    rt.update_outbox_tracked_state(&item.id, &item.channel_id, "sent")?;
                     if let Some(lid) = &item.lead_id {
                         if let Some(dto) = load_lead_dto(rt, lid)? {
                             rt.emit(CoreEvent::LeadUpdated(dto));
@@ -519,7 +519,7 @@ async fn deliver_single_outbox_item(
                         MAX_OUTBOX_QUEUE_AGE_MS,
                         finished_now,
                     )?;
-                    reconcile_outbox_counters_after_update(rt, &updated.state);
+                    rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
                 }
                 WebhookDeliveryOutcome::Exhausted { reason } => {
                     let updated = rt.store.retry_or_drop_outbox(
@@ -530,7 +530,7 @@ async fn deliver_single_outbox_item(
                         MAX_OUTBOX_QUEUE_AGE_MS,
                         finished_now,
                     )?;
-                    reconcile_outbox_counters_after_update(rt, &updated.state);
+                    rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
                 }
             }
         }
@@ -544,7 +544,7 @@ async fn deliver_single_outbox_item(
                 MAX_OUTBOX_QUEUE_AGE_MS,
                 now,
             )?;
-            reconcile_outbox_counters_after_update(rt, &updated.state);
+            rt.update_outbox_tracked_state(&item.id, &item.channel_id, &updated.state)?;
         }
     }
 
@@ -569,25 +569,6 @@ fn parse_telegram_send_request(payload: &Value) -> CoreResult<SendMessageRequest
         _ => None,
     };
     Ok(SendMessageRequest::html(chat_id, text, reply_markup))
-}
-
-fn reconcile_outbox_counters_after_update(rt: &CoreRuntime, new_state: &str) {
-    match new_state {
-        "dropped" => {
-            decrement_saturating(&rt.outbox_pending);
-        }
-        "failed" => {
-            decrement_saturating(&rt.outbox_pending);
-            rt.outbox_failed.fetch_add(1, Ordering::Relaxed);
-        }
-        _ => {}
-    }
-}
-
-fn decrement_saturating(counter: &std::sync::atomic::AtomicUsize) {
-    let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |cur| {
-        Some(cur.saturating_sub(1))
-    });
 }
 
 // ============================================================================

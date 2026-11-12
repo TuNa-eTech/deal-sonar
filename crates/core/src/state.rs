@@ -16,6 +16,7 @@ use dealsonar_protocol::ipc::IpcEndpoint;
 use dealsonar_protocol::{Body, Envelope};
 use dealsonar_store::models::{now_ms, EnqueueOutboxInput};
 use dealsonar_store::Store;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::{broadcast, mpsc, watch, Notify};
 
@@ -315,6 +316,16 @@ impl Drop for InflightAiGuard {
     }
 }
 
+pub const OUTBOX_TRACKER_SETTING_KEY: &str = "runtime.outbox_tracker";
+
+/// Persisted state of a pending or failed outbox entry so `HealthStatus.outbox_pending` and
+/// `HealthStatus.outbox_failed` stay accurate across app restarts and `channel_remove`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutboxTrackerEntry {
+    pub channel_id: String,
+    pub state: String,
+}
+
 /// Shared runtime state held by `CoreService`, `IpcServer`, pipeline, preview, and background workers.
 pub struct CoreRuntime {
     pub config: CoreConfig,
@@ -330,6 +341,7 @@ pub struct CoreRuntime {
     pub previews: Mutex<HashMap<String, PreviewRunState>>,
     pub latest_preview_by_radar: Mutex<HashMap<String, String>>,
     pub last_emitted_health: Mutex<Option<HealthStatus>>,
+    pub outbox_tracker: Mutex<BTreeMap<String, OutboxTrackerEntry>>,
     pub os_notify_hook: RwLock<Option<OsNotificationHook>>,
     pub event_tx: broadcast::Sender<CoreEvent>,
     pub job_wake: Arc<Notify>,
@@ -571,6 +583,51 @@ impl CoreRuntime {
         })
     }
 
+    fn sync_outbox_atomics_from_map(&self, map: &BTreeMap<String, OutboxTrackerEntry>) {
+        let mut pending = 0usize;
+        let mut failed = 0usize;
+        for entry in map.values() {
+            match entry.state.as_str() {
+                "pending" => pending += 1,
+                "failed" => failed += 1,
+                _ => {}
+            }
+        }
+        self.outbox_pending.store(pending, Ordering::Relaxed);
+        self.outbox_failed.store(failed, Ordering::Relaxed);
+    }
+
+    /// Restore persisted `runtime.outbox_tracker` on startup, pruning orphaned channels or terminal states.
+    pub fn restore_outbox_tracker(&self) -> CoreResult<()> {
+        let existing_channel_ids: HashSet<String> = self
+            .store
+            .channel_list()?
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+
+        let mut loaded: BTreeMap<String, OutboxTrackerEntry> = self
+            .store
+            .get_setting(OUTBOX_TRACKER_SETTING_KEY)?
+            .unwrap_or_default();
+        let before_len = loaded.len();
+        loaded.retain(|_, entry| {
+            existing_channel_ids.contains(&entry.channel_id)
+                && matches!(entry.state.as_str(), "pending" | "failed")
+        });
+        if loaded.len() != before_len {
+            if loaded.is_empty() {
+                self.store.delete_setting(OUTBOX_TRACKER_SETTING_KEY)?;
+            } else {
+                self.store
+                    .set_setting(OUTBOX_TRACKER_SETTING_KEY, &loaded)?;
+            }
+        }
+        self.sync_outbox_atomics_from_map(&loaded);
+        *self.outbox_tracker.lock().expect("outbox tracker lock") = loaded;
+        Ok(())
+    }
+
     fn count_outbox_states(&self) -> CoreResult<(usize, usize)> {
         Ok((
             self.outbox_pending.load(Ordering::Relaxed),
@@ -578,14 +635,89 @@ impl CoreRuntime {
         ))
     }
 
-    /// Enqueue an outbox row and increment the live `outbox_pending` counter.
+    /// Enqueue an outbox row and persist its `pending` state in `runtime.outbox_tracker`.
     pub fn enqueue_outbox_tracked(
         &self,
         input: &EnqueueOutboxInput,
     ) -> CoreResult<dealsonar_store::models::OutboxRecord> {
         let rec = self.store.enqueue_outbox(input)?;
-        self.outbox_pending.fetch_add(1, Ordering::Relaxed);
+        let snapshot = {
+            let mut guard = self.outbox_tracker.lock().expect("outbox tracker lock");
+            guard.insert(
+                rec.id.clone(),
+                OutboxTrackerEntry {
+                    channel_id: rec.channel_id.clone(),
+                    state: "pending".to_string(),
+                },
+            );
+            self.sync_outbox_atomics_from_map(&guard);
+            guard.clone()
+        };
+        self.store
+            .set_setting(OUTBOX_TRACKER_SETTING_KEY, &snapshot)?;
         Ok(rec)
+    }
+
+    /// Update or remove a tracked outbox item's state (`pending`, `failed`, `sent`, `dropped`).
+    pub fn update_outbox_tracked_state(
+        &self,
+        outbox_id: &str,
+        channel_id: &str,
+        new_state: &str,
+    ) -> CoreResult<()> {
+        let snapshot = {
+            let mut guard = self.outbox_tracker.lock().expect("outbox tracker lock");
+            match new_state {
+                "pending" | "failed" => {
+                    guard.insert(
+                        outbox_id.to_string(),
+                        OutboxTrackerEntry {
+                            channel_id: channel_id.to_string(),
+                            state: new_state.to_string(),
+                        },
+                    );
+                }
+                _ => {
+                    guard.remove(outbox_id);
+                }
+            }
+            self.sync_outbox_atomics_from_map(&guard);
+            guard.clone()
+        };
+        if snapshot.is_empty() {
+            self.store.delete_setting(OUTBOX_TRACKER_SETTING_KEY)?;
+        } else {
+            self.store
+                .set_setting(OUTBOX_TRACKER_SETTING_KEY, &snapshot)?;
+        }
+        Ok(())
+    }
+
+    /// Remove all tracked pending/failed outbox entries belonging to a deleted channel.
+    pub fn remove_channel_from_outbox_tracker(&self, channel_id: &str) -> CoreResult<()> {
+        let snapshot = {
+            let mut guard = self.outbox_tracker.lock().expect("outbox tracker lock");
+            guard.retain(|_, entry| entry.channel_id != channel_id);
+            self.sync_outbox_atomics_from_map(&guard);
+            guard.clone()
+        };
+        if snapshot.is_empty() {
+            self.store.delete_setting(OUTBOX_TRACKER_SETTING_KEY)?;
+        } else {
+            self.store
+                .set_setting(OUTBOX_TRACKER_SETTING_KEY, &snapshot)?;
+        }
+        Ok(())
+    }
+
+    /// Clear in-memory outbox tracker after `store.delete_all_data()`.
+    pub fn clear_outbox_tracker_in_memory(&self) {
+        self.outbox_tracker
+            .lock()
+            .expect("outbox tracker lock")
+            .clear();
+        self.outbox_pending.store(0, Ordering::Relaxed);
+        self.outbox_failed.store(0, Ordering::Relaxed);
     }
 
     /// Emit `health:changed` only when operational fields differ from the previous snapshot.

@@ -847,22 +847,44 @@ pub async fn run_audit_ruleset(
 
     let queue_key = format!("runtime.audit_queue.{ruleset_id}");
     let eval_ids: Vec<String> = rt.store.get_setting(&queue_key)?.unwrap_or_default();
-    rt.store.delete_setting(&queue_key)?;
 
     if eval_ids.is_empty() {
         return Ok(false);
     }
 
+    let batch_ids: Vec<String> = eval_ids.iter().take(30).cloned().collect();
+    let batch_id_set: std::collections::HashSet<&str> =
+        batch_ids.iter().map(String::as_str).collect();
+
     let mut evals_and_posts: Vec<(EvaluationRecord, dealsonar_store::models::PostDetail)> =
         Vec::new();
-    for eid in eval_ids.into_iter().take(30) {
-        if let Some(ev) = rt.store.get_evaluation(&eid)? {
+    for eid in &batch_ids {
+        if let Some(ev) = rt.store.get_evaluation(eid)? {
             if let Some(pd) = rt.store.post_get(&ev.post_id)? {
                 evals_and_posts.push((ev, pd));
             }
         }
     }
     if evals_and_posts.is_empty() {
+        let mut latest_queue: Vec<String> = rt.store.get_setting(&queue_key)?.unwrap_or_default();
+        latest_queue.retain(|id| !batch_id_set.contains(id.as_str()));
+        if latest_queue.is_empty() {
+            rt.store.delete_setting(&queue_key)?;
+        } else {
+            rt.store.set_setting(&queue_key, &latest_queue)?;
+            let dedup = format!("audit_ruleset:{ruleset_id}");
+            let cleanup_now = now_ms();
+            let _ = rt.store.enqueue_job(
+                "audit_ruleset",
+                Some(&dedup),
+                &serde_json::json!({
+                    "radar_version_id": radar_version_id,
+                    "ruleset_id": ruleset_id,
+                }),
+                cleanup_now.saturating_add(60_000),
+                cleanup_now,
+            )?;
+        }
         return Ok(false);
     }
 
@@ -897,6 +919,27 @@ pub async fn run_audit_ruleset(
     };
 
     let now = now_ms();
+
+    // Only dequeue processed audit IDs AFTER `judge_extract_all` succeeds, preserving any IDs
+    // beyond `.take(30)` as well as any IDs appended concurrently while AI was in flight!
+    let mut latest_queue: Vec<String> = rt.store.get_setting(&queue_key)?.unwrap_or_default();
+    latest_queue.retain(|id| !batch_id_set.contains(id.as_str()));
+    if latest_queue.is_empty() {
+        rt.store.delete_setting(&queue_key)?;
+    } else {
+        rt.store.set_setting(&queue_key, &latest_queue)?;
+        let dedup = format!("audit_ruleset:{ruleset_id}");
+        let _ = rt.store.enqueue_job(
+            "audit_ruleset",
+            Some(&dedup),
+            &serde_json::json!({
+                "radar_version_id": radar_version_id,
+                "ruleset_id": ruleset_id,
+            }),
+            now.saturating_add(60_000),
+            now,
+        )?;
+    }
     for call in &report.calls {
         let _ = rt.store.record_ai_call(&RecordAiCallInput {
             id: None,

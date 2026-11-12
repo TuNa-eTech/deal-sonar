@@ -150,6 +150,11 @@ pub fn build_crawl_policy(settings: &CrawlPolicySettings) -> CrawlPolicy {
 }
 
 /// Build the declarative data-only [`ExtractorProfile`] pushed inside `config.update` (`02-extension.md §4`).
+///
+/// Emits empty override objects (`{}`) for `network`, `dom`, and `session_markers` so the extension's
+/// `resolveNetworkConfig` / `resolveDomConfig` / `resolveSessionMarkers` preserve all built-in defaults
+/// (including `[role="feed"] [role="article"], [role="main"] [role="article"], div[role="article"]`)
+/// unless explicitly hot-patched.
 pub fn default_extractor_profile(rev: u64) -> ExtractorProfile {
     ExtractorProfile {
         rev: rev.max(1),
@@ -158,22 +163,9 @@ pub fn default_extractor_profile(rev: u64) -> ExtractorProfile {
             ExtractionStrategy::Embedded,
             ExtractionStrategy::Dom,
         ],
-        network: json!({
-            "graphql_path": "/api/graphql/",
-            "feed_friendly_names": [
-                "GroupsCometFeedRegularStoriesPaginationQuery",
-                "CometGroupDiscussionRootSuccessQuery"
-            ]
-        }),
-        dom: json!({
-            "feed_role": "feed",
-            "article_selector": "[role=\"feed\"] [role=\"article\"]",
-            "permalink_patterns": ["/groups/", "/posts/", "permalink/"]
-        }),
-        session_markers: json!({
-            "checkpoint_paths": ["/checkpoint/", "/two_step_verification/"],
-            "login_paths": ["/login", "/recover/"]
-        }),
+        network: json!({}),
+        dom: json!({}),
+        session_markers: json!({}),
     }
 }
 

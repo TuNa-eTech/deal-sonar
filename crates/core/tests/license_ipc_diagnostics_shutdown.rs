@@ -359,9 +359,81 @@ async fn ipc_malformed_frames_extractor_broken_and_checkpoint_pause_resume() {
         .await
         .expect("hello");
     let _ = recv_host_env(&mut stream).await; // HelloOk
-    let _ = recv_host_env(&mut stream).await; // ConfigUpdate
+    let cfg_env = recv_host_env(&mut stream).await; // ConfigUpdate
+    match cfg_env.body {
+        Body::ConfigUpdate { extractor, .. } => {
+            assert_eq!(
+                extractor.dom,
+                serde_json::json!({}),
+                "default_extractor_profile MUST emit empty dom JSON so extension preserves full DEFAULT_DOM_CONFIG.article_selector"
+            );
+            assert_eq!(extractor.network, serde_json::json!({}));
+            assert_eq!(extractor.session_markers, serde_json::json!({}));
+        }
+        other => panic!("expected Body::ConfigUpdate after Hello, got {other:?}"),
+    }
 
-    // 2. Three consecutive `CrawlStatus::Empty` reports across 3 distinct sources -> `extractor_broken`!
+    // 2a. Three `CrawlStatus::Empty` reports while `facebook_session != Ok` (`LoggedOut`)
+    //     MUST NOT falsely flag `extractor_broken` (`02-extension.md §4`)!
+    let sess_lo = Envelope::new(Body::SessionStatus {
+        platform: "facebook".to_string(),
+        state: SessionState::LoggedOut,
+        detail: Some("cookie expired".to_string()),
+    });
+    write_envelope_async(&mut stream, &sess_lo, MAX_EXT_TO_HOST_BYTES)
+        .await
+        .expect("send logged_out");
+    let _ = recv_host_env(&mut stream).await; // CrawlPause or Ack
+    let _ = recv_host_env(&mut stream).await; // Ack or CrawlPause
+
+    for idx in 1..=3 {
+        let rep = Envelope::new(Body::CrawlReport {
+            run_id: dealsonar_protocol::new_ulid(),
+            source_ref: SourceRef {
+                platform: "facebook".to_string(),
+                kind: "group".to_string(),
+                external_id: format!("logged_out_empty_src_{idx}"),
+            },
+            reason: CrawlReason::Scheduled,
+            status: CrawlStatus::Empty,
+            started_at: now_ms() - 2_000,
+            ended_at: now_ms(),
+            posts_seen: 0,
+            posts_new: 0,
+            page_loads: 1,
+            strategy: Some(ExtractionStrategy::Dom),
+            error: None,
+            dropped_posts: None,
+        });
+        write_envelope_async(&mut stream, &rep, MAX_EXT_TO_HOST_BYTES)
+            .await
+            .expect("send empty report while logged out");
+        let ack = recv_host_env(&mut stream).await;
+        assert!(matches!(ack.body, Body::Ack { accepted: 1, .. }));
+    }
+    assert!(
+        !service
+            .runtime()
+            .ipc_hub
+            .state
+            .lock()
+            .unwrap()
+            .extractor_broken,
+        "empty crawls while facebook_session == LoggedOut MUST NOT flag extractor_broken!"
+    );
+
+    // Restore `SessionState::Ok` before testing healthy-session empty crawl detection
+    let sess_restore_ok = Envelope::new(Body::SessionStatus {
+        platform: "facebook".to_string(),
+        state: SessionState::Ok,
+        detail: None,
+    });
+    write_envelope_async(&mut stream, &sess_restore_ok, MAX_EXT_TO_HOST_BYTES)
+        .await
+        .expect("restore ok");
+    let _ = recv_host_env(&mut stream).await; // Ack
+
+    // 2b. Three consecutive `CrawlStatus::Empty` reports across 3 distinct sources while `facebook_session == Ok` -> `extractor_broken`!
     for idx in 1..=3 {
         let rep = Envelope::new(Body::CrawlReport {
             run_id: dealsonar_protocol::new_ulid(),
@@ -387,7 +459,7 @@ async fn ipc_malformed_frames_extractor_broken_and_checkpoint_pause_resume() {
         let ack = recv_host_env(&mut stream).await;
         assert!(matches!(ack.body, Body::Ack { accepted: 1, .. }));
     }
-    assert_eq!(service.crawl_run_list(None, 10).expect("runs").len(), 3);
+    assert_eq!(service.crawl_run_list(None, 10).expect("runs").len(), 6);
     assert!(
         service
             .runtime()
@@ -763,4 +835,196 @@ async fn diagnostic_zip_redaction_os_notify_data_lifecycle_and_graceful_shutdown
     );
     let suggest_res = inflight_task.await.expect("join inflight task");
     assert!(suggest_res.is_ok());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn outbox_health_counters_persist_across_restart_and_clear_on_channel_remove() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().join("outbox_persist.sqlite3");
+    let backups_dir = tmp.path().join("backups");
+
+    let signer = LicenseSigner::generate_for_test();
+    let pro_token = signer
+        .sign(&LicensePayload {
+            plan: PlanTier::Pro,
+            licensee: "Outbox Durability Co".to_string(),
+            issued_at: now_ms() - 10_000,
+            expires_at: Some(now_ms() + 86_400_000),
+        })
+        .expect("sign pro");
+
+    let secrets = Arc::new(InMemorySecretStore::new());
+    let store1 = Store::open(&db_path, &backups_dir).expect("open store1");
+    let service1 = CoreServiceBuilder::new(store1)
+        .with_config(CoreConfig {
+            data_dir: tmp.path().join("data"),
+            spawn_background_workers: false,
+            ..CoreConfig::default()
+        })
+        .with_secrets(secrets.clone())
+        .with_license_verifier(signer.verifier())
+        .start()
+        .expect("start service1");
+
+    service1.license_set(&pro_token).expect("set pro");
+
+    let wh_pending = service1
+        .webhook_add(
+            "Retryable Webhook",
+            "http://127.0.0.1:9/unreachable-pending",
+            Some("whsec_valid_retryable_secret_111"),
+        )
+        .expect("add wh_pending");
+    let wh_failed = service1
+        .webhook_add(
+            "Broken Secret Webhook",
+            "http://127.0.0.1:9/broken-failed",
+            Some("whsec_temp_secret_222"),
+        )
+        .expect("add wh_failed");
+    // Delete `wh_failed`'s secret so delivery permanently marks its outbox entry `"failed"`
+    secrets
+        .delete_secret(&dealsonar_notify::webhook_channel_key(&wh_failed.id))
+        .expect("delete wh_failed secret");
+
+    let now = now_ms();
+    service1
+        .store()
+        .upsert_discovered_sources(
+            &[DiscoveredSourceInput {
+                platform: "facebook".to_string(),
+                kind: "group".to_string(),
+                external_id: "grp_outbox_persist".to_string(),
+                name: "Nhóm Test Outbox".to_string(),
+                url: "https://www.facebook.com/groups/grp_outbox_persist".to_string(),
+                privacy: Some("closed".to_string()),
+                member_count: Some(2_000),
+            }],
+            Some(true),
+            None,
+            now,
+        )
+        .expect("upsert source");
+    let src_rec = service1
+        .store()
+        .get_source_by_external_id("facebook", "grp_outbox_persist")
+        .expect("get src")
+        .expect("src");
+
+    let tpl = service1
+        .template_get("bds.khach-thue")
+        .expect("get template");
+    let radar = service1
+        .radar_create_draft(CreateRadarDraftInput {
+            name: "Radar Outbox Persist".to_string(),
+            template_id: Some("bds.khach-thue".to_string()),
+            description: tpl.description_template,
+            language_hint: Some("vi".to_string()),
+            user_profession: None,
+            fields: tpl.fields,
+            match_policy: tpl.match_policy,
+            source_ids: vec![src_rec.id.clone()],
+            notify: Some(dealsonar_core::dto::RadarNotifyPatch {
+                channel_ids: Some(vec![wh_pending.id.clone(), wh_failed.id.clone()]),
+                mode: None,
+                min_score: None,
+                quiet_hours: None,
+            }),
+        })
+        .expect("create radar");
+    service1
+        .radar_set_status(&radar.radar.id, RadarStatus::Active)
+        .await
+        .expect("activate radar");
+
+    // Ingest a post that DefiniteMatches `bds-vi-v1` immediately in T4 -> T6 -> T7 (enqueues 2 outbox items)
+    let raw_post = RawPost {
+        platform: "facebook".to_string(),
+        source_external_id: "grp_outbox_persist".to_string(),
+        post_id: "outbox_post_1".to_string(),
+        permalink: "https://www.facebook.com/groups/grp_outbox_persist/posts/101".to_string(),
+        author: AuthorInfo {
+            name: "Khách Thuê Thật".to_string(),
+            external_id: Some("fb_uid_outbox_1".to_string()),
+            is_anonymous: false,
+        },
+        text:
+            "Gia đình mình cần thuê căn hộ 2PN Quận 7 tài chính 12 triệu vào ở ngay LH 0909888777"
+                .to_string(),
+        text_truncated: false,
+        attachments: Vec::new(),
+        created_at: Some(now),
+        captured_at: now,
+        counts: None,
+        extraction: ExtractionInfo {
+            strategy: ExtractionStrategy::Network,
+            profile_rev: 1,
+        },
+    };
+    dealsonar_core::pipeline::ingest_raw_post(service1.runtime(), &src_rec, &raw_post, now)
+        .expect("ingest matching post");
+
+    let h_before_worker = service1.health_get().expect("health before worker");
+    assert_eq!(h_before_worker.outbox_pending, 2);
+    assert_eq!(h_before_worker.outbox_failed, 0);
+
+    // Run outbox worker batch once: `wh_pending` stays `pending` (backoff retry), `wh_failed` becomes `failed`!
+    dealsonar_core::workers::process_due_outbox_batch(service1.runtime())
+        .await
+        .expect("process due outbox");
+
+    let h_after_worker = service1.health_get().expect("health after worker");
+    assert_eq!(h_after_worker.outbox_pending, 1);
+    assert_eq!(h_after_worker.outbox_failed, 1);
+
+    let wh_pending_id = wh_pending.id.clone();
+    let wh_failed_id = wh_failed.id.clone();
+    service1.shutdown().await.expect("shutdown service1");
+
+    // Restart a brand-new `CoreService` on the SAME SQLite database -> counters MUST be restored!
+    let store2 = Store::open(&db_path, &backups_dir).expect("reopen store2");
+    let service2 = CoreServiceBuilder::new(store2)
+        .with_config(CoreConfig {
+            data_dir: tmp.path().join("data"),
+            spawn_background_workers: false,
+            ..CoreConfig::default()
+        })
+        .with_secrets(secrets)
+        .with_license_verifier(signer.verifier())
+        .start()
+        .expect("start service2");
+
+    let h_restarted = service2.health_get().expect("health after restart");
+    assert_eq!(
+        h_restarted.outbox_pending, 1,
+        "outbox_pending MUST persist across CoreService restart"
+    );
+    assert_eq!(
+        h_restarted.outbox_failed, 1,
+        "outbox_failed MUST persist across CoreService restart"
+    );
+
+    // Removing `wh_failed` clears `outbox_failed` down to 0 while keeping `wh_pending`'s `outbox_pending == 1`!
+    let _ = service2
+        .channel_remove(&wh_failed_id)
+        .expect("remove wh_failed");
+    let h_after_rm_failed = service2.health_get().expect("health after rm failed");
+    assert_eq!(h_after_rm_failed.outbox_pending, 1);
+    assert_eq!(
+        h_after_rm_failed.outbox_failed, 0,
+        "channel_remove MUST purge deleted channel's failed outbox counter"
+    );
+
+    // Removing `wh_pending` clears `outbox_pending` down to 0!
+    let _ = service2
+        .channel_remove(&wh_pending_id)
+        .expect("remove wh_pending");
+    let h_after_rm_pending = service2.health_get().expect("health after rm pending");
+    assert_eq!(
+        h_after_rm_pending.outbox_pending, 0,
+        "channel_remove MUST purge deleted channel's pending outbox counter"
+    );
+    assert_eq!(h_after_rm_pending.outbox_failed, 0);
+
+    service2.shutdown().await.expect("shutdown service2");
 }

@@ -981,7 +981,7 @@ pub struct FunnelStats {
     pub false_positives: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RulesetExtractorRule {
     pub field: String,
     pub extractor: String,
@@ -990,11 +990,25 @@ pub struct RulesetExtractorRule {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dict: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub units: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefixes: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multipliers: Option<BTreeMap<String, f64>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pattern: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cast: Option<dealsonar_rules::RegexCast>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub map: Option<BTreeMap<String, Vec<String>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multi: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2188,72 +2202,60 @@ pub fn rules_to_dto_ruleset_body(body: &dealsonar_rules::RulesetBody) -> Ruleset
                 extractor: "vn_money".to_string(),
                 near: (!near.is_empty()).then(|| near.clone()),
                 window: Some(*window),
-                scope: None,
-                pattern: None,
-                map: None,
+                ..Default::default()
             },
             dealsonar_rules::ExtractorConfig::VnPhone => RulesetExtractorRule {
                 field: er.field.clone(),
                 extractor: "vn_phone".to_string(),
-                near: None,
-                window: None,
-                scope: None,
-                pattern: None,
-                map: None,
+                ..Default::default()
             },
             dealsonar_rules::ExtractorConfig::VnArea => RulesetExtractorRule {
                 field: er.field.clone(),
                 extractor: "vn_area".to_string(),
-                near: None,
-                window: None,
-                scope: None,
-                pattern: None,
-                map: None,
+                ..Default::default()
             },
-            dealsonar_rules::ExtractorConfig::Gazetteer { scope, .. } => RulesetExtractorRule {
+            dealsonar_rules::ExtractorConfig::Gazetteer { dict, scope } => RulesetExtractorRule {
                 field: er.field.clone(),
                 extractor: "gazetteer".to_string(),
-                near: None,
-                window: None,
+                dict: Some(dict.clone()),
                 scope: scope.clone(),
-                pattern: None,
-                map: None,
+                ..Default::default()
             },
-            dealsonar_rules::ExtractorConfig::Number { .. } => RulesetExtractorRule {
+            dealsonar_rules::ExtractorConfig::Number {
+                units,
+                prefixes,
+                multipliers,
+            } => RulesetExtractorRule {
                 field: er.field.clone(),
                 extractor: "number".to_string(),
-                near: None,
-                window: None,
-                scope: None,
-                pattern: None,
-                map: None,
+                units: Some(units.clone()),
+                prefixes: Some(prefixes.clone()),
+                multipliers: Some(multipliers.clone()),
+                ..Default::default()
             },
             dealsonar_rules::ExtractorConfig::DateVi => RulesetExtractorRule {
                 field: er.field.clone(),
                 extractor: "date_vi".to_string(),
-                near: None,
-                window: None,
-                scope: None,
-                pattern: None,
-                map: None,
+                ..Default::default()
             },
-            dealsonar_rules::ExtractorConfig::EnumKw { map, .. } => RulesetExtractorRule {
+            dealsonar_rules::ExtractorConfig::EnumKw { map, multi } => RulesetExtractorRule {
                 field: er.field.clone(),
                 extractor: "enum_kw".to_string(),
-                near: None,
-                window: None,
-                scope: None,
-                pattern: None,
                 map: Some(map.clone()),
+                multi: Some(*multi),
+                ..Default::default()
             },
-            dealsonar_rules::ExtractorConfig::Regex { pattern, .. } => RulesetExtractorRule {
+            dealsonar_rules::ExtractorConfig::Regex {
+                pattern,
+                group,
+                cast,
+            } => RulesetExtractorRule {
                 field: er.field.clone(),
                 extractor: "regex".to_string(),
-                near: None,
-                window: None,
-                scope: None,
                 pattern: Some(pattern.clone()),
-                map: None,
+                group: Some(*group),
+                cast: Some(*cast),
+                ..Default::default()
             },
         })
         .collect();
@@ -2324,24 +2326,51 @@ pub fn dto_ruleset_body_to_rules(dto: &RulesetBody) -> dealsonar_rules::RulesetB
         .classify
         .iter()
         .map(|r| {
-            // If flat UI fields (`kw_any` / `kw_none` / `has_field`) were edited or supplied without `when`,
-            // construct a clean `Condition` from them; otherwise use `when`.
-            let has_flat = r.kw_any.as_ref().is_some_and(|v| !v.is_empty())
-                || r.kw_none.as_ref().is_some_and(|v| !v.is_empty())
-                || r.has_field.as_ref().is_some_and(|s| !s.trim().is_empty());
+            let cur_any = r.kw_any.as_ref().filter(|v| !v.is_empty()).cloned();
+            let cur_none = r.kw_none.as_ref().filter(|v| !v.is_empty()).cloned();
+            let cur_hf = r
+                .has_field
+                .as_ref()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
 
-            let when = if let (Some(existing_when), false) = (&r.when, has_flat) {
-                existing_when.clone()
+            // Preserve `existing_when` whenever `r.when` is present and the flat hint fields
+            // (`kw_any`, `kw_none`, `has_field`) were not modified relative to `existing_when`
+            // (so `ruleset_list -> ruleset_save_user` roundtrips never clobber `FieldOp`, `Any`,
+            // `Not`, `LenGt`, `Regex`, or multi-`HasField` trees!).
+            let preserve_existing = if let Some(existing_when) = &r.when {
+                let mut orig_any_vec = Vec::new();
+                let mut orig_none_vec = Vec::new();
+                let mut orig_hf = None;
+                extract_flat_condition_hints(
+                    existing_when,
+                    &mut orig_any_vec,
+                    &mut orig_none_vec,
+                    &mut orig_hf,
+                );
+                let orig_any = (!orig_any_vec.is_empty()).then_some(orig_any_vec);
+                let orig_none = (!orig_none_vec.is_empty()).then_some(orig_none_vec);
+                let orig_hf_clean = orig_hf
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty());
+                (cur_any == orig_any && cur_none == orig_none && cur_hf == orig_hf_clean)
+                    || (cur_any.is_none() && cur_none.is_none() && cur_hf.is_none())
+            } else {
+                false
+            };
+
+            let when = if preserve_existing {
+                r.when.clone().expect("checked Some")
             } else {
                 let mut clauses = Vec::new();
-                if let Some(any_kws) = r.kw_any.as_ref().filter(|v| !v.is_empty()) {
-                    clauses.push(dealsonar_rules::Condition::KwAny(any_kws.clone()));
+                if let Some(any_kws) = cur_any {
+                    clauses.push(dealsonar_rules::Condition::KwAny(any_kws));
                 }
-                if let Some(none_kws) = r.kw_none.as_ref().filter(|v| !v.is_empty()) {
-                    clauses.push(dealsonar_rules::Condition::KwNone(none_kws.clone()));
+                if let Some(none_kws) = cur_none {
+                    clauses.push(dealsonar_rules::Condition::KwNone(none_kws));
                 }
-                if let Some(hf) = r.has_field.as_ref().filter(|s| !s.trim().is_empty()) {
-                    clauses.push(dealsonar_rules::Condition::HasField(hf.trim().to_string()));
+                if let Some(hf) = cur_hf {
+                    clauses.push(dealsonar_rules::Condition::HasField(hf));
                 }
                 if clauses.is_empty() {
                     r.when
@@ -2380,23 +2409,23 @@ pub fn dto_ruleset_body_to_rules(dto: &RulesetBody) -> dealsonar_rules::RulesetB
                 "vn_phone" => dealsonar_rules::ExtractorConfig::VnPhone,
                 "vn_area" => dealsonar_rules::ExtractorConfig::VnArea,
                 "gazetteer" => dealsonar_rules::ExtractorConfig::Gazetteer {
-                    dict: "vn_admin".to_string(),
+                    dict: er.dict.clone().unwrap_or_else(|| "vn_admin".to_string()),
                     scope: er.scope.clone(),
                 },
                 "number" => dealsonar_rules::ExtractorConfig::Number {
-                    units: Vec::new(),
-                    prefixes: Vec::new(),
-                    multipliers: BTreeMap::new(),
+                    units: er.units.clone().unwrap_or_default(),
+                    prefixes: er.prefixes.clone().unwrap_or_default(),
+                    multipliers: er.multipliers.clone().unwrap_or_default(),
                 },
                 "date_vi" => dealsonar_rules::ExtractorConfig::DateVi,
                 "enum_kw" => dealsonar_rules::ExtractorConfig::EnumKw {
                     map: er.map.clone().unwrap_or_default(),
-                    multi: false,
+                    multi: er.multi.unwrap_or(false),
                 },
                 "regex" => dealsonar_rules::ExtractorConfig::Regex {
                     pattern: er.pattern.clone().unwrap_or_default(),
-                    group: 0,
-                    cast: dealsonar_rules::RegexCast::String,
+                    group: er.group.unwrap_or(0),
+                    cast: er.cast.unwrap_or_default(),
                 },
                 _ => dealsonar_rules::ExtractorConfig::VnPhone,
             };

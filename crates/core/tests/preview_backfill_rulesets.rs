@@ -3,10 +3,14 @@
 //! (`#29` DONE CRITERIA #2 & #3).
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use dealsonar_ai_bridge::MockAiProvider;
+use async_trait::async_trait;
+use dealsonar_ai_bridge::{
+    AiError, AiProvider, AiRequest, AiResponse, MockAiProvider, ProbeResult, ProviderId,
+};
 use dealsonar_core::dto::{
     AuthorRole, CoreEvent, CreateRadarDraftInput, FeedbackLabel, FeedbackOrigin, FieldDef,
     FieldType, LeadFeedbackInput, LeadFilterQuery, MatchPolicy, PlanTier, PreviewStartInput,
@@ -14,17 +18,24 @@ use dealsonar_core::dto::{
     RulesetExtractorRule, RulesetPrefilter, RulesetThresholds, SuggestFieldsInput,
     UpdateRadarInput, WantIntent,
 };
+use dealsonar_core::preview_rules::run_audit_ruleset;
 use dealsonar_core::{CoreConfig, CoreError, CoreServiceBuilder, LicensePayload, LicenseSigner};
 use dealsonar_protocol::ipc::{IpcEndpoint, IpcStream};
 use dealsonar_protocol::{
     parse_envelope, write_envelope_async, AuthorInfo, Body, CrawlReason, Envelope, ExtractionInfo,
     ExtractionStrategy, RawPost, MAX_EXT_TO_HOST_BYTES,
 };
-use dealsonar_rules::normalize_text;
+use dealsonar_rules::types::FilterOp as EngineFilterOp;
+use dealsonar_rules::{
+    compile_ruleset_unchecked, normalize_text, ClassifyRule as EngineClassifyRule, Condition,
+    ExtractRule as EngineExtractRule, ExtractorConfig as EngineExtractorConfig, FieldCmp,
+    PrefilterSpec as EnginePrefilterSpec, RuleVerdict as EngineRuleVerdict,
+    RulesetBody as EngineRulesetBody, RulesetOutcome, Thresholds as EngineThresholds,
+};
 use dealsonar_store::models::{
     now_ms, AuthorInput, DiscoveredSourceInput, EvaluationUpsertInput,
     ExtractedField as StoreExtractedField, FieldSource as StoreFieldSource, NewPost,
-    RecordFeedbackInput,
+    NewRulesetInput, RecordFeedbackInput,
 };
 use dealsonar_store::Store;
 use serde_json::json;
@@ -911,9 +922,7 @@ async fn seed_bds_ruleset_fastpath_and_pro_compile_shadow_promote_demote_lifecyc
             extractor: "vn_money".to_string(),
             near: Some(vec!["gia".to_string(), "tai chinh".to_string()]),
             window: Some(40),
-            scope: None,
-            pattern: None,
-            map: None,
+            ..Default::default()
         }],
         thresholds: RulesetThresholds {
             accept: 0.9,
@@ -924,6 +933,432 @@ async fn seed_bds_ruleset_fastpath_and_pro_compile_shadow_promote_demote_lifecyc
         .ruleset_save_user(&cr_id, &cr_vid, valid_user_body)
         .expect("save valid user ruleset");
     assert_eq!(saved_user_rs.origin, "user");
+
+    service.shutdown().await.expect("shutdown");
+}
+
+struct TogglableFailAiProvider {
+    inner: MockAiProvider,
+    should_fail: Arc<AtomicBool>,
+}
+
+#[async_trait]
+impl AiProvider for TogglableFailAiProvider {
+    fn id(&self) -> ProviderId {
+        ProviderId::Mock
+    }
+
+    async fn probe(&self) -> ProbeResult {
+        self.inner.probe().await
+    }
+
+    async fn complete(&self, req: AiRequest) -> Result<AiResponse, AiError> {
+        if self.should_fail.load(Ordering::SeqCst) {
+            return Err(AiError::Timeout);
+        }
+        self.inner.complete(req).await
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ruleset_roundtrip_lossless_audit_queue_durability_and_missed_feedback_event() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = Store::open_in_memory().expect("store");
+    let now = now_ms();
+
+    store
+        .upsert_discovered_sources(
+            &[DiscoveredSourceInput {
+                platform: "facebook".to_string(),
+                kind: "group".to_string(),
+                external_id: "grp_roundtrip".to_string(),
+                name: "Nhóm Test Roundtrip".to_string(),
+                url: "https://www.facebook.com/groups/grp_roundtrip".to_string(),
+                privacy: Some("closed".to_string()),
+                member_count: Some(5_000),
+            }],
+            Some(true),
+            None,
+            now,
+        )
+        .expect("upsert source");
+    let src_rec = store
+        .get_source_by_external_id("facebook", "grp_roundtrip")
+        .expect("get src")
+        .expect("src");
+
+    let should_fail = Arc::new(AtomicBool::new(false));
+    let provider = Arc::new(TogglableFailAiProvider {
+        inner: MockAiProvider::new(),
+        should_fail: Arc::clone(&should_fail),
+    });
+
+    let service = CoreServiceBuilder::new(store)
+        .with_config(CoreConfig {
+            data_dir: tmp.path().join("data"),
+            spawn_background_workers: false,
+            ..CoreConfig::default()
+        })
+        .with_ai_provider(provider)
+        .start()
+        .expect("start service");
+
+    // -------------------------------------------------------------------------
+    // 1a) `bds-vi-v1` seed ruleset roundtrip (`ruleset_list -> edit prefilter -> ruleset_save_user`)
+    //     MUST preserve `Regex { group: 1, cast: Int }`, `Gazetteer { dict }`, and `EnumKw`!
+    // -------------------------------------------------------------------------
+    let tpl = service
+        .template_get("bds.khach-thue")
+        .expect("get bds.khach-thue template");
+    let radar = service
+        .radar_create_draft(CreateRadarDraftInput {
+            name: "Radar Roundtrip Seed".to_string(),
+            template_id: Some("bds.khach-thue".to_string()),
+            description: tpl.description_template,
+            language_hint: Some("vi".to_string()),
+            user_profession: None,
+            fields: tpl.fields,
+            match_policy: tpl.match_policy,
+            source_ids: vec![src_rec.id.clone()],
+            notify: None,
+        })
+        .expect("create draft with seed ruleset");
+    let r_id = radar.radar.id.clone();
+    let r_vid = radar.current_version_data.id.clone();
+
+    let listed = service.ruleset_list(&r_id, None).expect("ruleset_list");
+    let seed_dto = listed
+        .iter()
+        .find(|rs| rs.origin == "seed")
+        .expect("seed ruleset present");
+
+    // Simulate `RadarsScreen.tsx` editing ONLY `prefilter.none` while spreading `{ ...baseBody }`
+    let mut edited_seed_body = seed_dto.body.clone();
+    edited_seed_body
+        .prefilter
+        .none
+        .push("spam quang cao rac".to_string());
+
+    let saved_from_seed = service
+        .ruleset_save_user(&r_id, &r_vid, edited_seed_body)
+        .expect("save edited seed ruleset");
+    assert_eq!(saved_from_seed.origin, "user");
+
+    let stored_seed_rs = service
+        .store()
+        .get_active_ruleset(&r_vid)
+        .expect("get active ruleset")
+        .expect("active ruleset exists");
+    let engine_seed_rs: EngineRulesetBody =
+        serde_json::from_value(stored_seed_rs.body).expect("parse stored engine ruleset");
+    let compiled_seed = compile_ruleset_unchecked(&engine_seed_rs).expect("compile seed");
+
+    let sample_norm = normalize_text(
+        "Gia đình cần thuê căn hộ 2PN 70m2 tại Quận 7 tài chính 12 triệu LH 0909111222",
+    );
+    let eval_seed = compiled_seed.evaluate(&sample_norm, &[], now);
+    let seed_fields = match eval_seed {
+        RulesetOutcome::DefiniteMatch { fields, .. } => fields,
+        RulesetOutcome::Uncertain { hint_fields, .. } => hint_fields,
+        other => panic!("expected DefiniteMatch or Uncertain on valid demand post, got {other:?}"),
+    };
+    assert_eq!(
+        seed_fields.get("bedrooms").map(|f| &f.value),
+        Some(&json!(2)),
+        "Regex group=1 + cast=Int MUST survive ruleset_list -> ruleset_save_user so bedrooms is integer 2, not '2pn'!"
+    );
+    assert!(
+        seed_fields.contains_key("location"),
+        "Gazetteer dict='vn_admin' MUST survive roundtrip"
+    );
+    assert!(
+        seed_fields.contains_key("area"),
+        "VnArea extractor MUST survive roundtrip"
+    );
+    assert!(
+        seed_fields.contains_key("property_type"),
+        "EnumKw map MUST survive roundtrip"
+    );
+
+    // -------------------------------------------------------------------------
+    // 1b) Complex `Condition::All([KwAny, FieldCmp])` + `ExtractorConfig::Number` roundtrip!
+    // -------------------------------------------------------------------------
+    let complex_engine_rs = EngineRulesetBody {
+        dsl: 1,
+        prefilter: Some(EnginePrefilterSpec {
+            any: vec!["can thue".to_string()],
+            none: Vec::new(),
+            min_len: Some(15),
+        }),
+        extract: vec![EngineExtractRule {
+            field: "bedrooms".to_string(),
+            config: EngineExtractorConfig::Number {
+                units: vec!["pn".to_string(), "phong ngu".to_string()],
+                prefixes: vec!["so phong".to_string()],
+                multipliers: BTreeMap::from([("chuc".to_string(), 10.0)]),
+            },
+        }],
+        classify: vec![EngineClassifyRule {
+            id: "match_2plus_bedrooms".to_string(),
+            when: Condition::All(vec![
+                Condition::KwAny(vec!["can thue".to_string()]),
+                Condition::FieldCmp(FieldCmp {
+                    field: "bedrooms".to_string(),
+                    op: EngineFilterOp::Gte,
+                    value: json!(2.0),
+                }),
+            ]),
+            verdict: EngineRuleVerdict::Match,
+            confidence: 0.95,
+            set: BTreeMap::new(),
+        }],
+        thresholds: EngineThresholds {
+            accept: 0.9,
+            reject: 0.9,
+        },
+    };
+
+    service
+        .store()
+        .insert_ruleset(&NewRulesetInput {
+            id: None,
+            radar_version_id: r_vid.clone(),
+            state: "active".to_string(),
+            origin: "compiled".to_string(),
+            body: serde_json::to_value(&complex_engine_rs).expect("serialize complex ruleset"),
+            metrics: None,
+            now_ms: now + 10,
+        })
+        .expect("insert compiled complex ruleset");
+
+    let listed_complex = service.ruleset_list(&r_id, None).expect("list complex");
+    let active_complex_dto = listed_complex
+        .iter()
+        .find(|rs| rs.state == "active")
+        .expect("active complex dto");
+
+    // UI spreads `{ ...baseBody }` and edits `prefilter.min_len` without touching `classify` or `extract`
+    let mut ui_edited_complex = active_complex_dto.body.clone();
+    ui_edited_complex.prefilter.min_len = Some(18);
+    service
+        .ruleset_save_user(&r_id, &r_vid, ui_edited_complex)
+        .expect("ruleset_save_user complex");
+
+    let roundtripped_record = service
+        .store()
+        .get_active_ruleset(&r_vid)
+        .expect("get active after save")
+        .expect("active after save");
+    let roundtripped_engine: EngineRulesetBody =
+        serde_json::from_value(roundtripped_record.body).expect("parse roundtripped complex");
+    let compiled_complex =
+        compile_ruleset_unchecked(&roundtripped_engine).expect("compile roundtripped complex");
+
+    // Verify `FieldCmp(bedrooms >= 2)` was NOT silently dropped:
+    // Use non-required field slice `&[]` so `DefiniteMatch` depends purely on rule condition!
+    let norm_1pn = normalize_text("Gia đình mình đang cần thuê căn hộ 1pn khu vực Quận 7");
+    let res_1pn = compiled_complex.evaluate(&norm_1pn, &[], now);
+    match res_1pn {
+        RulesetOutcome::Uncertain { hint_fields, .. } => {
+            assert_eq!(
+                hint_fields.get("bedrooms").map(|f| &f.value),
+                Some(&json!(1))
+            );
+        }
+        other => panic!(
+            "1PN post MUST be Uncertain (not DefiniteMatch) when FieldCmp(bedrooms >= 2) is preserved, got {other:?}"
+        ),
+    }
+
+    let norm_3pn = normalize_text("Gia đình mình đang cần thuê căn hộ 3pn khu vực Quận 7");
+    let res_3pn = compiled_complex.evaluate(&norm_3pn, &[], now);
+    match res_3pn {
+        RulesetOutcome::DefiniteMatch { fields, .. } => {
+            assert_eq!(fields.get("bedrooms").map(|f| &f.value), Some(&json!(3)));
+        }
+        other => panic!(
+            "3PN post MUST DefiniteMatch via preserved Number extractor + FieldCmp(bedrooms >= 2), got {other:?}"
+        ),
+    }
+
+    // -------------------------------------------------------------------------
+    // 3c) `run_audit_ruleset` durability on AI failure AND >30 evaluation batching!
+    // -------------------------------------------------------------------------
+    let active_rs_id = roundtripped_record.id.clone();
+    let mut queued_eval_ids = Vec::new();
+    for idx in 1..=35 {
+        let pid = seed_post(
+            service.store(),
+            &src_rec.id,
+            &format!("audit_post_{idx}"),
+            &format!("Gia đình cần thuê căn hộ 3PN Quận 7 mã bài kiểm toán riêng biệt số {idx}"),
+            now - idx * 1_000,
+        );
+        let ev = service
+            .store()
+            .upsert_evaluation(&EvaluationUpsertInput {
+                id: None,
+                radar_version_id: r_vid.clone(),
+                post_id: pid,
+                is_preview: false,
+                state: "done".to_string(),
+                verdict: Some("match".to_string()),
+                reject_reason: None,
+                score: Some(0.95),
+                intent: Some("demand".to_string()),
+                author_role: Some("customer".to_string()),
+                summary: Some("Rule match".to_string()),
+                reason: Some("Rule match".to_string()),
+                fields: None,
+                decided_by: Some("rule".to_string()),
+                ruleset_id: Some(active_rs_id.clone()),
+                ai_call_id: None,
+                created_at: now,
+                decided_at: Some(now),
+            })
+            .expect("upsert rule eval");
+        queued_eval_ids.push(ev.id);
+    }
+
+    let queue_key = format!("runtime.audit_queue.{active_rs_id}");
+    service
+        .store()
+        .set_setting(&queue_key, &queued_eval_ids)
+        .expect("seed 35 audit eval IDs");
+
+    // Simulate AI outage: `run_audit_ruleset` returns `Err`, and ALL 35 IDs remain in `queue_key`!
+    should_fail.store(true, Ordering::SeqCst);
+    let audit_err = run_audit_ruleset(service.runtime(), &r_vid, &active_rs_id).await;
+    assert!(audit_err.is_err(), "AI timeout must surface error");
+    let preserved_on_err: Vec<String> = service
+        .store()
+        .get_setting(&queue_key)
+        .expect("read queue after err")
+        .expect("queue setting must still exist after AI error");
+    assert_eq!(
+        preserved_on_err.len(),
+        35,
+        "audit queue MUST NOT drop pending evaluation IDs when AI call fails!"
+    );
+
+    // Restore AI: first batch processes 30 IDs and preserves the remaining 5 IDs in `queue_key`!
+    should_fail.store(false, Ordering::SeqCst);
+    run_audit_ruleset(service.runtime(), &r_vid, &active_rs_id)
+        .await
+        .expect("first 30 audit batch succeeds");
+    let remaining_after_batch1: Vec<String> = service
+        .store()
+        .get_setting(&queue_key)
+        .expect("read queue after batch 1")
+        .expect("remaining 5 IDs must still be stored");
+    assert_eq!(
+        remaining_after_batch1,
+        queued_eval_ids[30..].to_vec(),
+        "IDs beyond .take(30) MUST be preserved for the next audit run!"
+    );
+
+    // Second batch drains the final 5 IDs and deletes `queue_key`!
+    run_audit_ruleset(service.runtime(), &r_vid, &active_rs_id)
+        .await
+        .expect("remaining 5 audit batch succeeds");
+    let after_batch2: Option<Vec<String>> = service
+        .store()
+        .get_setting(&queue_key)
+        .expect("read queue after batch 2");
+    assert!(
+        after_batch2.is_none(),
+        "queue key deleted once fully drained"
+    );
+
+    // -------------------------------------------------------------------------
+    // 3d) `lead_feedback(Missed)` on a rejected evaluation emits `CoreEvent::LeadNew`
+    //     (while feedback on an existing lead emits `CoreEvent::LeadUpdated`)!
+    // -------------------------------------------------------------------------
+    let mut events_rx = service.subscribe_events();
+    let missed_post_id = seed_post(
+        service.store(),
+        &src_rec.id,
+        "missed_eval_post_1",
+        "Mình đang tìm căn hộ dịch vụ yên tĩnh khu Phú Mỹ Hưng LH 0912345678",
+        now,
+    );
+    let rejected_ev = service
+        .store()
+        .upsert_evaluation(&EvaluationUpsertInput {
+            id: None,
+            radar_version_id: r_vid.clone(),
+            post_id: missed_post_id.clone(),
+            is_preview: false,
+            state: "done".to_string(),
+            verdict: Some("no_match".to_string()),
+            reject_reason: Some("irrelevant".to_string()),
+            score: Some(0.25),
+            intent: Some("other".to_string()),
+            author_role: Some("customer".to_string()),
+            summary: Some("Rejected post".to_string()),
+            reason: Some("Low score".to_string()),
+            fields: None,
+            decided_by: Some("ai".to_string()),
+            ruleset_id: None,
+            ai_call_id: None,
+            created_at: now,
+            decided_at: Some(now),
+        })
+        .expect("upsert rejected evaluation");
+
+    let missed_fb = service
+        .lead_feedback(LeadFeedbackInput {
+            evaluation_id: rejected_ev.id.clone(),
+            lead_id: None,
+            post_id: Some(missed_post_id),
+            radar_version_id: Some(r_vid.clone()),
+            label: FeedbackLabel::Missed,
+            corrected_fields: None,
+            duplicate_of_lead_id: None,
+            block_author: Some(false),
+            origin: FeedbackOrigin::App,
+        })
+        .expect("lead_feedback Missed");
+    let created_lead = missed_fb
+        .updated_lead
+        .expect("Missed feedback must materialize a lead");
+    let created_lead_id = created_lead.id.clone();
+
+    let ev1 = events_rx
+        .try_recv()
+        .expect("event emitted on Missed feedback");
+    match ev1 {
+        CoreEvent::LeadNew(lead) => {
+            assert_eq!(lead.id, created_lead_id);
+        }
+        other => panic!("expected CoreEvent::LeadNew for newly created Missed lead, got {other:?}"),
+    }
+
+    // Subsequent feedback on the now-existing lead emits `CoreEvent::LeadUpdated`!
+    let _ = service
+        .lead_feedback(LeadFeedbackInput {
+            evaluation_id: rejected_ev.id,
+            lead_id: Some(created_lead_id.clone()),
+            post_id: None,
+            radar_version_id: Some(r_vid),
+            label: FeedbackLabel::Correct,
+            corrected_fields: None,
+            duplicate_of_lead_id: None,
+            block_author: Some(false),
+            origin: FeedbackOrigin::App,
+        })
+        .expect("lead_feedback Correct on existing lead");
+    let ev2 = events_rx
+        .try_recv()
+        .expect("event emitted on existing lead feedback");
+    match ev2 {
+        CoreEvent::LeadUpdated(lead) => {
+            assert_eq!(lead.id, created_lead_id);
+        }
+        other => {
+            panic!("expected CoreEvent::LeadUpdated for existing lead feedback, got {other:?}")
+        }
+    }
 
     service.shutdown().await.expect("shutdown");
 }
