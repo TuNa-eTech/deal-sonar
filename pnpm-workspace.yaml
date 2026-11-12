@@ -1,2 +1,4 @@
 packages:
   - "apps/extension"
+  - "apps/desktop/ui"
+
