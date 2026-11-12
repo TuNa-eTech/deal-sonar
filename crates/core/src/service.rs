@@ -19,10 +19,11 @@ use dealsonar_ai_bridge::{
 };
 use dealsonar_notify::{
     export_csv, export_xlsx, validate_webhook_url, webhook_channel_key, ExportLeadRow,
-    ExportOptions, InMemorySecretStore, SecretStore, SendMessageRequest, TelegramClient,
-    TelegramDeliveryOutcome, WebhookClient, TELEGRAM_BOT_TOKEN_KEY,
+    ExportOptions, InMemorySecretStore, KeyringSecretStore, SecretStore, SendMessageRequest,
+    TelegramClient, TelegramClientConfig, TelegramDeliveryOutcome, WebhookClient,
+    TELEGRAM_BOT_TOKEN_KEY,
 };
-use dealsonar_protocol::ipc::{IpcEndpoint, IpcListener};
+use dealsonar_protocol::ipc::{ensure_secure_socket_dir, IpcEndpoint, IpcListener};
 use dealsonar_protocol::native_manifest::{
     chrome_manifest_path, verify_or_write_manifest, NativeHostManifest,
 };
@@ -79,8 +80,27 @@ use crate::workers::{
 /// is invoked without an explicit `extension_id`.
 pub const DEFAULT_CHROME_EXTENSION_ID: &str = "dealsonarchromeextensionid000001";
 
+/// Settings table key storing the paired Chrome extension ID (`03-desktop.md §2.2`).
+pub const CHROME_EXTENSION_ID_SETTING_KEY: &str = "chrome.extension_id";
+
 /// Exact confirmation phrase required by `data_delete_all` (`04-data-model.md §5`, `03-ux-flows.md §6`).
 pub const CONFIRM_DELETE_ALL_PHRASE: &str = "XOA TAT CA";
+
+fn env_flag_enabled(name: &str) -> bool {
+    std::env::var(name)
+        .ok()
+        .is_some_and(|v| matches!(v.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
+}
+
+fn prepare_data_directories(config: &CoreConfig) -> CoreResult<()> {
+    ensure_secure_socket_dir(&config.data_dir)?;
+    fs::create_dir_all(config.data_dir.join("backups"))?;
+    fs::create_dir_all(config.data_dir.join("ai-workdir"))?;
+    if let Some(logs_dir) = &config.logs_dir {
+        fs::create_dir_all(logs_dir)?;
+    }
+    Ok(())
+}
 
 /// Builder for [`CoreService`].
 pub struct CoreServiceBuilder {
@@ -108,6 +128,52 @@ impl CoreServiceBuilder {
         }
     }
 
+    /// Open a production file-backed [`CoreServiceBuilder`] at `config.data_dir` (`03-desktop.md §1–2`):
+    /// - Initializes `<data_dir>` (`0700` on Unix), `backups/`, `logs/`, and `ai-workdir/`.
+    /// - Opens `dealsonar.db` in WAL mode with automatic pre-migration backups.
+    /// - Wires [`KeyringSecretStore`] (OS keychain) unless `DEALSONAR_IN_MEMORY_SECRETS=1`.
+    /// - Wires a real CLI [`AiProvider`] (`claude` / `codex` / `agy`, switching to persisted
+    ///   `settings.ai_provider` on `start()`) unless `DEALSONAR_MOCK_AI=1`.
+    pub fn open_production(config: CoreConfig) -> CoreResult<Self> {
+        prepare_data_directories(&config)?;
+        let db_path = config.data_dir.join("dealsonar.db");
+        let backup_dir = config.data_dir.join("backups");
+        let store = Store::open(&db_path, &backup_dir)?;
+
+        let secrets: Arc<dyn SecretStore> = if env_flag_enabled("DEALSONAR_IN_MEMORY_SECRETS") {
+            Arc::new(InMemorySecretStore::new())
+        } else {
+            Arc::new(KeyringSecretStore::new())
+        };
+
+        let ai_provider: Arc<dyn AiProvider> = if env_flag_enabled("DEALSONAR_MOCK_AI") {
+            Arc::new(MockAiProvider::new())
+        } else {
+            let cli_cfg =
+                CliAdapterConfig::new("claude").with_workdir(config.data_dir.join("ai-workdir"));
+            Arc::new(ClaudeCliProvider::new(cli_cfg))
+        };
+
+        Ok(Self::new(store)
+            .with_config(config)
+            .with_secrets(secrets)
+            .with_ai_provider(ai_provider))
+    }
+
+    /// Open a file-backed [`CoreServiceBuilder`] at `config.data_dir` using deterministic
+    /// in-memory secrets and `MockAiProvider` for integration/contract tests.
+    pub fn open_for_test(config: CoreConfig) -> CoreResult<Self> {
+        prepare_data_directories(&config)?;
+        let db_path = config.data_dir.join("dealsonar.db");
+        let backup_dir = config.data_dir.join("backups");
+        let store = Store::open(&db_path, &backup_dir)?;
+
+        Ok(Self::new(store)
+            .with_config(config)
+            .with_secrets(Arc::new(InMemorySecretStore::new()))
+            .with_ai_provider(Arc::new(MockAiProvider::new())))
+    }
+
     pub fn with_config(mut self, config: CoreConfig) -> Self {
         self.config = config;
         self
@@ -131,6 +197,19 @@ impl CoreServiceBuilder {
     pub fn with_telegram_client(mut self, telegram: TelegramClient) -> Self {
         self.telegram = Some(telegram);
         self
+    }
+
+    /// Override the Telegram Bot API base URL (used by local mock HTTP servers in tests).
+    pub fn with_telegram_api_base_url(
+        mut self,
+        api_base_url: impl Into<String>,
+    ) -> CoreResult<Self> {
+        let cfg = TelegramClientConfig {
+            api_base_url: api_base_url.into(),
+            ..TelegramClientConfig::default()
+        };
+        self.telegram = Some(TelegramClient::with_config(cfg)?);
+        Ok(self)
     }
 
     pub fn with_webhook_client(mut self, webhook: WebhookClient) -> Self {
@@ -2100,10 +2179,34 @@ impl CoreService {
             }
         }
 
-        let ext_id = opts
+        let target_manifest_path = match &self.rt.config.chrome_manifest_path {
+            Some(p) => p.clone(),
+            None => chrome_manifest_path().map_err(|e| CoreError::Internal(e.to_string()))?,
+        };
+
+        let explicit_ext_id = opts
             .extension_id
             .as_deref()
-            .filter(|s| !s.trim().is_empty())
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+
+        let stored_or_existing_ext_id = if explicit_ext_id.is_none() {
+            self.rt
+                .store
+                .get_setting::<String>(CHROME_EXTENSION_ID_SETTING_KEY)?
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| {
+                    fs::read_to_string(&target_manifest_path)
+                        .ok()
+                        .and_then(|raw| serde_json::from_str::<NativeHostManifest>(&raw).ok())
+                        .and_then(|m| m.allowed_origins.into_iter().next())
+                })
+        } else {
+            None
+        };
+
+        let ext_id = explicit_ext_id
+            .or(stored_or_existing_ext_id.as_deref())
             .unwrap_or(DEFAULT_CHROME_EXTENSION_ID);
 
         let bin_path = self
@@ -2114,16 +2217,23 @@ impl CoreService {
             .or_else(|| std::env::current_exe().ok())
             .unwrap_or_else(|| PathBuf::from("/usr/local/bin/dealsonar-native-host"));
 
-        let target_manifest_path = match &self.rt.config.chrome_manifest_path {
-            Some(p) => p.clone(),
-            None => chrome_manifest_path().map_err(|e| CoreError::Internal(e.to_string()))?,
-        };
-
         let manifest = NativeHostManifest::new(ext_id, &bin_path)
             .map_err(|e| CoreError::Validation(e.to_string()))?;
         let native_host_installed = verify_or_write_manifest(&target_manifest_path, &manifest)
             .map(|_| true)
             .unwrap_or(false);
+
+        if let Some(origin) = manifest.allowed_origins.first() {
+            let clean_id = origin
+                .strip_prefix("chrome-extension://")
+                .unwrap_or(origin)
+                .strip_suffix('/')
+                .unwrap_or(origin);
+            let _ = self
+                .rt
+                .store
+                .set_setting(CHROME_EXTENSION_ID_SETTING_KEY, &clean_id.to_string());
+        }
 
         let health = self.rt.emit_health_if_changed(now)?;
         let message = if health.extension_connected {
@@ -2139,6 +2249,123 @@ impl CoreService {
             facebook_session: health.facebook_session,
             message,
         })
+    }
+
+    /// Startup check (`03-desktop.md §2`): if Chrome was previously paired (saved `chrome.extension_id`
+    /// or existing `com.dealsonar.host.json`) and the manifest is missing or points to a stale
+    /// `dealsonar-native-host` binary path after an app update/move, rewrite it automatically.
+    ///
+    /// Returns `Ok(true)` if the manifest file was created or updated, or `Ok(false)` if unchanged
+    /// or if Chrome has never been paired yet.
+    pub fn refresh_native_host_manifest_if_paired(&self) -> CoreResult<bool> {
+        let target_manifest_path = match &self.rt.config.chrome_manifest_path {
+            Some(p) => p.clone(),
+            None => match chrome_manifest_path() {
+                Ok(p) => p,
+                Err(_) => return Ok(false),
+            },
+        };
+
+        let existing_manifest = fs::read_to_string(&target_manifest_path)
+            .ok()
+            .and_then(|raw| serde_json::from_str::<NativeHostManifest>(&raw).ok());
+
+        let saved_ext_id = self
+            .rt
+            .store
+            .get_setting::<String>(CHROME_EXTENSION_ID_SETTING_KEY)?
+            .filter(|s| !s.trim().is_empty());
+
+        let ext_id_or_origin = match saved_ext_id {
+            Some(id) => id,
+            None => match existing_manifest
+                .as_ref()
+                .and_then(|m| m.allowed_origins.first().cloned())
+            {
+                Some(origin) => origin,
+                None => return Ok(false),
+            },
+        };
+
+        let Some(bin_path) = self
+            .rt
+            .config
+            .native_host_binary_path
+            .clone()
+            .or_else(|| std::env::current_exe().ok())
+        else {
+            return Ok(false);
+        };
+
+        let expected = NativeHostManifest::new(&ext_id_or_origin, &bin_path)
+            .map_err(|e| CoreError::Validation(e.to_string()))?;
+        let updated = verify_or_write_manifest(&target_manifest_path, &expected)
+            .map_err(|e| CoreError::Internal(e.to_string()))?;
+        Ok(updated)
+    }
+
+    /// Manually pause or resume extension crawling (`03-desktop.md §2` System Tray).
+    /// Resuming is refused if `facebook_session` is not `Ok` (`02-extension.md §7`).
+    pub fn set_crawl_paused(&self, paused: bool) -> CoreResult<HealthStatus> {
+        self.ensure_not_shutting_down()?;
+        let now = now_ms();
+
+        if paused {
+            let changed = {
+                let mut hub = self.rt.ipc_hub.state.lock().expect("ipc state lock");
+                if !hub.crawl_paused {
+                    hub.crawl_paused = true;
+                    hub.crawl_pause_reason = Some(crate::dto::CrawlPauseReason::Manual);
+                    true
+                } else {
+                    false
+                }
+            };
+            if changed {
+                self.rt.ipc_hub.send_to_profile(
+                    None,
+                    &Envelope::new(Body::CrawlPause {
+                        until: None,
+                        reason: "manual".to_string(),
+                    }),
+                );
+            }
+        } else {
+            let changed = {
+                let mut hub = self.rt.ipc_hub.state.lock().expect("ipc state lock");
+                if hub.facebook_session != FacebookSessionState::Ok {
+                    return Err(CoreError::Validation(
+                        "Không thể tiếp tục quét khi phiên Facebook đang có sự cố".to_string(),
+                    ));
+                }
+                if hub.crawl_paused {
+                    hub.crawl_paused = false;
+                    hub.crawl_pause_reason = None;
+                    true
+                } else {
+                    false
+                }
+            };
+            if changed {
+                self.rt
+                    .ipc_hub
+                    .send_to_profile(None, &Envelope::new(Body::CrawlResume {}));
+            }
+        }
+
+        self.rt.emit_health_if_changed(now)
+    }
+
+    /// Toggle manual crawl pause/resume (`03-desktop.md §2` System Tray).
+    pub fn toggle_crawl_paused(&self) -> CoreResult<HealthStatus> {
+        let currently_paused = self
+            .rt
+            .ipc_hub
+            .state
+            .lock()
+            .expect("ipc state lock")
+            .crawl_paused;
+        self.set_crawl_paused(!currently_paused)
     }
 
     pub fn license_get(&self) -> CoreResult<LicenseStatus> {

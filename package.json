@@ -16,6 +16,9 @@
     "rust:check": "cargo check --workspace",
     "rust:test": "cargo test --workspace",
     "rust:lint": "cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check",
+    "test": "pnpm ext:test && pnpm ui:test && pnpm protocol:verify && cargo test --workspace",
+    "lint": "pnpm ext:typecheck && pnpm ui:typecheck && pnpm rust:lint",
+    "eval:bds": "cargo run -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/golden/bds.jsonl --radar docs/eval/golden/bds.radar.json",
     "desktop": "cargo run -p dealsonar-desktop"
   }
 }

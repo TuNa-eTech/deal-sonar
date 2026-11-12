@@ -1,38 +1,150 @@
 # DealSonar
 
-A Chrome extension and a Rust desktop app that run on the user's machine and talk to each other locally — no backend.
+**DealSonar** is a 100% local-first lead discovery & CRM desktop system for Vietnamese and multilingual Facebook Groups — combining a Manifest V3 Chrome Extension, a stateless Native Messaging relay, and a Rust + Tauri v2 Desktop App with local SQLite FTS5 storage, deterministic Vietnamese rule engines, CLI-based AI extraction (`claude`, `codex`, `agy`), and instant Telegram / Webhook / OS notifications. No cloud backend is required.
 
-## Layout
+---
 
+## Architecture Overview
+
+```text
+┌───────────────────────────┐   4-byte LE JSON frames    ┌───────────────────────────┐
+│     Chrome Extension      │ ◄─────── stdio ──────────► │   dealsonar-native-host   │
+│  (MV3: Network + DOM +    │   com.dealsonar.host       │  (Stateless Frame Relay)  │
+│   Safety Rate Limiter)    │                            └─────────────┬─────────────┘
+└───────────────────────────┘                                          │
+                                                           Unix Socket / Named Pipe
+                                                             (0700 / Per-User ACL)
+                                                                       │
+┌──────────────────────────────────────────────────────────────────────▼─────────────┐
+│                        DealSonar Desktop App (`dealsonar`)                         │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Tauri v2 Shell (`apps/desktop`): React 18 UI, System Tray, Single-Instance,  │  │
+│  │ Autostart, Strict CSP, Safe Permalink Opener, 55 IPC Commands & Push Events  │  │
+│  └──────────────────────────────────────┬───────────────────────────────────────┘  │
+│                                         ▼                                          │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐  │
+│  │ `dealsonar-core`: Multi-Profile IPC Server, Pipeline T0–T7, Crawl Scheduler, │  │
+│  │ Streaming Preview, Shadow/Active Ruleset Lifecycle, Ed25519 Plan Limits      │  │
+│  └──────┬──────────────────────┬───────────────────────┬────────────────────────┘  │
+│         ▼                      ▼                       ▼                           │
+│  `dealsonar-store`      `dealsonar-rules`      `dealsonar-ai-bridge`               │
+│  SQLite WAL + FTS5 +    VN Text Folding,       Isolated CLI Subprocesses           │
+│  SimHash + Contacts     Phones, Money, DSL     (`claude` / `codex` / `agy` / mock) │
+│                                                        │                           │
+│                                                        ▼                           │
+│                                                `dealsonar-notify`                  │
+│                                                OS Keychain, Telegram HTML Bot,     │
+│                                                Signed HMAC Webhooks, CSV & XLSX    │
+└────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Repository Layout
+
+```text
 apps/
-  desktop/        Rust desktop app (binary: dealsonar)
-  extension/      Chrome extension (MV3, TypeScript, Vite)
+  desktop/               Tauri v2 Rust desktop shell (`dealsonar` binary + `dealsonar_desktop` lib)
+    capabilities/        Minimal Tauri v2 capability permissions (`core`, `notification`, `autostart`)
+    icons/               RGBA PNG, macOS `.icns`, and Windows `.ico` bundle & tray icons
+    src/                 Lifecycle, Vietnamese system tray, logging, URL security, 55 IPC commands
+    templates/           7 built-in Radar JSON templates (BĐS, Tuyển dụng, Dịch vụ, Xe cũ, B2B, ...)
+    tests/               UI <-> Desktop contract suite & real binary-to-binary E2E suite
+    ui/                  React 18 + TypeScript + Vite Vietnamese desktop interface
+  extension/             Chrome Manifest V3 extension (GraphQL/Comet network tap, DOM fallback, popup)
 crates/
-  protocol/       Shared message types (Rust). TS mirror: apps/extension/src/protocol.ts
-  native-host/    Chrome Native Messaging host (stdio <-> desktop app)
-scripts/          Dev helpers (native host manifest install, etc.)
-docs/             Product and technical specs (Vietnamese) — start at docs/README.md
+  protocol/              Protocol v2 envelopes, 4-byte LE framing, Unix/NamedPipe IPC, Native Host manifest
+  native-host/           `dealsonar-native-host` stdio <-> local IPC relay binary
+  rules/                 Vietnamese normalization, phone/price/area/location extractors & DSL v1 engine
+  store/                 SQLite (WAL + FTS5) storage, migrations, SimHash dedup, CRM leads, jobs & outbox
+  ai-bridge/             Sandboxed CLI adapters (`claude`, `codex`, `agy`), PII redaction & `eval` runner
+  notify/                OS Keyring secret store, Telegram Bot client, HMAC-SHA256 webhooks, CSV/XLSX export
+  core/                  Central `CoreService` orchestrating T0–T7 pipeline, scheduler, licensing & health
+docs/                    Complete product & technical specifications (`docs/README.md`) + golden eval suite
+scripts/                 Developer helpers (`install-native-host-dev.sh`, `verify-protocol-fixtures.mjs`)
 ```
 
-## Docs
+---
 
-The full product and technical specification lives in [docs/](docs/README.md): PRD, radar spec, architecture and ADRs, protocol, extension, desktop, data model, pipeline and rules, AI bridge, notifications, roadmap, validation plan, and risks.
+## Prerequisites & Setup
 
-## How the two sides talk
+- **Rust**: Toolchain pinned via [`rust-toolchain.toml`](rust-toolchain.toml) (`1.83.0` compatible)
+- **Node.js**: `>= 22`
+- **pnpm**: `9.12.3` (`corepack enable`)
+- **Optional AI CLI** (for live AI extraction): Claude Code (`claude`), OpenAI Codex (`codex`), or Antigravity (`agy`)
 
-```
-extension --(Native Messaging, stdio)--> native-host --(local IPC, TODO)--> desktop app
-```
-
-Chrome extensions cannot open a channel to a local app directly; Native Messaging is the supported no-server route. Alternative to evaluate later: a localhost WebSocket served by the desktop app.
-
-## Setup
-
-Requires Rust (stable, pinned via `rust-toolchain.toml`), Node >= 22, pnpm 9.
+Install workspace dependencies and build the UI + Extension bundles:
 
 ```bash
-pnpm install
-cargo check --workspace
-pnpm ext:build      # output: apps/extension/dist (load unpacked in chrome://extensions)
+pnpm install --frozen-lockfile
+pnpm ui:build
+pnpm ext:build
+cargo build --workspace
 ```
+
+---
+
+## Running & Pairing DealSonar Locally
+
+### 1. Start the Desktop App
+
+```bash
+# Build frontend assets and launch the Tauri v2 desktop shell
+pnpm ui:build
+pnpm desktop
+```
+
+For hot-reload UI development in a browser (backed by deterministic mock state) or alongside Tauri:
+
+```bash
+pnpm ui:dev
+```
+
+Startup flags supported by the `dealsonar` binary:
+- `--minimized` / `--autostart`: boots silently into the system tray without opening the main window.
+- `DEALSONAR_DATA_DIR=/custom/path`: overrides the OS data directory (`~/Library/Application Support/DealSonar` on macOS, `%APPDATA%\DealSonar` on Windows, `~/.local/share/dealsonar` on Linux).
+
+### 2. Load & Pair the Chrome Extension + Native Messaging Host
+
+1. Build the extension (`pnpm ext:build`) and open `chrome://extensions` in Google Chrome / Brave / Edge.
+2. Enable **Developer mode**, click **Load unpacked**, and select `apps/extension/dist`.
+3. Copy the 32-character **Extension ID** shown on the card.
+4. In the DealSonar Desktop App, open **Cài đặt → Kết nối Chrome** (or Onboarding Step 2), paste the Extension ID, and click **Kết nối Chrome**.
+   - DealSonar automatically writes `com.dealsonar.host.json` pointing to `dealsonar-native-host` and refreshes it on future app updates if the binary path moves.
+   - Alternatively, from a terminal during development:
+     ```bash
+     ./scripts/install-native-host-dev.sh <YOUR_32_CHAR_EXTENSION_ID>
+     ```
+
+---
+
+## Scripts & Quality Gates
+
+| Command | Description |
+|---|---|
+| `pnpm ui:dev` | Start Vite dev server for `apps/desktop/ui` (`http://localhost:5173`) |
+| `pnpm ui:build` | Typecheck and build production UI bundle into `apps/desktop/ui/dist` |
+| `pnpm ui:test` | Run Vitest unit, flow, template, and XSS/permalink security tests for UI |
+| `pnpm ext:build` | Build Chrome MV3 extension into `apps/extension/dist` |
+| `pnpm ext:test` | Run Vitest extractor, scheduler, budget, and protocol tests for Extension |
+| `pnpm protocol:verify` | Verify cross-language Rust ↔ TypeScript Protocol v2 golden fixtures |
+| `pnpm eval:bds` | Run Golden Evaluation benchmark on Vietnamese Real Estate (`bds.jsonl`) |
+| `pnpm lint` | Run TypeScript typechecks (`extension` + `desktop-ui`), `cargo clippy -D warnings`, and `cargo fmt --check` |
+| `pnpm test` | Run all Extension tests, Desktop UI tests, protocol fixture checks, and `cargo test --workspace` |
+
+### Full Verification Checklist
+
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+pnpm --filter @dealsonar/extension typecheck && pnpm --filter @dealsonar/extension test && pnpm --filter @dealsonar/extension build
+pnpm --filter @dealsonar/desktop-ui typecheck && pnpm --filter @dealsonar/desktop-ui test && pnpm --filter @dealsonar/desktop-ui build
+```
+
+---
+
+## Security & Privacy Highlights
+
+- **Strict WebView Isolation**: Content Security Policy blocks all remote scripts, frames, and network origins (`connect-src ipc: http://ipc.localhost`). Post text is rendered exclusively as plain text + `<mark>` slices (`dangerouslySetInnerHTML` is banned by automated tests).
+- **Safe Permalink Opener**: Both UI and Rust WebView navigation/command guards strictly allow opening only `https://www.facebook.com/`, `https://m.facebook.com/`, `https://web.facebook.com/`, and `https://t.me/<bot>` in the OS default browser.
+- **Zero Plaintext Secrets**: Telegram bot tokens and HMAC webhook secrets are stored in the OS Keychain (`KeyringSecretStore`), never in SQLite or logs. Diagnostic `.zip` bundles scrub tokens, secrets, phone numbers, and post bodies before export.
+- **Data Retention & Logs**: Rotating JSON logs in `<data_dir>/logs/` are automatically pruned after 7 days, and unmatched posts are purged per configurable retention (`unmatched_retention_days`).
