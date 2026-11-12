@@ -6,6 +6,7 @@ members = [
     "crates/rules",
     "crates/store",
     "crates/ai-bridge",
+    "crates/notify",
     "apps/desktop",
 ]
 
@@ -27,3 +28,4 @@ dealsonar-native-host = { path = "crates/native-host" }
 dealsonar-rules = { path = "crates/rules" }
 dealsonar-store = { path = "crates/store" }
 dealsonar-ai-bridge = { path = "crates/ai-bridge" }
+dealsonar-notify = { path = "crates/notify" }
