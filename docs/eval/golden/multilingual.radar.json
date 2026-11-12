@@ -1,0 +1,102 @@
+{
+  "radar_version_id": "01JCFEVALMULTIGOLDENV1",
+  "id": "bds.expat-multilingual.golden",
+  "industry": "Bất động sản (Đa ngôn ngữ / Expat)",
+  "name": "Expat & Bilingual Housing Demand Radar (Golden Eval v1)",
+  "description": "Expats and foreign residents looking to rent or buy apartments/houses in Ho Chi Minh City, Hanoi, and Da Nang (excluding real-estate agents/brokers and landlord supply listings)",
+  "user_profession": "real estate relocation consultant / môi giới căn hộ expat",
+  "language_hint": "en",
+  "want_intent": "demand",
+  "exclude_roles": [
+    "peer"
+  ],
+  "match_policy": {
+    "want_intent": "demand",
+    "exclude_roles": [
+      "peer"
+    ],
+    "hard_filters": []
+  },
+  "seed_ruleset": null,
+  "fields": [
+    {
+      "key": "deal_type",
+      "label": "Deal Type / Loại giao dịch",
+      "type": "enum",
+      "description": "Whether the expat wants to rent or buy property",
+      "required": true,
+      "options": [
+        "rent",
+        "buy"
+      ],
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "property_type",
+      "label": "Property Type / Loại nhà",
+      "type": "enum",
+      "description": "Type of housing requested",
+      "required": false,
+      "options": [
+        "apartment",
+        "house",
+        "studio",
+        "villa"
+      ],
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "location",
+      "label": "District / Khu vực",
+      "type": "location",
+      "description": "City and district requested in Vietnam",
+      "required": true,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "price",
+      "label": "Budget / Ngân sách",
+      "type": "money",
+      "description": "Monthly rent or purchase budget in VND",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "bedrooms",
+      "label": "Bedrooms / Số phòng ngủ",
+      "type": "number",
+      "description": "Number of bedrooms requested",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    },
+    {
+      "key": "area",
+      "label": "Area / Diện tích",
+      "type": "range",
+      "description": "Desired floor area in square meters (m2) if stated",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 6
+    },
+    {
+      "key": "phone",
+      "label": "Phone / WhatsApp / Zalo",
+      "type": "phone",
+      "description": "Vietnam contact phone in E.164 format",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 7
+    }
+  ],
+  "feedback_examples": []
+}

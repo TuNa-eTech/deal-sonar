@@ -1,0 +1,116 @@
+{
+  "radar_version_id": "01JCFEVALXECUGOLDENV1",
+  "id": "xe-cu.chinh-chu.golden",
+  "industry": "Xe và đồ cũ",
+  "name": "Tin cá nhân bán xe ô tô / xe máy cũ chính chủ (Golden Eval v1)",
+  "description": "Chính chủ hoặc người dùng riêng lẻ cần bán lại ô tô, xe máy cũ tại Hà Nội, TP.HCM và Đà Nẵng (loại trừ salon/thợ buôn xe và tin hỏi mua)",
+  "user_profession": "người buôn xe cũ",
+  "language_hint": "vi",
+  "want_intent": "supply",
+  "exclude_roles": [
+    "peer"
+  ],
+  "match_policy": {
+    "want_intent": "supply",
+    "exclude_roles": [
+      "peer"
+    ],
+    "hard_filters": []
+  },
+  "seed_ruleset": null,
+  "fields": [
+    {
+      "key": "brand",
+      "label": "Hãng xe",
+      "type": "enum",
+      "description": "Hãng sản xuất phương tiện",
+      "required": false,
+      "options": [
+        "Toyota",
+        "Honda",
+        "Hyundai",
+        "Mazda",
+        "Kia",
+        "Ford",
+        "VinFast",
+        "Mitsubishi",
+        "Yamaha"
+      ],
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "model",
+      "label": "Dòng xe",
+      "type": "enum",
+      "description": "Tên dòng xe cụ thể",
+      "required": true,
+      "options": [
+        "Vios",
+        "Accent",
+        "City",
+        "CX-5",
+        "Xpander",
+        "Ranger",
+        "VF5",
+        "Morning",
+        "SH",
+        "Vision",
+        "Exciter"
+      ],
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "year",
+      "label": "Năm sản xuất",
+      "type": "number",
+      "description": "Đời xe / năm đăng ký",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "price",
+      "label": "Giá bán",
+      "type": "money",
+      "description": "Giá người bán mong muốn",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "chinh_chu",
+      "label": "Chính chủ",
+      "type": "boolean",
+      "description": "Người bán khẳng định xe chính chủ tên cá nhân",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    },
+    {
+      "key": "location",
+      "label": "Khu vực xem xe",
+      "type": "location",
+      "description": "Tỉnh/thành hoặc quận/huyện xem xe",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 6
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại người bán chuẩn E.164",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 7
+    }
+  ],
+  "feedback_examples": []
+}
