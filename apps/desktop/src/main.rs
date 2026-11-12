@@ -1,6 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 fn main() {
-    println!(
-        "DealSonar desktop (protocol v{})",
-        dealsonar_protocol::PROTOCOL_VERSION
-    );
+    dealsonar_desktop::run();
 }

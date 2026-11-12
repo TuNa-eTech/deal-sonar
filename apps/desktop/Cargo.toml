@@ -1,18 +1,38 @@
 [package]
 name = "dealsonar-desktop"
-description = "DealSonar desktop app"
+description = "DealSonar Tauri v2 desktop shell, system tray, native host setup, and IPC command layer"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lib]
+name = "dealsonar_desktop"
+path = "src/lib.rs"
+
 [[bin]]
 name = "dealsonar"
 path = "src/main.rs"
 
+[build-dependencies]
+tauri-build = "2"
+
 [dependencies]
+dealsonar-core.workspace = true
 dealsonar-protocol.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-# GUI framework intentionally not chosen yet (egui / Tauri / Slint ...).
+tokio.workspace = true
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-notification = "2"
+tracing = ">=0.1.40, <0.1.42"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "json"] }
+url = "2.5"
+
+[dev-dependencies]
+tempfile.workspace = true
+zip = { version = "=2.2.2", default-features = false, features = ["deflate"] }
