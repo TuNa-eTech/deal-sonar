@@ -1,0 +1,238 @@
+{
+  "spec_section_6_session": [
+    {
+      "v": 2,
+      "id": "01A",
+      "type": "hello",
+      "ts": 1794384000000,
+      "reply_to": null,
+      "payload": {
+        "profile_id": "p_7f3a",
+        "ext_version": "0.2.0",
+        "browser": "chrome/142",
+        "config_rev": 11
+      }
+    },
+    {
+      "v": 2,
+      "id": "01B",
+      "type": "hello.ok",
+      "ts": 1794384000050,
+      "reply_to": "01A",
+      "payload": {
+        "desktop_version": "0.2.0",
+        "config_rev": 12
+      }
+    },
+    {
+      "v": 2,
+      "id": "01C",
+      "type": "config.update",
+      "ts": 1794384000060,
+      "reply_to": null,
+      "payload": {
+        "rev": 12,
+        "plan": {
+          "entries": [
+            {
+              "source_ref": {
+                "platform": "facebook",
+                "kind": "group",
+                "external_id": "123456789"
+              },
+              "interval_s": 900,
+              "priority": 0,
+              "max_posts_per_visit": 30
+            }
+          ]
+        },
+        "policy": {
+          "max_loads_per_hour": 60,
+          "max_loads_per_day": 600,
+          "active_hours": {
+            "from": "07:00",
+            "to": "23:00"
+          },
+          "jitter": 0.3,
+          "max_scroll_steps": 3,
+          "only_when_idle": false
+        },
+        "extractor": {
+          "rev": 4,
+          "strategies": ["network", "embedded", "dom"],
+          "network": {},
+          "dom": {},
+          "session_markers": {}
+        }
+      }
+    },
+    {
+      "v": 2,
+      "id": "01D",
+      "type": "posts.push",
+      "ts": 1794384905000,
+      "reply_to": null,
+      "payload": {
+        "run_id": "r_01",
+        "source_ref": {
+          "platform": "facebook",
+          "kind": "group",
+          "external_id": "123456789"
+        },
+        "posts": [
+          {
+            "platform": "facebook",
+            "post_id": "987654321",
+            "source_external_id": "123456789",
+            "permalink": "https://www.facebook.com/groups/123456789/posts/987654321/",
+            "author": {
+              "name": "Nguyễn Văn A",
+              "is_anonymous": false
+            },
+            "text": "E cần thuê chung cư 2pn khu Cầu Giấy, tầm 12-15tr, vào ở luôn. Lh 0912.345.678",
+            "text_truncated": false,
+            "created_at": 1794384600000,
+            "captured_at": 1794384900000,
+            "attachments": [],
+            "extraction": {
+              "strategy": "network",
+              "profile_rev": 4
+            }
+          }
+        ]
+      }
+    },
+    {
+      "v": 2,
+      "id": "01E",
+      "type": "ack",
+      "ts": 1794384905020,
+      "reply_to": "01D",
+      "payload": {
+        "accepted": 1,
+        "duplicates": 0
+      }
+    }
+  ],
+  "additional_catalog_messages": [
+    {
+      "v": 2,
+      "id": "01JCF7Z3K80000000000000001",
+      "ts": 1794384910000,
+      "reply_to": null,
+      "type": "crawl.report",
+      "payload": {
+        "run_id": "r_01",
+        "source_ref": {
+          "platform": "facebook",
+          "kind": "group",
+          "external_id": "123456789"
+        },
+        "reason": "scheduled",
+        "status": "ok",
+        "started_at": 1794384890000,
+        "ended_at": 1794384909500,
+        "posts_seen": 12,
+        "posts_new": 1,
+        "page_loads": 1,
+        "strategy": "network"
+      }
+    },
+    {
+      "v": 2,
+      "id": "01JCF7Z3K80000000000000002",
+      "ts": 1794384920000,
+      "reply_to": null,
+      "type": "sources.discovered",
+      "payload": {
+        "sources": [
+          {
+            "platform": "facebook",
+            "kind": "group",
+            "external_id": "123456789",
+            "name": "Thuê Chung Cư Hà Nội",
+            "url": "https://www.facebook.com/groups/123456789/",
+            "privacy": "private",
+            "member_count": 145000
+          }
+        ],
+        "follow": true
+      }
+    },
+    {
+      "v": 2,
+      "id": "01JCF7Z3K80000000000000003",
+      "ts": 1794384930000,
+      "reply_to": null,
+      "type": "session.status",
+      "payload": {
+        "platform": "facebook",
+        "state": "ok"
+      }
+    },
+    {
+      "v": 2,
+      "id": "01JCF7Z3K80000000000000004",
+      "ts": 1794384955000,
+      "reply_to": null,
+      "type": "ping",
+      "payload": {}
+    },
+    {
+      "v": 2,
+      "id": "01JCF7Z3K80000000000000005",
+      "ts": 1794384955005,
+      "reply_to": "01JCF7Z3K80000000000000004",
+      "type": "pong",
+      "payload": {}
+    },
+    {
+      "v": 2,
+      "id": "01JCF7Z3K80000000000000006",
+      "ts": 1794384960000,
+      "reply_to": null,
+      "type": "crawl.request",
+      "payload": {
+        "request_id": "req_preview_01",
+        "source_ref": {
+          "platform": "facebook",
+          "kind": "group",
+          "external_id": "123456789"
+        },
+        "reason": "preview",
+        "max_posts": 30
+      }
+    },
+    {
+      "v": 2,
+      "id": "01JCF7Z3K80000000000000007",
+      "ts": 1794384970000,
+      "reply_to": null,
+      "type": "crawl.pause",
+      "payload": {
+        "until": null,
+        "reason": "user_paused"
+      }
+    },
+    {
+      "v": 2,
+      "id": "01JCF7Z3K80000000000000008",
+      "ts": 1794384980000,
+      "reply_to": null,
+      "type": "crawl.resume",
+      "payload": {}
+    },
+    {
+      "v": 2,
+      "id": "01JCF7Z3K80000000000000009",
+      "ts": 1794384990000,
+      "reply_to": "01A",
+      "type": "error",
+      "payload": {
+        "code": "desktop_unavailable",
+        "message": "DealSonar desktop app is not running or local IPC is unavailable",
+        "retryable": true
+      }
+    }
+  ]
+}

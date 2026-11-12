@@ -1,50 +1,37 @@
-//! Native Messaging host. Chrome launches this process and speaks to it over
-//! stdin/stdout. Messages are length-prefixed (u32, native-endian) JSON.
+//! Chrome Native Messaging host binary (`com.dealsonar.host`).
 //!
-//! TODO: relay requests to the desktop app over local IPC. For now it answers
-//! `ping` itself so the extension <-> host path can be tested end to end.
+//! Relays length-prefixed JSON frames verbatim between Chrome `stdin`/`stdout`
+//! and the DealSonar desktop local IPC server.
 
-use std::io::{self, Read, Write};
+use std::process::ExitCode;
 
-use dealsonar_protocol::{Request, Response, PROTOCOL_VERSION};
+use dealsonar_native_host::{run_relay, RelayConfig};
 
-fn read_message(input: &mut impl Read) -> io::Result<Option<Vec<u8>>> {
-    let mut len = [0u8; 4];
-    match input.read_exact(&mut len) {
-        Ok(()) => {}
-        Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
-        Err(e) => return Err(e),
+fn main() -> ExitCode {
+    let config = match RelayConfig::from_env() {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            eprintln!("dealsonar-native-host: failed to resolve IPC endpoint: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(err) => {
+            eprintln!("dealsonar-native-host: failed to start runtime: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    match runtime.block_on(run_relay(tokio::io::stdin(), tokio::io::stdout(), config)) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("dealsonar-native-host: relay terminated with error: {err}");
+            ExitCode::FAILURE
+        }
     }
-    let mut buf = vec![0u8; u32::from_ne_bytes(len) as usize];
-    input.read_exact(&mut buf)?;
-    Ok(Some(buf))
-}
-
-fn write_message(output: &mut impl Write, msg: &[u8]) -> io::Result<()> {
-    output.write_all(&(msg.len() as u32).to_ne_bytes())?;
-    output.write_all(msg)?;
-    output.flush()
-}
-
-fn handle(req: Request) -> Response {
-    match req {
-        Request::Ping { .. } => Response::Pong {
-            version: PROTOCOL_VERSION,
-        },
-    }
-}
-
-fn main() -> io::Result<()> {
-    let mut stdin = io::stdin().lock();
-    let mut stdout = io::stdout().lock();
-    while let Some(raw) = read_message(&mut stdin)? {
-        let resp = match serde_json::from_slice::<Request>(&raw) {
-            Ok(req) => handle(req),
-            Err(e) => Response::Error {
-                message: e.to_string(),
-            },
-        };
-        write_message(&mut stdout, &serde_json::to_vec(&resp)?)?;
-    }
-    Ok(())
 }
