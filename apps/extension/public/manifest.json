@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "DealSonar",
   "version": "0.2.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp3VsvsKMr7QHX7N5kb1qOQLA3hQK9xEa1vUBq1A3BCAv2EZmI4PtIkbMWxngEl8at9xLFj+HUqy50bkKIECwmsfBfLN1ls3+cLW+F/xx3XmiuLm3L2fnO4hjJ1sIj0M03uB1eeWDWe/pTp63hqus9vTO/MmZOaDOD/f6DlSxzjXivft6XpzySu6AGyTYwZ5M8HadNDJnJ7uAk2fCbujZl20rYRHxXivG9U0iC1QuqCvsWPM2yICymFtNlXBElDQ57jHXkpZ/kGkH5C1epOCos1oGBtFPQdvbd0217fhX8qWxtj45jmOLgVYZfdjraKR5DcGyRQ5i7Hjdp/3freABTQIDAQAB",
   "description": "Đọc bài mới tần suất thấp trong các group Facebook bạn đã tham gia và chuyển về ứng dụng DealSonar trên máy tính.",
   "minimum_chrome_version": "116",
   "permissions": [

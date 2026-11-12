@@ -109,6 +109,7 @@ export type PopupStatusSnapshot = {
   desktopAvailable: boolean;
   desktopVersion?: string;
   connectionError?: string;
+  extensionId?: string;
   session: {
     state: SessionState;
     detail?: string;

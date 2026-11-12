@@ -25,7 +25,8 @@ use dealsonar_notify::{
 };
 use dealsonar_protocol::ipc::{ensure_secure_socket_dir, IpcEndpoint, IpcListener};
 use dealsonar_protocol::native_manifest::{
-    chrome_manifest_path, verify_or_write_manifest, NativeHostManifest,
+    chrome_manifest_path, secondary_chromium_manifest_paths, verify_or_write_manifest,
+    NativeHostManifest,
 };
 use dealsonar_protocol::{Body, CrawlReason, Envelope};
 use dealsonar_store::models::{
@@ -36,6 +37,7 @@ use dealsonar_store::models::{
 };
 use dealsonar_store::Store;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use tokio::sync::{broadcast, watch, Notify};
 use tokio::task::JoinHandle;
 
@@ -76,12 +78,79 @@ use crate::workers::{
     tick_jobs_once,
 };
 
-/// Default Chrome Web Store / unpacked extension ID fallback used when `chrome_connect`
-/// is invoked without an explicit `extension_id`.
-pub const DEFAULT_CHROME_EXTENSION_ID: &str = "dealsonarchromeextensionid000001";
+/// Default Chrome Web Store / deterministic MV3 `manifest.json` `"key"` extension ID
+/// (`SHA256(SPKI_DER)[0..16]` mapped `0..15 -> 'a'..'p'`).
+pub const DEFAULT_CHROME_EXTENSION_ID: &str = "hkmjpcenjjebhpjicnbpmogidfcbmbjn";
+
+const LEGACY_PLACEHOLDER_EXTENSION_ID: &str = "dealsonarchromeextensionid000001";
 
 /// Settings table key storing the paired Chrome extension ID (`03-desktop.md §2.2`).
 pub const CHROME_EXTENSION_ID_SETTING_KEY: &str = "chrome.extension_id";
+
+fn strip_origin_wrapper(id_or_origin: &str) -> &str {
+    let trimmed = id_or_origin.trim();
+    let no_scheme = trimmed
+        .strip_prefix("chrome-extension://")
+        .unwrap_or(trimmed);
+    no_scheme.strip_suffix('/').unwrap_or(no_scheme)
+}
+
+fn is_legacy_placeholder_ext_id(id_or_origin: &str) -> bool {
+    strip_origin_wrapper(id_or_origin).eq_ignore_ascii_case(LEGACY_PLACEHOLDER_EXTENSION_ID)
+}
+
+/// Computes Chrome's deterministic path-based unpacked Extension ID for `dir`
+/// (`crx_file::id_util::GenerateIdForPath`: SHA-256 of canonical path, first 16 bytes -> `'a'..'p'`),
+/// allowing pre-reload unpacked installs from `apps/extension/dist` to connect seamlessly.
+fn compute_chrome_unpacked_extension_id(dir: &std::path::Path) -> Option<String> {
+    let canonical = fs::canonicalize(dir).ok()?;
+    let mut hasher = Sha256::new();
+
+    #[cfg(not(windows))]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        hasher.update(canonical.as_os_str().as_bytes());
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        let raw = canonical.to_string_lossy();
+        let cleaned = raw.strip_prefix(r"\\?\").unwrap_or(&raw);
+        for unit in std::ffi::OsStr::new(cleaned).encode_wide() {
+            hasher.update(unit.to_le_bytes());
+        }
+    }
+
+    let digest = hasher.finalize();
+    let mut out = String::with_capacity(32);
+    for byte in &digest[..16] {
+        out.push(char::from(b'a' + (byte >> 4)));
+        out.push(char::from(b'a' + (byte & 0x0f)));
+    }
+    Some(out)
+}
+
+/// Discovers local workspace unpacked extension IDs (`apps/extension/dist` and `apps/extension`)
+/// when running from a developer checkout.
+fn discover_workspace_unpacked_extension_ids() -> Vec<String> {
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let Some(workspace_root) = manifest_dir.parent().and_then(std::path::Path::parent) else {
+        return Vec::new();
+    };
+    let mut ids = Vec::new();
+    for rel in ["apps/extension/dist", "apps/extension"] {
+        let candidate = workspace_root.join(rel);
+        if candidate.is_dir() {
+            if let Some(id) = compute_chrome_unpacked_extension_id(&candidate) {
+                if !ids.contains(&id) {
+                    ids.push(id);
+                }
+            }
+        }
+    }
+    ids
+}
 
 /// Exact confirmation phrase required by `data_delete_all` (`04-data-model.md §5`, `03-ux-flows.md §6`).
 pub const CONFIRM_DELETE_ALL_PHRASE: &str = "XOA TAT CA";
@@ -2217,24 +2286,45 @@ impl CoreService {
             .map(str::trim)
             .filter(|s| !s.is_empty());
 
+        let existing_manifest = fs::read_to_string(&target_manifest_path)
+            .ok()
+            .and_then(|raw| serde_json::from_str::<NativeHostManifest>(&raw).ok());
+
         let stored_or_existing_ext_id = if explicit_ext_id.is_none() {
             self.rt
                 .store
                 .get_setting::<String>(CHROME_EXTENSION_ID_SETTING_KEY)?
-                .filter(|s| !s.trim().is_empty())
+                .filter(|s| !s.trim().is_empty() && !is_legacy_placeholder_ext_id(s))
                 .or_else(|| {
-                    fs::read_to_string(&target_manifest_path)
-                        .ok()
-                        .and_then(|raw| serde_json::from_str::<NativeHostManifest>(&raw).ok())
-                        .and_then(|m| m.allowed_origins.into_iter().next())
+                    existing_manifest.as_ref().and_then(|m| {
+                        m.allowed_origins
+                            .iter()
+                            .find(|o| !is_legacy_placeholder_ext_id(o))
+                            .cloned()
+                    })
                 })
         } else {
             None
         };
 
-        let ext_id = explicit_ext_id
+        let primary_ext_id = explicit_ext_id
             .or(stored_or_existing_ext_id.as_deref())
             .unwrap_or(DEFAULT_CHROME_EXTENSION_ID);
+
+        let mut origins_to_allow: Vec<String> = vec![primary_ext_id.to_string()];
+        if strip_origin_wrapper(primary_ext_id) != DEFAULT_CHROME_EXTENSION_ID {
+            origins_to_allow.push(DEFAULT_CHROME_EXTENSION_ID.to_string());
+        }
+        if let Some(ref existing) = existing_manifest {
+            for origin in &existing.allowed_origins {
+                if !is_legacy_placeholder_ext_id(origin) {
+                    origins_to_allow.push(origin.clone());
+                }
+            }
+        }
+        for dev_id in discover_workspace_unpacked_extension_ids() {
+            origins_to_allow.push(dev_id);
+        }
 
         let bin_path = self
             .rt
@@ -2244,18 +2334,20 @@ impl CoreService {
             .or_else(|| std::env::current_exe().ok())
             .unwrap_or_else(|| PathBuf::from("/usr/local/bin/dealsonar-native-host"));
 
-        let manifest = NativeHostManifest::new(ext_id, &bin_path)
+        let manifest = NativeHostManifest::new_with_origins(&origins_to_allow, &bin_path)
             .map_err(|e| CoreError::Validation(e.to_string()))?;
         let native_host_installed = verify_or_write_manifest(&target_manifest_path, &manifest)
             .map(|_| true)
             .unwrap_or(false);
 
+        if self.rt.config.chrome_manifest_path.is_none() {
+            for extra_path in secondary_chromium_manifest_paths() {
+                let _ = verify_or_write_manifest(&extra_path, &manifest);
+            }
+        }
+
         if let Some(origin) = manifest.allowed_origins.first() {
-            let clean_id = origin
-                .strip_prefix("chrome-extension://")
-                .unwrap_or(origin)
-                .strip_suffix('/')
-                .unwrap_or(origin);
+            let clean_id = strip_origin_wrapper(origin);
             let _ = self
                 .rt
                 .store
@@ -2297,22 +2389,28 @@ impl CoreService {
             .ok()
             .and_then(|raw| serde_json::from_str::<NativeHostManifest>(&raw).ok());
 
-        let saved_ext_id = self
+        let raw_saved = self
             .rt
             .store
             .get_setting::<String>(CHROME_EXTENSION_ID_SETTING_KEY)?
             .filter(|s| !s.trim().is_empty());
 
-        let ext_id_or_origin = match saved_ext_id {
-            Some(id) => id,
-            None => match existing_manifest
-                .as_ref()
-                .and_then(|m| m.allowed_origins.first().cloned())
-            {
-                Some(origin) => origin,
-                None => return Ok(false),
-            },
-        };
+        let was_paired = raw_saved.is_some() || existing_manifest.is_some();
+        if !was_paired {
+            return Ok(false);
+        }
+
+        let primary_ext_id = raw_saved
+            .filter(|s| !is_legacy_placeholder_ext_id(s))
+            .or_else(|| {
+                existing_manifest.as_ref().and_then(|m| {
+                    m.allowed_origins
+                        .iter()
+                        .find(|o| !is_legacy_placeholder_ext_id(o))
+                        .cloned()
+                })
+            })
+            .unwrap_or_else(|| DEFAULT_CHROME_EXTENSION_ID.to_string());
 
         let Some(bin_path) = self
             .rt
@@ -2324,10 +2422,40 @@ impl CoreService {
             return Ok(false);
         };
 
-        let expected = NativeHostManifest::new(&ext_id_or_origin, &bin_path)
+        let mut origins_to_allow: Vec<String> = vec![primary_ext_id.clone()];
+        if strip_origin_wrapper(&primary_ext_id) != DEFAULT_CHROME_EXTENSION_ID {
+            origins_to_allow.push(DEFAULT_CHROME_EXTENSION_ID.to_string());
+        }
+        if let Some(ref existing) = existing_manifest {
+            for origin in &existing.allowed_origins {
+                if !is_legacy_placeholder_ext_id(origin) {
+                    origins_to_allow.push(origin.clone());
+                }
+            }
+        }
+        for dev_id in discover_workspace_unpacked_extension_ids() {
+            origins_to_allow.push(dev_id);
+        }
+
+        let expected = NativeHostManifest::new_with_origins(&origins_to_allow, &bin_path)
             .map_err(|e| CoreError::Validation(e.to_string()))?;
         let updated = verify_or_write_manifest(&target_manifest_path, &expected)
             .map_err(|e| CoreError::Internal(e.to_string()))?;
+
+        if self.rt.config.chrome_manifest_path.is_none() {
+            for extra_path in secondary_chromium_manifest_paths() {
+                let _ = verify_or_write_manifest(&extra_path, &expected);
+            }
+        }
+
+        if let Some(origin) = expected.allowed_origins.first() {
+            let clean_id = strip_origin_wrapper(origin);
+            let _ = self
+                .rt
+                .store
+                .set_setting(CHROME_EXTENSION_ID_SETTING_KEY, &clean_id.to_string());
+        }
+
         Ok(updated)
     }
 

@@ -146,11 +146,20 @@ function renderStatus(status: PopupStatusSnapshot): void {
   } else {
     statusText.textContent = "Mất kết nối";
     desktopHelp.classList.remove("hidden");
-    desktopHelpMsg.textContent =
-      status.connectionError &&
-      status.connectionError.includes("không khớp")
-        ? status.connectionError
-        : "Ứng dụng DealSonar trên máy tính đang tắt hoặc chưa kết nối. Hãy mở DealSonar rồi bấm Thử lại.";
+    const errLower = (status.connectionError ?? "").toLowerCase();
+    const extIdSuffix = status.extensionId ? ` (ID tiện ích: ${status.extensionId})` : "";
+    if (status.connectionError && status.connectionError.includes("không khớp")) {
+      desktopHelpMsg.textContent = status.connectionError;
+    } else if (errLower.includes("forbidden")) {
+      desktopHelpMsg.textContent =
+        `ID tiện ích chưa được ghép nối với ứng dụng Desktop${extIdSuffix}. Hãy mở DealSonar → bấm «Kiểm tra lại» (hoặc dán ID trên vào mục Kết nối Chrome), rồi bấm «Thử lại».`;
+    } else if (errLower.includes("not found")) {
+      desktopHelpMsg.textContent =
+        `Chưa tìm thấy cầu nối Native Host${extIdSuffix}. Hãy mở ứng dụng DealSonar trên máy tính trước, rồi bấm «Thử lại».`;
+    } else {
+      desktopHelpMsg.textContent =
+        `Ứng dụng DealSonar trên máy tính đang tắt hoặc chưa kết nối${extIdSuffix}. Hãy mở DealSonar rồi bấm Thử lại.`;
+    }
   }
 
   // 2. Facebook session badge

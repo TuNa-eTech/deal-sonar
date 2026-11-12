@@ -87,7 +87,19 @@ impl NativeHostManifest {
     /// Create a validated `com.dealsonar.host` stdio manifest for `extension_id` and
     /// an absolute `binary_path`.
     pub fn new(extension_id: &str, binary_path: impl AsRef<Path>) -> Result<Self, ManifestError> {
-        let origin = format_allowed_origin(extension_id)?;
+        Self::new_with_origins([extension_id], binary_path)
+    }
+
+    /// Create a validated `com.dealsonar.host` stdio manifest allowing multiple
+    /// deduplicated Chrome extension origins (e.g. pinned manifest key ID + local unpacked ID).
+    pub fn new_with_origins<I, S>(
+        extension_ids_or_origins: I,
+        binary_path: impl AsRef<Path>,
+    ) -> Result<Self, ManifestError>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
         let bin = binary_path.as_ref();
         if !is_absolute_for_any_os(bin) {
             return Err(ManifestError::RelativeBinaryPath(
@@ -95,12 +107,24 @@ impl NativeHostManifest {
             ));
         }
 
+        let mut allowed_origins = Vec::new();
+        for item in extension_ids_or_origins {
+            let origin = format_allowed_origin(item.as_ref())?;
+            if !allowed_origins.contains(&origin) {
+                allowed_origins.push(origin);
+            }
+        }
+
+        if allowed_origins.is_empty() {
+            return Err(ManifestError::InvalidExtensionId(String::new()));
+        }
+
         Ok(Self {
             name: NATIVE_HOST_NAME.to_owned(),
             description: NATIVE_HOST_DESCRIPTION.to_owned(),
             path: bin.to_string_lossy().into_owned(),
             host_type: "stdio".to_owned(),
-            allowed_origins: vec![origin],
+            allowed_origins,
         })
     }
 
@@ -174,6 +198,75 @@ pub fn chrome_manifest_path() -> Result<PathBuf, ManifestError> {
         xdg_config.as_deref(),
         appdata.as_deref(),
     )
+}
+
+/// Resolve additional `NativeMessagingHosts/com.dealsonar.host.json` target paths for other
+/// Chromium-based browsers that are ALREADY installed on the current macOS / Linux user account
+/// (so users running DealSonar Extension in Chromium, Arc, Brave, Edge, Vivaldi, Opera, or Cốc Cốc
+/// connect automatically without manual file copying).
+pub fn secondary_chromium_manifest_paths() -> Vec<PathBuf> {
+    let Some(home) = env::var_os("HOME").map(PathBuf::from) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+
+    match IpcPlatform::current() {
+        IpcPlatform::MacOs => {
+            let app_support = home.join("Library").join("Application Support");
+            let browser_roots: &[&[&str]] = &[
+                &["Google", "Chrome Beta"],
+                &["Google", "Chrome Canary"],
+                &["Google", "Chrome Dev"],
+                &["Google", "Chrome for Testing"],
+                &["Google", "ChromeForTesting"],
+                &["Chromium"],
+                &["Arc", "User Data"],
+                &["BraveSoftware", "Brave-Browser"],
+                &["Microsoft Edge"],
+                &["Vivaldi"],
+                &["CocCoc", "Browser"],
+                &["com.operasoftware.Opera"],
+            ];
+            for parts in browser_roots {
+                let mut base = app_support.clone();
+                for part in *parts {
+                    base.push(part);
+                }
+                if base.is_dir() {
+                    out.push(
+                        base.join("NativeMessagingHosts")
+                            .join(NATIVE_HOST_MANIFEST_FILENAME),
+                    );
+                }
+            }
+        }
+        IpcPlatform::Linux => {
+            let config_base = env::var_os("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or_else(|| home.join(".config"));
+            for dir_name in [
+                "google-chrome-beta",
+                "google-chrome-unstable",
+                "chromium",
+                "BraveSoftware/Brave-Browser",
+                "microsoft-edge",
+                "vivaldi",
+                "opera",
+            ] {
+                let base = config_base.join(dir_name);
+                if base.is_dir() {
+                    out.push(
+                        base.join("NativeMessagingHosts")
+                            .join(NATIVE_HOST_MANIFEST_FILENAME),
+                    );
+                }
+            }
+        }
+        IpcPlatform::Windows => {}
+    }
+
+    out
 }
 
 /// Write `manifest` to `manifest_path`, creating parent directories as needed.

@@ -167,13 +167,19 @@ impl DesktopState {
         }
         let core = Arc::new(builder.start()?);
 
-        match core.refresh_native_host_manifest_if_paired() {
-            Ok(true) => {
-                tracing::info!("refreshed Chrome Native Messaging Host manifest on startup");
+        match core.chrome_connect(None) {
+            Ok(res) if res.native_host_installed => {
+                tracing::info!(
+                    manifest_path = %res.manifest_path,
+                    "ensured Chrome Native Messaging Host manifest on startup"
+                );
             }
-            Ok(false) => {}
+            Ok(_) => {}
             Err(err) => {
-                tracing::warn!(error = %err, "failed to auto-refresh Chrome Native Messaging Host manifest");
+                tracing::warn!(
+                    error = %err,
+                    "failed to ensure Chrome Native Messaging Host manifest on startup"
+                );
             }
         }
 

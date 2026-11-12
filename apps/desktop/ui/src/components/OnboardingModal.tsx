@@ -30,6 +30,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [osTab, setOsTab] = useState<"macos" | "windows" | "linux">("macos");
   const [chromeStatus, setChromeStatus] = useState<ChromeConnectResult | null>(null);
   const [checkingChrome, setCheckingChrome] = useState(false);
+  const [customExtId, setCustomExtId] = useState("");
+  const [chromeError, setChromeError] = useState<string | null>(null);
 
   const [probes, setProbes] = useState<Record<AiProviderId, ProbeResult> | null>(null);
   const [probingAi, setProbingAi] = useState(false);
@@ -46,11 +48,17 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
   const [launchAtLogin, setLaunchAtLogin] = useState(settings.launch_at_login ?? true);
 
-  const runChromeCheck = async () => {
+  const runChromeCheck = async (explicitExtId?: string) => {
     setCheckingChrome(true);
+    setChromeError(null);
     try {
-      const res = await api.chromeConnect();
+      const trimmed = (explicitExtId ?? customExtId).trim();
+      const res = await api.chromeConnect(
+        trimmed ? { extension_id: trimmed } : undefined
+      );
       setChromeStatus(res);
+    } catch (err) {
+      setChromeError(err instanceof Error ? err.message : String(err));
     } finally {
       setCheckingChrome(false);
     }
@@ -123,8 +131,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     onComplete(openRadarWizard);
   };
 
-  const chromeOk = Boolean(chromeStatus?.extension_connected ?? health?.extension_connected);
-  const fbOk = (chromeStatus?.facebook_session ?? health?.facebook_session) === "ok";
+  const chromeOk = Boolean(health?.extension_connected || chromeStatus?.extension_connected);
+  const fbOk =
+    health?.facebook_session === "ok" || chromeStatus?.facebook_session === "ok";
   const currentProbe = probes?.[selectedProvider];
   const aiOk = Boolean(currentProbe?.installed && currentProbe?.authenticated);
   const tgOk = Boolean(
@@ -275,9 +284,41 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     type="button"
                     className="btn"
                     disabled={checkingChrome}
-                    onClick={runChromeCheck}
+                    onClick={() => void runChromeCheck()}
                   >
                     {checkingChrome ? "Đang kiểm tra…" : "Kiểm tra lại"}
+                  </button>
+                </div>
+                {chromeError && (
+                  <div className="badge badge-danger" style={{ marginTop: 8 }}>
+                    {chromeError}
+                  </div>
+                )}
+              </div>
+
+              <div className="card" style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                  Ghép nối ID tiện ích thủ công (tuỳ chọn)
+                </div>
+                <div className="field-hint" style={{ marginBottom: 8 }}>
+                  Nếu bạn nạp bản unpacked từ thư mục khác, dán <strong>ID</strong> hiển thị tại{" "}
+                  <code>chrome://extensions</code> (32 ký tự) rồi bấm Ghép nối:
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Ví dụ: hkmjpcenjjebhpjicnbpmogidfcbmbjn"
+                    value={customExtId}
+                    onChange={(e) => setCustomExtId(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={checkingChrome || !customExtId.trim()}
+                    onClick={() => void runChromeCheck(customExtId)}
+                  >
+                    Ghép nối ID
                   </button>
                 </div>
               </div>
@@ -346,7 +387,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     >
                       Mở facebook.com
                     </button>
-                    <button type="button" className="btn btn-primary" onClick={runChromeCheck}>
+                    <button type="button" className="btn btn-primary" onClick={() => void runChromeCheck()}>
                       Kiểm tra lại
                     </button>
                   </div>

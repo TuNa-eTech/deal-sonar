@@ -18,6 +18,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
   const [funnel, setFunnel] = useState<FunnelStats | null>(null);
   const [checking, setChecking] = useState(false);
   const [diagMsg, setDiagMsg] = useState<string | null>(null);
+  const [customExtId, setCustomExtId] = useState("");
+  const [pairingMsg, setPairingMsg] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     const [runs, usage, fn] = await Promise.all([
@@ -37,9 +39,28 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
   const handleRecheck = async () => {
     setChecking(true);
     try {
+      await api.chromeConnect(
+        customExtId.trim() ? { extension_id: customExtId.trim() } : undefined
+      );
       await api.aiProbe();
       await onRefreshHealth();
       await loadAll();
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const handlePairExtensionId = async () => {
+    setChecking(true);
+    setPairingMsg(null);
+    try {
+      const res = await api.chromeConnect(
+        customExtId.trim() ? { extension_id: customExtId.trim() } : undefined
+      );
+      setPairingMsg(`${res.message} (${res.manifest_path})`);
+      await onRefreshHealth();
+    } catch (err) {
+      setPairingMsg(err instanceof Error ? err.message : String(err));
     } finally {
       setChecking(false);
     }
@@ -99,9 +120,34 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
           </div>
           <div>
             {health?.extension_connected
-              ? `Đang kết nối (v${health.extension_version ?? "0.1.0"})`
-              : "Mất kết nối — cần mở Chrome"}
+              ? `Đang kết nối (v${health.extension_version ?? "0.2.0"})`
+              : "Mất kết nối — cần mở Chrome / bấm Thử lại trong popup tiện ích"}
           </div>
+          {!health?.extension_connected && (
+            <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
+              <input
+                type="text"
+                className="input"
+                style={{ fontSize: 12, padding: "4px 8px" }}
+                placeholder="Extension ID tuỳ chỉnh (tuỳ chọn)"
+                value={customExtId}
+                onChange={(e) => setCustomExtId(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={checking}
+                onClick={() => void handlePairExtensionId()}
+              >
+                Ghép nối
+              </button>
+            </div>
+          )}
+          {pairingMsg && (
+            <div className="field-hint" style={{ marginTop: 6 }}>
+              {pairingMsg}
+            </div>
+          )}
         </div>
 
         <div className="card">

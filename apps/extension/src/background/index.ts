@@ -71,8 +71,24 @@ function getQueue(): OutboundQueue {
 let nativePort: chrome.runtime.Port | null = null;
 let lastPortTrafficAt = 0;
 let pingIntervalId: ReturnType<typeof setInterval> | null = null;
+let fastReconnectTimerId: ReturnType<typeof setTimeout> | null = null;
 let activeCrawlAbort: AbortController | null = null;
 let flushingQueue = false;
+
+function stopFastReconnect(): void {
+  if (fastReconnectTimerId !== null) {
+    clearTimeout(fastReconnectTimerId);
+    fastReconnectTimerId = null;
+  }
+}
+
+function scheduleFastReconnect(delayMs: number = 5_000): void {
+  if (fastReconnectTimerId !== null) return;
+  fastReconnectTimerId = setTimeout(() => {
+    fastReconnectTimerId = null;
+    void ensureNativeConnected(false);
+  }, delayMs);
+}
 
 function detectBrowserString(): string {
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
@@ -212,6 +228,7 @@ async function handleDesktopEnvelope(env: DesktopEnvelope): Promise<void> {
 
   switch (env.type) {
     case "hello.ok": {
+      stopFastReconnect();
       const updated = await storage.update((state) => {
         state.connection = {
           connected: true,
@@ -310,6 +327,7 @@ async function handleDesktopEnvelope(env: DesktopEnvelope): Promise<void> {
         await updateActionBadge(updated);
         await getQueue().markErrorReply(env.reply_to, true, now);
         await scheduleQueueRetryAlarm();
+        scheduleFastReconnect(5_000);
         return;
       }
 
@@ -420,6 +438,7 @@ async function ensureNativeConnected(forceReconnect: boolean = false): Promise<v
           return state;
         }, now);
         await updateActionBadge(updated);
+        scheduleFastReconnect(5_000);
       })();
     });
 
@@ -444,6 +463,7 @@ async function ensureNativeConnected(forceReconnect: boolean = false): Promise<v
       return state;
     });
     await updateActionBadge(updated);
+    scheduleFastReconnect(5_000);
   }
 }
 
@@ -915,6 +935,7 @@ async function buildPopupStatus(now: number = Date.now()): Promise<PopupStatusSn
     desktopAvailable: state.connection.desktop_available,
     desktopVersion: state.connection.desktop_version,
     connectionError: state.connection.last_error,
+    extensionId: typeof chrome !== "undefined" ? chrome.runtime?.id : undefined,
     session: {
       state: state.session.state,
       detail: state.session.detail,
