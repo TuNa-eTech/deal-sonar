@@ -54,6 +54,14 @@ pub fn run() {
         ))
         // 3. Native OS notifications (`07-notifications-export.md §4`)
         .plugin(tauri_plugin_notification::init())
+        .on_page_load(|webview, payload| {
+            tracing::info!(
+                label = webview.label(),
+                url = %payload.url(),
+                event = ?payload.event(),
+                "webview page load"
+            );
+        })
         .setup(move |app| {
             let _runtime_guard = tauri::async_runtime::handle().inner().enter();
             let app_handle = app.handle().clone();

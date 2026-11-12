@@ -88,7 +88,9 @@ pub fn handle_webview_navigation(url: &Url) -> bool {
                     return true;
                 }
                 #[cfg(debug_assertions)]
-                if (host == "localhost" || host == "127.0.0.1") && url.port() == Some(5173) {
+                if (host == "localhost" || host == "127.0.0.1")
+                    && matches!(url.port(), Some(1420 | 5173))
+                {
                     return true;
                 }
             }

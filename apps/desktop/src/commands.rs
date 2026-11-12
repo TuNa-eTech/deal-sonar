@@ -531,6 +531,7 @@ pub fn exec_settings_set(
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn settings_get(state: State<'_, DesktopState>) -> Result<Settings, CommandError> {
+    tracing::debug!("ipc settings_get");
     Ok(state.core().settings_get()?)
 }
 

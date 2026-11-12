@@ -91,10 +91,26 @@ pub fn init_logging(logs_dir: &Path) -> io::Result<WorkerGuard> {
         .with_target(true)
         .with_writer(non_blocking);
 
-    let _ = tracing_subscriber::registry()
-        .with(env_filter)
-        .with(file_layer)
-        .try_init();
+    #[cfg(debug_assertions)]
+    {
+        let stderr_layer = tracing_subscriber::fmt::layer()
+            .compact()
+            .with_target(true)
+            .with_writer(std::io::stderr);
+        let _ = tracing_subscriber::registry()
+            .with(env_filter)
+            .with(file_layer)
+            .with(stderr_layer)
+            .try_init();
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = tracing_subscriber::registry()
+            .with(env_filter)
+            .with(file_layer)
+            .try_init();
+    }
 
     Ok(guard)
 }

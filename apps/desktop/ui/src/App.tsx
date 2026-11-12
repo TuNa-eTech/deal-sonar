@@ -32,6 +32,7 @@ export type ScreenKey =
 export const App: React.FC = () => {
   const [screen, setScreen] = useState<ScreenKey>("inbox");
   const [booting, setBooting] = useState(true);
+  const [bootError, setBootError] = useState<string | null>(null);
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [license, setLicense] = useState<LicenseStatus | null>(null);
@@ -65,26 +66,34 @@ export const App: React.FC = () => {
   };
 
   const loadCoreData = useCallback(async () => {
-    const [st, lic, hl, tpls, rds, srcs, newLeads] = await Promise.all([
-      api.settingsGet(),
-      api.licenseGet(),
-      api.healthGet(),
-      api.templateList(),
-      api.radarList(),
-      api.sourceList(),
-      api.leadList({ status: ["new"], limit: 100 }),
-    ]);
-    setSettings(st);
-    setLicense(lic);
-    setHealth(hl);
-    setTemplates(tpls);
-    setRadars(rds);
-    setSources(srcs);
-    setUnreadNewCount(newLeads.total);
-    if (!st.onboarding_completed || !st.privacy_consent_accepted) {
-      setOnboardingOpen(true);
+    try {
+      setBootError(null);
+      const [st, lic, hl, tpls, rds, srcs, newLeads] = await Promise.all([
+        api.settingsGet(),
+        api.licenseGet(),
+        api.healthGet(),
+        api.templateList(),
+        api.radarList(),
+        api.sourceList(),
+        api.leadList({ status: ["new"], limit: 100 }),
+      ]);
+      setSettings(st);
+      setLicense(lic);
+      setHealth(hl);
+      setTemplates(tpls);
+      setRadars(rds);
+      setSources(srcs);
+      setUnreadNewCount(newLeads.total);
+      if (!st.onboarding_completed || !st.privacy_consent_accepted) {
+        setOnboardingOpen(true);
+      }
+      setBooting(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[DealSonar] Lỗi khởi tạo dữ liệu giao diện:", err);
+      setBootError(msg);
+      setBooting(false);
     }
-    setBooting(false);
   }, []);
 
   useEffect(() => {
@@ -97,29 +106,33 @@ export const App: React.FC = () => {
     let cancelled = false;
 
     const bind = async () => {
-      const u1 = await onDesktopEvent("lead:new", (lead) => {
-        showToast(`🎯 Tin mới [${lead.radar_name}]: ${lead.summary}`);
-        setRefreshToken((n) => n + 1);
-        void loadCoreData();
-      });
-      const u2 = await onDesktopEvent("lead:updated", () => {
-        setRefreshToken((n) => n + 1);
-        void loadCoreData();
-      });
-      const u3 = await onDesktopEvent("health:changed", (hl) => {
-        setHealth(hl);
-      });
-      const u4 = await onDesktopEvent("crawl:finished", () => {
-        void api.sourceList().then(setSources);
-      });
-      const u5 = await onDesktopEvent("job:failed", (ev) => {
-        showToast(`⚠️ Công việc nền lỗi (${ev.kind}): ${ev.error}`);
-      });
+      try {
+        const u1 = await onDesktopEvent("lead:new", (lead) => {
+          showToast(`🎯 Tin mới [${lead.radar_name}]: ${lead.summary}`);
+          setRefreshToken((n) => n + 1);
+          void loadCoreData();
+        });
+        const u2 = await onDesktopEvent("lead:updated", () => {
+          setRefreshToken((n) => n + 1);
+          void loadCoreData();
+        });
+        const u3 = await onDesktopEvent("health:changed", (hl) => {
+          setHealth(hl);
+        });
+        const u4 = await onDesktopEvent("crawl:finished", () => {
+          void api.sourceList().then(setSources);
+        });
+        const u5 = await onDesktopEvent("job:failed", (ev) => {
+          showToast(`⚠️ Công việc nền lỗi (${ev.kind}): ${ev.error}`);
+        });
 
-      if (cancelled) {
-        [u1, u2, u3, u4, u5].forEach((fn) => fn());
-      } else {
-        unsubs.push(u1, u2, u3, u4, u5);
+        if (cancelled) {
+          [u1, u2, u3, u4, u5].forEach((fn) => fn());
+        } else {
+          unsubs.push(u1, u2, u3, u4, u5);
+        }
+      } catch (err) {
+        console.error("[DealSonar] Không thể đăng ký nhận sự kiện thời gian thực:", err);
       }
     };
 
@@ -129,6 +142,27 @@ export const App: React.FC = () => {
       unsubs.forEach((fn) => fn());
     };
   }, [loadCoreData]);
+
+  if (bootError && (!settings || !license)) {
+    return (
+      <div style={{ padding: 32 }}>
+        <h2 style={{ marginBottom: 8 }}>Không thể khởi động giao diện DealSonar</h2>
+        <p className="text-muted" style={{ marginBottom: 16 }}>
+          {bootError}
+        </p>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => {
+            setBooting(true);
+            void loadCoreData();
+          }}
+        >
+          Thử lại
+        </button>
+      </div>
+    );
+  }
 
   if (booting || !settings || !license) {
     return (
