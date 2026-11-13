@@ -614,6 +614,7 @@ pub struct Lead {
     pub evaluation_id: String,
     pub contact_id: Option<String>,
     pub status: LeadStatus,
+    pub read_at: Option<i64>,
     pub score: f64,
     pub is_weak_match: bool,
     pub summary: String,
@@ -688,6 +689,10 @@ pub struct LeadSortInput {
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LeadFilterQuery {
+    #[serde(default)]
+    pub unread_only: Option<bool>,
+    #[serde(default)]
+    pub follow_up_before: Option<i64>,
     #[serde(default)]
     pub radar_id: Option<String>,
     #[serde(default)]
@@ -905,6 +910,10 @@ pub struct FloodRadarInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HealthStatus {
+    pub automatic_scanning: Option<bool>,
+    pub next_crawl_at: Option<i64>,
+    pub last_crawl_at: Option<i64>,
+    pub runtime_checked_at: Option<i64>,
     pub extension_connected: bool,
     pub extension_version: Option<String>,
     pub facebook_session: FacebookSessionState,
@@ -1484,6 +1493,8 @@ pub struct PreviewRunState {
     pub status: PreviewStatus,
     pub total_posts: usize,
     pub evaluated_posts: usize,
+    #[serde(default)]
+    pub failed_posts: usize,
     pub items: Vec<PreviewItem>,
     pub warnings: Vec<PreviewWarning>,
     pub error: Option<String>,
@@ -1682,9 +1693,13 @@ pub struct PreviewProgressEvent {
     pub radar_id: String,
     pub status: PreviewStatus,
     pub evaluated_posts: usize,
+    #[serde(default)]
+    pub failed_posts: usize,
     pub total_posts: usize,
     pub new_items: Vec<PreviewItem>,
     pub warnings: Vec<PreviewWarning>,
+    #[serde(default)]
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1701,6 +1716,8 @@ pub struct JobFailedEvent {
 pub enum CoreEvent {
     #[serde(rename = "lead:new")]
     LeadNew(Lead),
+    #[serde(rename = "lead:reminder")]
+    LeadReminder(Lead),
     #[serde(rename = "lead:updated")]
     LeadUpdated(Lead),
     #[serde(rename = "preview:progress")]
@@ -1718,6 +1735,7 @@ impl CoreEvent {
     /// `"health:changed"`, `"crawl:finished"`, `"job:failed"`).
     pub fn event_name(&self) -> &'static str {
         match self {
+            Self::LeadReminder(_) => "lead:reminder",
             Self::LeadNew(_) => "lead:new",
             Self::LeadUpdated(_) => "lead:updated",
             Self::PreviewProgress(_) => "preview:progress",
@@ -1730,7 +1748,7 @@ impl CoreEvent {
     /// Serialize the event's inner payload matching `TauriEventMap[event_name]`.
     pub fn to_payload_value(&self) -> Value {
         match self {
-            Self::LeadNew(v) | Self::LeadUpdated(v) => {
+            Self::LeadNew(v) | Self::LeadUpdated(v) | Self::LeadReminder(v) => {
                 serde_json::to_value(v).unwrap_or(Value::Null)
             }
             Self::PreviewProgress(v) => serde_json::to_value(v).unwrap_or(Value::Null),

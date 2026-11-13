@@ -6,6 +6,8 @@ dist
 !.env.example
 *.log
 apps/desktop/gen/schemas
+apps/desktop/binaries/
+apps/desktop/release.conf.json
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/

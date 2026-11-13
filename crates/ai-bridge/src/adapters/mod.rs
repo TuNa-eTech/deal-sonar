@@ -1,6 +1,7 @@
 pub mod agy;
 pub mod claude;
 pub mod codex;
+mod codex_schema;
 pub mod mock;
 
 use std::ffi::OsString;

@@ -139,6 +139,15 @@ pub(crate) fn load_radar_with_version_conn(
 }
 
 impl Store {
+    pub fn radar_versions(&self, id: &str) -> Result<Vec<RadarVersionRecord>, StoreError> {
+        let conn = self.lock_conn()?;
+        let mut statement =
+            conn.prepare("SELECT * FROM radar_versions WHERE radar_id=?1 ORDER BY version DESC")?;
+        let rows = statement.query_map(params![id], map_radar_version_row)?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(StoreError::from)
+    }
+
     /// Create a new radar in `draft` state along with its initial `version = 1` row and `radar_sources`.
     pub fn radar_create_draft(
         &self,
@@ -338,6 +347,44 @@ impl Store {
             version_created,
             pending_confirmation,
         })
+    }
+
+    /// Persist an immutable preview definition without changing live metadata, sources or version.
+    pub fn radar_preview_snapshot(
+        &self,
+        definition: &RadarVersionRecord,
+    ) -> Result<RadarVersionRecord, StoreError> {
+        validate_field_defs(&definition.fields)?;
+        let mut conn = self.lock_conn()?;
+        let tx = conn.transaction()?;
+        let existing =
+            load_radar_with_version_conn(&tx, &definition.radar_id)?.ok_or_else(|| {
+                StoreError::NotFound {
+                    entity: "radar",
+                    id: definition.radar_id.clone(),
+                }
+            })?;
+        for version in
+            std::iter::once(&existing.current_version).chain(existing.candidate_version.iter())
+        {
+            if version.description == definition.description
+                && version.fields == definition.fields
+                && version.match_policy == definition.match_policy
+                && version.user_profession == definition.user_profession
+            {
+                return Ok(version.clone());
+            }
+        }
+        let mut snapshot = definition.clone();
+        snapshot.id = new_ulid();
+        snapshot.version = tx.query_row(
+            "SELECT MAX(version)+1 FROM radar_versions WHERE radar_id=?1",
+            params![definition.radar_id],
+            |r| r.get(0),
+        )?;
+        tx.execute("INSERT INTO radar_versions(id,radar_id,version,description,language_hint,user_profession,fields,match_policy,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",params![snapshot.id,snapshot.radar_id,snapshot.version,snapshot.description,snapshot.language_hint,snapshot.user_profession,serde_json::to_string(&snapshot.fields)?,serde_json::to_string(&snapshot.match_policy)?,snapshot.created_at])?;
+        tx.commit()?;
+        Ok(snapshot)
     }
 
     /// Confirm and activate a candidate `radar_versions` version on an active radar,

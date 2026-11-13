@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import {offerUndo} from "../components/UndoCenter";
 import { api } from "../lib/api";
 import { formatRelativeTime } from "../lib/format";
 import { openSafeSetupUrl, renderHighlightedPostText } from "../lib/security";
@@ -29,7 +30,11 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
     setErrorMsg(null);
     try {
       if (s.followed) {
+        const radars=await api.radarList();
+        const affected=radars.filter(r=>r.source_ids.includes(s.id));
+        if(affected.length&&!window.confirm(`Bỏ theo dõi “${s.name}” ảnh hưởng ${affected.map(r=>r.name).join(", ")}. Bạn có thể hoàn tác sau thao tác. Tiếp tục?`))return;
         await api.sourceUnfollow(s.id);
+        offerUndo(`Đã bỏ theo dõi ${s.name}`,async()=>{await api.sourceFollow(s.id);if(s.priority)await api.sourceSetPriority(s.id,true);onChanged();});
       } else {
         await api.sourceFollow(s.id);
       }
@@ -51,8 +56,9 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
 
   const handleCrawlNow = async (s: Source) => {
     setErrorMsg(null);
-    await api.sourceCrawlNow(s.id, "manual");
-    setInfoMsg(`Đã gửi lệnh quét ngay cho group «${s.name}».`);
+    const result=await api.sourceCrawlNow(s.id, "manual");
+    if(!result.queued){setErrorMsg("Chưa có tiện ích kết nối để nhận lệnh. Mở Chrome rồi thử lại.");return;}
+    setInfoMsg(`Đã gửi lệnh quét ngay cho group «${s.name}». Hãy xem lần quét cuối và số bài lưu để xác nhận kết quả.`);
     onChanged();
   };
 
@@ -62,17 +68,17 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
   };
 
   return (
-    <div>
+    <div className="sources-workspace">
       <div className="screen-header">
         <div>
           <h1 className="screen-title">Nguồn Group Facebook</h1>
           <p className="screen-subtitle">
-            Đang theo dõi {followedCount} / {license.limits.max_followed_groups} group · Group ưu
-            tiên: {priorityCount} / 3 (chu kỳ 5 phút)
+            Đang theo dõi {followedCount} / {license.limits.max_followed_groups} group. Group ưu
+            tiên: {priorityCount} / 3 (chu kỳ 5 phút).
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="management-header-actions">
           <button
             type="button"
             className="btn"
@@ -81,7 +87,7 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
               void runPostSearch();
             }}
           >
-            🔍 Tìm bài viết thô trong kho (FTS)
+            Tìm bài viết thô trong kho (FTS)
           </button>
           <button
             type="button"
@@ -104,7 +110,7 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
         </div>
       )}
 
-      <div className="table-wrap">
+      <div className="table-wrap source-directory">
         <table className="crm-table">
           <thead>
             <tr>
@@ -151,15 +157,15 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
                 <td>
                   <button
                     type="button"
-                    className={`btn btn-sm ${s.priority ? "btn-primary" : ""}`}
+                    className={`btn btn-sm ${s.priority ? "priority-selected" : ""}`}
                     disabled={!s.followed}
                     onClick={() => void handleTogglePriority(s)}
                   >
-                    {s.priority ? "★ Ưu tiên" : "☆ Thường"}
+                    {s.priority ? "Ưu tiên" : "Thường"}
                   </button>
                 </td>
                 <td>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div className="management-row-actions">
                     <button
                       type="button"
                       className={`btn btn-sm ${s.followed ? "" : "btn-primary"}`}
@@ -171,7 +177,7 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
                       type="button"
                       className="btn btn-sm"
                       disabled={!s.followed}
-                      onClick={() => void handleCrawlNow(s)}
+                      onClick={() => void handleCrawlNow(s).catch(e=>setErrorMsg(String(e)))}
                     >
                       Quét ngay
                     </button>
@@ -190,7 +196,7 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
             <div className="modal-header">
               <h3 style={{ margin: 0 }}>Tìm kiếm toàn văn trên kho bài thô (FTS5 không phân biệt dấu)</h3>
               <button type="button" className="btn btn-sm" onClick={() => setFtsOpen(false)}>
-                Đóng ✕
+                Đóng
               </button>
             </div>
             <div className="modal-body">
@@ -213,10 +219,10 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {ftsPosts.map((p) => (
                   <div key={p.id} className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div className="management-row-heading">
                       <strong>{p.author_name}</strong>
                       <span className="field-hint">
-                        {p.source_name} · {formatRelativeTime(p.created_at)} · chiến lược: {p.strategy}
+                        {p.source_name}, {formatRelativeTime(p.created_at)}, chiến lược: {p.strategy}
                       </span>
                     </div>
                     <div className="post-plain-text" style={{ fontSize: 12.5, padding: 9 }}>

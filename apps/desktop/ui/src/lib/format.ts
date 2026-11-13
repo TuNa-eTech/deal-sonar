@@ -26,8 +26,8 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
 };
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
-  new: "Mới",
-  viewed: "Đã xem",
+  new: "Chưa xử lý",
+  viewed: "Chưa xử lý",
   contacted: "Đã liên hệ",
   negotiating: "Đang thương lượng",
   won: "Chốt thành công",
@@ -37,7 +37,7 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
 
 export const RADAR_STATUS_LABELS: Record<RadarStatus, string> = {
   draft: "Bản nháp",
-  active: "Đang chạy",
+  active: "Đã bật",
   paused: "Tạm dừng",
   archived: "Đã lưu trữ",
 };

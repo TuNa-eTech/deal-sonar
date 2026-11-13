@@ -89,6 +89,7 @@ pub fn spawn_jobs_worker(
 /// Run one pass of pending-AI batch scheduling and claim/execute all currently due jobs.
 pub async fn tick_jobs_once(rt: &Arc<CoreRuntime>) -> CoreResult<usize> {
     let now = now_ms();
+    dispatch_due_followups(rt, now)?;
 
     // Check if any `pending_ai` batch reached `>= batch_trigger_count` or `>= batch_max_wait_ms`
     let pending_groups = rt.store.list_pending_ai_batches()?;
@@ -134,6 +135,34 @@ pub async fn tick_jobs_once(rt: &Arc<CoreRuntime>) -> CoreResult<usize> {
     }
 
     Ok(processed)
+}
+
+/// Delivery is durable per scheduled timestamp; overdue work remains visible until completed.
+pub fn dispatch_due_followups(rt: &Arc<CoreRuntime>, now: i64) -> CoreResult<usize> {
+    let settings = rt.load_settings()?;
+    let ids = rt.store.claim_due_followups(now)?;
+    for id in &ids {
+        if let Some(lead) = load_lead_dto(rt, id)? {
+            rt.emit(CoreEvent::LeadReminder(lead.clone()));
+            if settings.os_notifications_enabled {
+                if let Some(hook) = rt
+                    .os_notify_hook
+                    .read()
+                    .expect("notification hook")
+                    .as_ref()
+                {
+                    hook(crate::state::OsNotification {
+                        lead_id: lead.id,
+                        radar_name: "Đến hạn liên hệ".into(),
+                        summary: lead.summary,
+                        group_name: lead.source_name,
+                        permalink: lead.permalink,
+                    });
+                }
+            }
+        }
+    }
+    Ok(ids.len())
 }
 
 async fn execute_job(rt: &Arc<CoreRuntime>, job: &JobRecord) -> CoreResult<()> {
@@ -808,6 +837,9 @@ async fn handle_telegram_incoming_event(
             let leads_page = rt
                 .store
                 .lead_list(&dealsonar_store::models::LeadListQuery {
+                    unread_only: None,
+                    follow_up_before: None,
+                    exclude_weak: None,
                     radar_id: None,
                     status: None,
                     since: Some(day_start),

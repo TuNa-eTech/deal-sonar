@@ -10,7 +10,7 @@ describe("All 7 Main Screens Coverage (Radar, Nguồn, Danh bạ, Sức khoẻ, 
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole("heading", { name: "Hộp tin" });
+    await screen.findByRole("heading", { name: "Cơ hội" });
 
     // 1. Rejected posts modal & "Đánh dấu bỏ sót" (`missed`)
     await user.click(screen.getByRole("button", { name: /Xem các bài bị loại gần nhất/i }));
@@ -48,15 +48,15 @@ describe("All 7 Main Screens Coverage (Radar, Nguồn, Danh bạ, Sức khoẻ, 
     await user.click(within(ftsDialog).getByRole("button", { name: /Đóng/i }));
 
     // 4. Danh bạ & Blocklist Screen
-    await user.click(screen.getByRole("button", { name: "Danh bạ" }));
+    await user.click(screen.getByRole("button", { name: "Liên hệ" }));
     await screen.findByRole("heading", { name: /Danh bạ & Danh sách chặn/i });
     expect(await screen.findByText("0912 345 678")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Danh sách chặn/i }));
     expect(await screen.findByText(/Kho Tổng Chung Cư Mini HN/i)).toBeInTheDocument();
 
     // 5. Sức khoẻ Screen: 4 lamps + Diagnostic Bundle
-    await user.click(screen.getByRole("button", { name: /Sức khoẻ/i }));
-    await screen.findByRole("heading", { name: /Sức khoẻ hệ thống/i });
+    await user.click(screen.getByRole("button", { name: /Kết nối/i }));
+    await screen.findByRole("heading", { name: /Kết nối & Chẩn đoán/i });
     expect(screen.getByText("1. Chrome Extension")).toBeInTheDocument();
     expect(screen.getByText("2. Phiên Facebook")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Tạo gói chẩn đoán/i }));
@@ -72,6 +72,7 @@ describe("All 7 Main Screens Coverage (Radar, Nguồn, Danh bạ, Sức khoẻ, 
     await user.selectOptions(smartModelSelect, "sonnet");
     await user.click(screen.getByRole("button", { name: "Lưu cấu hình AI" }));
 
+    await user.click(screen.getByRole("button", { name: "Dữ liệu" }));
     await user.click(screen.getByRole("button", { name: /Xoá toàn bộ dữ liệu/i }));
 
     const delDialog = await screen.findByRole("dialog", {

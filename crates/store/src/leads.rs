@@ -72,6 +72,7 @@ pub(crate) fn map_lead_row(row: &Row<'_>) -> rusqlite::Result<LeadRecord> {
         evaluation_id: row.get("evaluation_id")?,
         contact_id: row.get("contact_id")?,
         status: row.get("status")?,
+        read_at: row.get("read_at")?,
         score: row.get("score")?,
         summary: row.get("summary")?,
         fields,
@@ -109,6 +110,7 @@ fn map_feedback_row(row: &Row<'_>) -> rusqlite::Result<FeedbackRecord> {
             rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
         })?;
     Ok(FeedbackRecord {
+        expected_match: row.get("expected_match")?,
         id: row.get("id")?,
         evaluation_id: row.get("evaluation_id")?,
         radar_version_id: row.get("radar_version_id")?,
@@ -720,6 +722,11 @@ impl Store {
             });
         }
 
+        let definition = version_fields
+            .iter()
+            .find(|f| f.key == field_key)
+            .expect("checked field");
+        crate::field_values::validate_field_value(definition, &new_value)?;
         let mut fields_map = lead.fields.clone();
         let old_entry = fields_map.get(field_key).cloned();
         let preserved_raw = raw.or_else(|| old_entry.as_ref().and_then(|e| e.raw.clone()));
@@ -820,6 +827,33 @@ impl Store {
         Ok(updated)
     }
 
+    /// Read state is independent of CRM stage.
+    pub fn lead_mark_read(&self, id: &str, now: i64) -> Result<(), StoreError> {
+        let conn = self.lock_conn()?;
+        conn.execute(
+            "UPDATE leads SET read_at=COALESCE(read_at,?1) WHERE id=?2",
+            params![now, id],
+        )?;
+        Ok(())
+    }
+
+    /// Claim due local reminders once per scheduled time. Overdue reminders survive restarts.
+    pub fn claim_due_followups(&self, now: i64) -> Result<Vec<String>, StoreError> {
+        let mut conn = self.lock_conn()?;
+        let tx = conn.transaction()?;
+        let ids: Vec<(String, i64)> = {
+            let mut stmt=tx.prepare("SELECT id,follow_up_at FROM leads l WHERE follow_up_at<=?1 AND status NOT IN ('won','lost','ignored') AND NOT EXISTS(SELECT 1 FROM follow_up_deliveries d WHERE d.lead_id=l.id AND d.due_at=l.follow_up_at) ORDER BY follow_up_at LIMIT 50")?;
+            let rows = stmt.query_map(params![now], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            rows.collect::<Result<_, _>>()?
+        };
+        for (id, due) in &ids {
+            tx.execute("INSERT INTO follow_up_deliveries(lead_id,due_at,delivered_at) VALUES (?1,?2,?3) ON CONFLICT(lead_id) DO UPDATE SET due_at=excluded.due_at,delivered_at=excluded.delivered_at", params![id,due,now])?;
+            tx.execute("INSERT INTO lead_events(id,lead_id,kind,data,created_at) VALUES(?1,?2,'follow_up_due',?3,?4)",params![new_ulid(),id,serde_json::json!({"due_at":due}).to_string(),now])?;
+        }
+        tx.commit()?;
+        Ok(ids.into_iter().map(|(id, _)| id).collect())
+    }
+
     /// Link a lead to a `contact_id`.
     pub fn lead_set_contact_id(
         &self,
@@ -898,6 +932,19 @@ impl Store {
             where_clauses.push(format!("l.radar_id = {p}"));
         }
 
+        if query.unread_only == Some(true) {
+            where_clauses.push("l.read_at IS NULL".into());
+        }
+        if let Some(due) = query.follow_up_before {
+            let p = push_param(&mut sql_params, SqlValue::Integer(due));
+            where_clauses.push(format!(
+                "l.follow_up_at <= {p} AND l.status NOT IN ('won','lost','ignored')"
+            ));
+        }
+        if query.exclude_weak == Some(true) {
+            where_clauses
+                .push("l.score >= COALESCE(json_extract(r.notify, '$.min_score'), 0.6)".into());
+        }
         if let Some(statuses) = &query.status {
             if !statuses.is_empty() {
                 let mut ph = Vec::with_capacity(statuses.len());
@@ -952,6 +999,7 @@ impl Store {
             SortDir::Desc => "DESC",
         };
 
+        let filter_param_count = sql_params.len();
         let order_sql = if let Some(fdef) = &dynamic_sort_field {
             let expr = build_dynamic_sort_expr(fdef, &mut sql_params);
             format!(
@@ -972,6 +1020,7 @@ impl Store {
             format!("WHERE {}", where_clauses.join(" AND "))
         };
 
+        let total: i64 = conn.query_row(&format!("SELECT COUNT(*) FROM leads l JOIN radars r ON r.id=l.radar_id JOIN posts p ON p.id=l.post_id JOIN sources s ON s.id=p.source_id LEFT JOIN authors a ON a.id=p.author_id {where_sql}"), params_from_iter(sql_params[..filter_param_count].iter()), |r|r.get(0))?;
         let p_limit = push_param(&mut sql_params, SqlValue::Integer(fetch_limit));
         let p_offset = push_param(&mut sql_params, SqlValue::Integer(offset as i64));
 
@@ -1008,7 +1057,11 @@ impl Store {
             None
         };
 
-        Ok(LeadListPage { items, next_cursor })
+        Ok(LeadListPage {
+            items,
+            next_cursor,
+            total: total as usize,
+        })
     }
 
     // ========================================================================
@@ -1040,17 +1093,22 @@ impl Store {
         let mut conn = self.lock_conn()?;
         let tx = conn.transaction()?;
 
-        let (radar_version_id, post_id, fallback_text): (String, String, String) = tx
+        let (radar_version_id, post_id, fallback_text, verdict): (
+            String,
+            String,
+            String,
+            Option<String>,
+        ) = tx
             .query_row(
                 "SELECT
                    e.radar_version_id,
                    e.post_id,
-                   COALESCE(p.text, e.summary, '')
+                   COALESCE(p.text, e.summary, ''), e.verdict
                  FROM evaluations e
                  JOIN posts p ON p.id = e.post_id
                  WHERE e.id = ?1",
                 params![input.evaluation_id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
             )
             .optional()?
             .ok_or_else(|| StoreError::NotFound {
@@ -1058,6 +1116,11 @@ impl Store {
                 id: input.evaluation_id.clone(),
             })?;
 
+        let expected_match = match input.label.as_str() {
+            "correct" => verdict.as_deref() == Some("match"),
+            "missed" | "wrong_fields" => true,
+            _ => false,
+        };
         let id = new_ulid();
         let post_text = input.post_text.clone().unwrap_or(fallback_text);
         let cf_json = input
@@ -1069,8 +1132,8 @@ impl Store {
         tx.execute(
             "INSERT INTO feedback (
                id, evaluation_id, radar_version_id, post_id, label,
-               corrected_fields, post_text, origin, created_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+               corrected_fields, post_text, origin, created_at, expected_match
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 id,
                 input.evaluation_id,
@@ -1081,6 +1144,7 @@ impl Store {
                 post_text,
                 input.origin,
                 input.now_ms,
+                expected_match,
             ],
         )?;
 
@@ -1124,7 +1188,7 @@ impl Store {
             let mut stmt = conn.prepare(
                 "SELECT * FROM feedback
                  WHERE radar_version_id = ?1
-                   AND label IN ('correct', 'missed', 'wrong_fields')
+                   AND expected_match = 1
                  ORDER BY created_at DESC
                  LIMIT ?2",
             )?;
@@ -1136,7 +1200,7 @@ impl Store {
             let mut stmt = conn.prepare(
                 "SELECT * FROM feedback
                  WHERE radar_version_id = ?1
-                   AND label IN ('irrelevant', 'peer', 'duplicate', 'spam')
+                   AND expected_match = 0
                  ORDER BY created_at DESC
                  LIMIT ?2",
             )?;
@@ -1169,6 +1233,7 @@ impl Store {
                    f.post_text,
                    p.text_fold,
                    f.label,
+                   f.expected_match,
                    f.corrected_fields,
                    e.author_role,
                    e.score,
@@ -1189,7 +1254,7 @@ impl Store {
                     .and_then(|s| serde_json::from_str(s).ok());
 
                 let label: String = row.get("label")?;
-                let is_match = matches!(label.as_str(), "correct" | "missed" | "wrong_fields");
+                let is_match: bool = row.get("expected_match")?;
                 let role: Option<String> = if label == "peer" {
                     Some("peer".to_string())
                 } else {

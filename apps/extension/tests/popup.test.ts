@@ -276,7 +276,7 @@ describe("Popup UI (`03-ux-flows.md §4`)", () => {
     scrolls.value = "4";
     scrolls.dispatchEvent(new Event("change"));
     await vi.waitFor(() => expect(status.scanOptions?.maxScrollSteps).toBe(4));
-    expect(document.getElementById("scan-options-summary")?.textContent).toBe("Tab nền · 65 bài · 4 cuộn");
+    expect(document.getElementById("scan-options-summary")?.textContent).toBe("Tab nền, 65 bài, 4 cuộn");
     expect(document.getElementById("scan-options-feedback")?.textContent).toContain("Đã lưu");
     disposePanel();
     mount();

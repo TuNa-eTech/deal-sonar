@@ -888,6 +888,7 @@ pub struct LeadRecord {
     pub evaluation_id: String,
     pub contact_id: Option<String>,
     pub status: String,
+    pub read_at: Option<i64>,
     pub score: f64,
     pub summary: String,
     pub fields: BTreeMap<String, ExtractedField>,
@@ -990,6 +991,9 @@ impl Default for LeadSort {
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LeadListQuery {
+    pub unread_only: Option<bool>,
+    pub follow_up_before: Option<i64>,
+    pub exclude_weak: Option<bool>,
     pub radar_id: Option<String>,
     pub status: Option<Vec<String>>,
     pub since: Option<i64>,
@@ -1009,6 +1013,7 @@ fn default_lead_limit() -> usize {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LeadListPage {
+    pub total: usize,
     pub items: Vec<LeadListItem>,
     pub next_cursor: Option<String>,
 }
@@ -1025,6 +1030,7 @@ pub struct RecordFeedbackInput {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FeedbackRecord {
+    pub expected_match: bool,
     pub id: String,
     pub evaluation_id: String,
     pub radar_version_id: String,

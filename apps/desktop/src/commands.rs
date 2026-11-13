@@ -226,6 +226,18 @@ pub async fn radar_preview_start(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn radar_preview_cancel(
+    state: State<'_, DesktopState>,
+    radar_id: String,
+    preview_id: String,
+) -> Result<PreviewRunState, CommandError> {
+    Ok(state
+        .core()
+        .radar_preview_cancel(&radar_id, &preview_id)
+        .await?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn radar_preview_get(
     state: State<'_, DesktopState>,
     radar_id: String,
@@ -327,6 +339,14 @@ pub async fn lead_get(
     id: String,
 ) -> Result<LeadDetail, CommandError> {
     Ok(state.core().lead_get(&id)?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn lead_mark_read(
+    state: State<'_, DesktopState>,
+    id: String,
+) -> Result<LeadDetail, CommandError> {
+    Ok(state.core().lead_mark_read(&id)?)
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -665,6 +685,15 @@ pub async fn data_backup(state: State<'_, DesktopState>) -> Result<DataBackupRes
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn workspace_action(
+    state: State<'_, DesktopState>,
+    action: String,
+    input: Value,
+) -> Result<Value, CommandError> {
+    Ok(state.core().workspace_action(&action, input)?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn data_purge(
     state: State<'_, DesktopState>,
     unmatched_retention_days: Option<u32>,
@@ -764,6 +793,13 @@ pub async fn invoke_command_json(
                 .await?,
         ),
         "radar_preview_start" => to_json(c.radar_preview_start(parse_arg(map, "input")?).await?),
+        "radar_preview_cancel" => to_json(
+            c.radar_preview_cancel(
+                &parse_arg::<String>(map, "radar_id")?,
+                &parse_arg::<String>(map, "preview_id")?,
+            )
+            .await?,
+        ),
         "radar_preview_get" => {
             let radar_id: String = parse_arg(map, "radar_id")?;
             let preview_id: Option<String> = parse_opt_arg(map, "preview_id")?;
@@ -795,6 +831,7 @@ pub async fn invoke_command_json(
 
         // 4. Leads
         "lead_list" => to_json(c.lead_list(parse_arg(map, "query")?)?),
+        "lead_mark_read" => to_json(c.lead_mark_read(&parse_arg::<String>(map, "id")?)?),
         "lead_get" => to_json(c.lead_get(&parse_arg::<String>(map, "id")?)?),
         "lead_set_status" => {
             let (id, status, crm) = parse_lead_set_status_payload(&args)?;
@@ -921,6 +958,10 @@ pub async fn invoke_command_json(
             to_json(c.ai_usage_get(days.unwrap_or(7))?)
         }
         "diagnostic_bundle_create" => to_json(c.diagnostic_bundle_create()?),
+        "workspace_action" => to_json(c.workspace_action(
+            &parse_arg::<String>(map, "action")?,
+            parse_arg(map, "input")?,
+        )?),
         "data_backup" => to_json(c.data_backup()?),
         "data_purge" => {
             let days: Option<u32> = parse_opt_arg(map, "unmatched_retention_days")?;

@@ -1,4 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { readWorkspace, saveWorkspace } from "../lib/workspace";
+import { parseFieldValue } from "../lib/fieldValues";
+import { OperationStatus } from "./OperationStatus";
 import { api, onDesktopEvent } from "../lib/api";
 import {
   composeTemplateDescription,
@@ -8,6 +11,7 @@ import {
 } from "../lib/format";
 import { openSafeSetupUrl, renderHighlightedPostText } from "../lib/security";
 import type {
+  Channel, HealthStatus, HardFilter, RadarNotifyConfig,
   FieldDef,
   FieldType,
   LicenseStatus,
@@ -65,17 +69,30 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
   onClose,
   onSaved,
 }) => {
+  const draftKey=`radar-draft-${editRadar?.radar.id ?? initialTemplate?.id ?? "new"}`;
+  const restored=useMemo(()=>readWorkspace<Record<string,any>|null>(draftKey,null),[draftKey]);
+  const version=editRadar?.pending_version_data ?? editRadar?.current_version_data;
+  const [health,setHealth]=useState<HealthStatus|null>(null);
+  const [channels,setChannels]=useState<Channel[]>([]);
+  const [notify,setNotify]=useState<RadarNotifyConfig>(restored?.notify ?? editRadar?.radar.notify ?? {mode:"instant",channel_ids:[],min_score:0.6,quiet_hours:null});
+  const [hardFilters,setHardFilters]=useState<HardFilter[]>(restored?.hardFilters ?? version?.match_policy.hard_filters ?? initialTemplate?.match_policy.hard_filters ?? []);
+  const [showFields,setShowFields]=useState(false);
+  const [templatesOpen,setTemplatesOpen]=useState(!initialTemplate&&!editRadar&&!restored);
+  const [answers,setAnswers]=useState<Record<number,string>>({});
+  const [readyAck,setReadyAck]=useState(false);
+  const [previewTab,setPreviewTab]=useState<"match"|"no_match">("match");
+  useEffect(()=>{void Promise.all([api.healthGet(),api.channelList(),api.settingsGet()]).then(([h,c,settings])=>{setHealth(h);setChannels(c);if(!editRadar&&!restored)setNotify(n=>({...n,mode:settings.default_notify_mode,channel_ids:c.filter(x=>x.state==="ok").map(x=>x.id)}));}).catch(err=>setErrorMsg(String(err)));},[]);
   const isEditingActive = editRadar?.radar.status === "active";
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(initialStep);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(initialStep===4?4:restored?.step ?? initialStep);
   const [mode, setMode] = useState<"template" | "blank">(
-    editRadar
+    restored?.mode ?? (editRadar
       ? editRadar.radar.template_id
         ? "template"
         : "blank"
       : initialTemplate
         ? "template"
-        : "template"
+        : "template")
   );
 
   const defaultTpl =
@@ -85,34 +102,34 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
       : templates[0] ?? null);
 
   const [selectedTemplate, setSelectedTemplate] = useState<RadarTemplate | null>(
-    mode === "template" ? defaultTpl : null
+    restored?.selectedTemplate ?? (mode === "template" ? defaultTpl : null)
   );
-  const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
+  const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>(restored?.placeholderValues ?? {});
 
   const [radarName, setRadarName] = useState<string>(
-    editRadar?.radar.name ?? defaultTpl?.name ?? ""
+    restored?.radarName ?? editRadar?.radar.name ?? defaultTpl?.name ?? ""
   );
   const [description, setDescription] = useState<string>(
-    editRadar?.current_version_data.description ??
+    restored?.description ?? version?.description ??
       (defaultTpl ? composeTemplateDescription(defaultTpl, {}) : "")
   );
   const [userProfession, setUserProfession] = useState<string>(
-    editRadar?.current_version_data.user_profession ?? defaultTpl?.user_profession ?? ""
+    restored?.userProfession ?? version?.user_profession ?? defaultTpl?.user_profession ?? ""
   );
   const [wantIntent, setWantIntent] = useState<WantIntent>(
-    editRadar?.current_version_data.match_policy.want_intent ??
+    restored?.wantIntent ?? version?.match_policy.want_intent ??
       defaultTpl?.match_policy.want_intent ??
       "demand"
   );
   const [excludePeers, setExcludePeers] = useState<boolean>(
-    editRadar
-      ? editRadar.current_version_data.match_policy.exclude_roles.includes("peer")
-      : (defaultTpl?.match_policy.exclude_roles.includes("peer") ?? true)
+    restored?.excludePeers ?? (editRadar
+      ? version!.match_policy.exclude_roles.includes("peer")
+      : (defaultTpl?.match_policy.exclude_roles.includes("peer") ?? true))
   );
 
   const [fields, setFields] = useState<FieldDef[]>(
     structuredClone(
-      editRadar?.current_version_data.fields ?? defaultTpl?.fields ?? []
+      restored?.fields ?? version?.fields ?? defaultTpl?.fields ?? []
     )
   );
   const [suggesting, setSuggesting] = useState(false);
@@ -122,12 +139,11 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
   const [sources, setSources] = useState<Source[]>(initialSources);
   const [sourceQuery, setSourceQuery] = useState("");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>(
-    editRadar?.radar.source_ids ??
-      initialSources.filter((s) => s.followed).map((s) => s.id)
+    restored?.selectedSourceIds ?? editRadar?.radar.source_ids ?? []
   );
 
   const [draftRadarId, setDraftRadarId] = useState<string | null>(
-    editRadar?.radar.id ?? null
+    restored?.draftRadarId ?? editRadar?.radar.id ?? null
   );
   const [requiresVersionConfirm, setRequiresVersionConfirm] = useState(false);
   const [confirmedUpgrade, setConfirmedUpgrade] = useState(false);
@@ -135,12 +151,29 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const startingPreview = useRef(false);
+  const [previewSeconds, setPreviewSeconds] = useState(0);
+  const [previewSyncError, setPreviewSyncError] = useState<string | null>(null);
+  const previewRunning = previewState?.status === "crawling" || previewState?.status === "evaluating";
+  const previewBusy = previewLoading || previewRunning;
+  const evaluatedSignature=useRef<string|null>(null);
+  const definitionSignature=JSON.stringify([description,userProfession,fields,wantIntent,excludePeers,hardFilters,selectedSourceIds]);
+  useEffect(()=>{
+    if(!previewBusy&&evaluatedSignature.current!==null&&evaluatedSignature.current!==definitionSignature){
+      setPreviewState(null);setConfirmedUpgrade(false);setReadyAck(false);
+    }
+  },[definitionSignature,previewBusy]);
 
+
+
+  useEffect(()=>{saveWorkspace(draftKey,{step,mode,selectedTemplate,placeholderValues,radarName,description,userProfession,wantIntent,excludePeers,fields,selectedSourceIds,draftRadarId,hardFilters,notify});},[draftKey,step,mode,selectedTemplate,placeholderValues,radarName,description,userProfession,wantIntent,excludePeers,fields,selectedSourceIds,draftRadarId,hardFilters,notify]);
   const maxFields = license.limits.max_fields_per_radar;
   const maxGroups = license.limits.max_followed_groups;
 
   const selectTemplate = (tpl: RadarTemplate) => {
+    setHardFilters(structuredClone(tpl.match_policy.hard_filters));
     setMode("template");
+    setTemplatesOpen(false);
     setSelectedTemplate(tpl);
     setPlaceholderValues({});
     setRadarName(tpl.name);
@@ -179,6 +212,8 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
       if (!radarName.trim()) {
         setRadarName(res.suggested_name);
       }
+      setHardFilters(res.hard_filters);
+      setWantIntent(res.want_intent);
       setClarifyingQuestions(res.clarifying_questions ?? []);
       setClarifyingDismissed(false);
     } catch (err) {
@@ -212,9 +247,12 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
   // Subscribe to streaming `preview:progress` events!
   useEffect(() => {
     let unlisten: (() => void) | null = null;
+    let disposed = false;
     void onDesktopEvent("preview:progress", (ev) => {
       setPreviewState((prev) => {
         if (!prev || prev.preview_id !== ev.preview_id) return prev;
+        if (!["crawling", "evaluating"].includes(prev.status) && ["crawling", "evaluating"].includes(ev.status)) return prev;
+        if (ev.evaluated_posts < prev.evaluated_posts) return prev;
         const existingIds = new Set(prev.items.map((i) => i.evaluation_id));
         const mergedItems = [
           ...prev.items,
@@ -224,26 +262,86 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
           ...prev,
           status: ev.status,
           evaluated_posts: ev.evaluated_posts,
+          failed_posts: ev.failed_posts ?? 0,
+          error: ev.error ?? null,
           total_posts: ev.total_posts,
           items: mergedItems,
           warnings: ev.warnings,
         };
       });
+      if (ev.status === "done" || ev.status === "error") {
+        // A terminal event may arrive even when an earlier batch event was lost.
+        void api.radarPreviewGet(ev.radar_id, ev.preview_id).then((snapshot) => {
+          if (!disposed) setPreviewState((prev) => prev?.preview_id === ev.preview_id ? snapshot : prev);
+        }).catch((err) => {
+          if (!disposed) setPreviewSyncError(`Chưa lấy được kết quả đầy đủ: ${String(err)}`);
+        });
+      }
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
     return () => {
+      disposed = true;
       if (unlisten) unlisten();
     };
   }, []);
 
+  // Events are best effort: a fast batch can finish before start() returns,
+  // and a WebView can miss an event. Reconcile with the authoritative snapshot.
+  useEffect(() => {
+    if (!previewState || !previewRunning) return;
+    const { radar_id, preview_id } = previewState;
+    let disposed = false;
+    let pending = false;
+    const startedAt = Date.now();
+    setPreviewSeconds(0);
+    const timer = window.setInterval(() => {
+      setPreviewSeconds(Math.floor((Date.now() - startedAt) / 1000));
+      if (pending) return;
+      pending = true;
+      void api.radarPreviewGet(radar_id, preview_id).then((snapshot) => {
+        if (disposed) return;
+        setPreviewSyncError(null);
+        setPreviewState((prev) => {
+          if (prev?.preview_id !== preview_id || !["crawling", "evaluating"].includes(prev.status)) return prev;
+          // Never regress a newer event when a snapshot request was in flight.
+          if (snapshot.evaluated_posts < prev.evaluated_posts) return prev;
+          const labels = new Map(prev.items.map((item) => [item.evaluation_id, item.feedback_label]));
+          return { ...snapshot, items: snapshot.items.map((item) => ({ ...item,
+            feedback_label: labels.get(item.evaluation_id) ?? item.feedback_label,
+          })) };
+        });
+      }).catch((err) => {
+        if (!disposed) setPreviewSyncError(`Chưa cập nhật được tiến độ: ${err instanceof Error ? err.message : String(err)}`);
+      }).finally(() => { pending = false; });
+    }, 1000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [previewState?.preview_id, previewRunning]);
+
+  const stopPreview = async () => {
+    if (!previewState) return;
+    setPreviewLoading(true);
+    try {
+      const state = await api.radarPreviewCancel(previewState.radar_id, previewState.preview_id);
+      setPreviewState(state);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
+    } finally { setPreviewLoading(false); }
+  };
+
   const currentMatchPolicy = (): MatchPolicy => ({
     want_intent: wantIntent,
     exclude_roles: excludePeers ? ["peer"] : [],
-    hard_filters: editRadar?.current_version_data.match_policy.hard_filters ?? [],
+    hard_filters: hardFilters,
   });
 
   const startPreviewRun = async (overrideFields?: FieldDef[]) => {
+    if (startingPreview.current || previewRunning) return;
+    startingPreview.current = true;
+    evaluatedSignature.current=JSON.stringify([description,userProfession,overrideFields??fields,wantIntent,excludePeers,hardFilters,selectedSourceIds]);
+    setPreviewState(null);
+    setPreviewSyncError(null);
     setPreviewLoading(true);
     setErrorMsg(null);
     const activeFields = (overrideFields ?? fields).map((f, idx) => ({
@@ -262,22 +360,12 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
           fields: activeFields,
           match_policy: currentMatchPolicy(),
           source_ids: selectedSourceIds,
+          notify,
         });
         rId = created.radar.id;
         setDraftRadarId(rId);
-      } else {
-        const upd = await api.radarUpdate({
-          id: rId,
-          name: radarName.trim() || "Radar mới",
-          description,
-          user_profession: userProfession.trim() || null,
-          fields: activeFields,
-          match_policy: currentMatchPolicy(),
-          source_ids: selectedSourceIds,
-          confirm_version_upgrade: false,
-        });
-        setRequiresVersionConfirm(upd.requires_confirmation);
       }
+      setRequiresVersionConfirm(Boolean(editRadar));
 
       const started = await api.radarPreviewStart({
         radar_id: rId,
@@ -291,6 +379,7 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : String(err));
     } finally {
+      startingPreview.current = false;
       setPreviewLoading(false);
     }
   };
@@ -384,8 +473,10 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
 
   const handlePreviewFeedback = async (
     item: PreviewItem,
-    label: "correct" | "irrelevant"
+    label: "correct" | "irrelevant" | "missed"
   ) => {
+    setErrorMsg(null);
+    try {
     await api.leadFeedback({
       evaluation_id: item.evaluation_id,
       post_id: item.post_id,
@@ -404,9 +495,17 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
           }
         : prev
     );
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const handleSaveRadar = async (activate: boolean) => {
+    if (previewBusy || saving) return;
+    if (!description.trim() || !fields.length) {setErrorMsg("Hãy mô tả nhu cầu và chọn ít nhất một thông tin cần lấy.");return;}
+    if (activate && (previewState?.status!=="done" || !previewState.total_posts || !selectedSourceIds.length)) {setErrorMsg("Cần hoàn tất xem thử trên bài thật trước khi bật. Bạn vẫn có thể lưu nháp.");return;}
+    if (activate && health && (health.automatic_scanning!==true || !health.extension_connected || health.crawl_paused) && !readyAck) {setErrorMsg("Xác nhận chế độ hoạt động giới hạn trước khi bật radar.");return;}
+    if (!activate && editRadar) {onClose();return;}
     if (isEditingActive && requiresVersionConfirm && activate && !confirmedUpgrade) {
       setErrorMsg(
         "Vui lòng đánh dấu xác nhận nâng cấp phiên bản mới cho radar đang chạy trước khi áp dụng."
@@ -432,24 +531,23 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
           fields: normalizedFields,
           match_policy: currentMatchPolicy(),
           source_ids: selectedSourceIds,
+          notify,
         });
         rId = created.radar.id;
       } else {
-        await api.radarUpdate({
-          id: rId,
-          name: radarName.trim() || "Radar mới",
-          description,
-          user_profession: userProfession.trim() || null,
-          fields: normalizedFields,
-          match_policy: currentMatchPolicy(),
-          source_ids: selectedSourceIds,
-          confirm_version_upgrade: activate ? true : false,
+        const latest=await api.radarGet(rId);
+        const candidate=latest.pending_version_data;
+        const same=candidate && candidate.description===description && JSON.stringify(candidate.fields)===JSON.stringify(normalizedFields) && JSON.stringify(candidate.match_policy)===JSON.stringify(currentMatchPolicy()) && candidate.user_profession===(userProfession.trim()||null);
+        await api.radarUpdate({id:rId,name:radarName.trim()||"Radar mới",source_ids:selectedSourceIds,notify,
+          ...(same && activate ? {} : {description,user_profession:userProfession.trim()||null,fields:normalizedFields,match_policy:currentMatchPolicy()}),
+          confirm_version_upgrade:activate,
         });
       }
 
       if (activate) {
         await api.radarSetStatus(rId, "active");
       }
+      saveWorkspace(draftKey,null);
       onSaved(rId);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : String(err));
@@ -514,48 +612,59 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Trình tạo và sửa Radar">
-      <div className="modal-panel" style={{ maxWidth: 1060 }}>
-        <div className="modal-header">
+      <div className="modal-panel radar-studio">
+        <div className="modal-header radar-studio-header">
           <div>
+            
             <h2 style={{ margin: 0, fontSize: 17 }}>
               {editRadar ? `Chỉnh sửa Radar: ${editRadar.radar.name}` : "Tạo Radar mới"}
             </h2>
             <div className="field-hint">
-              4 bước nhanh gọn (&lt; 5 phút): Mô tả → Trường trích xuất → Nguồn group → Xem thử & Bật
+              Mô tả một lần. Kiểm tra kết quả thật trước khi bật radar.
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button type="button" className="radar-close-button" aria-label="Đóng" title="Đóng" disabled={previewLoading || saving} onClick={() => {
+              if (previewRunning) {
+                void api.radarPreviewCancel(previewState!.radar_id, previewState!.preview_id).then(onClose).catch((err) => setErrorMsg(String(err)));
+              } else onClose();
+            }}>
+              <span className="radar-close-label">Đóng</span><span aria-hidden="true">×</span>
+            </button>
+
+          <div className="radar-stepper" aria-label="Các bước tạo radar">
             {[
               { n: 1 as const, label: "1. Mô tả" },
-              { n: 2 as const, label: "2. Trường" },
+              { n: 2 as const, label: "2. Cách hiểu" },
               { n: 3 as const, label: "3. Nguồn" },
               { n: 4 as const, label: "4. Xem thử và bật" },
             ].map((s) => (
               <button
                 key={s.n}
+                disabled={previewBusy || saving || s.n>step+1}
+                aria-current={step===s.n?"step":undefined}
                 type="button"
                 className={`btn btn-sm ${step === s.n ? "btn-primary" : ""}`}
                 onClick={() => {
-                  if (s.n === 4) {
-                    void goToStep4();
-                  } else {
-                    setStep(s.n);
-                  }
+                  if(s.n<=step)setStep(s.n);
+                  else if(s.n===2)void goToStep2();
+                  else if(s.n===3)goToStep3();
+                  else void goToStep4();
                 }}
               >
-                {s.label}
+                <span className="radar-step-number">{s.n<step?"✓":s.n}</span><span>{s.label.replace(/^\d+\. /, "")}</span>
               </button>
             ))}
-            <button type="button" className="btn btn-sm" onClick={onClose}>
-              Đóng ✕
-            </button>
+
           </div>
         </div>
 
-        <div className="modal-body">
+        <div className="radar-studio-workspace">
+        <div className="modal-body radar-studio-body">
+          <div className="radar-step-intro" aria-live="polite"><h3>{["Bạn đang tìm cơ hội nào?","Kiểm tra cách radar hiểu nhu cầu","Chọn nơi radar tìm bài","Kiểm tra kết quả trước khi bật"][step-1]}</h3><p>{["Chọn mẫu gần với công việc của bạn, rồi mô tả khu vực và nhu cầu cụ thể.","Xác nhận điều kiện bắt buộc. Các thông tin trích xuất đã có sẵn và có thể tùy chỉnh.","Chỉ chọn những nhóm phù hợp. Bạn có thể đổi danh sách này khi chỉnh radar.","Đọc các bài khớp và bị loại, sau đó chọn cách nhận tin phù hợp."][step-1]}</p></div>
+          {step===1&&readWorkspace<string>("onboarding-goal","")&&<div className="card"><strong>Nhu cầu đã mô tả</strong><p>{readWorkspace<string>("onboarding-goal","")}</p><button className="btn" onClick={()=>{setDescription(readWorkspace<string>("onboarding-goal",""));setMode("blank");setFields([]);setHardFilters([]);}}>Dùng nhu cầu này và đề xuất bằng AI</button></div>}
           {errorMsg && (
-            <div className="health-banner danger" style={{ borderRadius: 6, marginBottom: 12 }}>
+            <div role="alert" className="health-banner danger" style={{ borderRadius: 6, marginBottom: 12 }}>
               <span>{errorMsg}</span>
             </div>
           )}
@@ -569,6 +678,7 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                   className={`btn ${mode === "template" ? "btn-primary" : ""}`}
                   onClick={() => {
                     setMode("template");
+                    setTemplatesOpen(true);
                     if (!selectedTemplate && templates[0]) selectTemplate(templates[0]);
                   }}
                 >
@@ -588,11 +698,13 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
 
               {mode === "template" && (
                 <div style={{ marginBottom: 14 }}>
-                  <div className="template-grid" style={{ marginBottom: 14 }}>
+                  {selectedTemplate&&!templatesOpen&&<div className="radar-selected-template"><div><span className="field-hint">Mẫu đang dùng · {selectedTemplate.industry}</span><strong>{selectedTemplate.name}</strong></div><button type="button" className="btn btn-sm" onClick={()=>setTemplatesOpen(true)}>Đổi mẫu</button></div>}
+                  <div className="template-grid radar-template-grid" hidden={!templatesOpen} style={{ marginBottom: 14 }}>
                     {templates.map((tpl) => (
                       <button
                         key={tpl.id}
                         type="button"
+                        aria-pressed={selectedTemplate?.id===tpl.id}
                         className={`template-card ${selectedTemplate?.id === tpl.id ? "selected" : ""}`}
                         onClick={() => selectTemplate(tpl)}
                       >
@@ -646,6 +758,18 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                 </div>
               )}
 
+              <div className="field-group">
+                <label className="field-label" htmlFor="radar-desc-textarea">
+                  Câu mô tả chi tiết thứ cần tìm
+                </label>
+                <textarea
+                  id="radar-desc-textarea"
+                  className="textarea"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Mô tả rõ đối tượng, khu vực, tầm giá hoặc đặc điểm tin bạn muốn bắt…"
+                />
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div className="field-group">
                   <label className="field-label" htmlFor="radar-name-input">
@@ -679,20 +803,8 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                 </div>
               </div>
 
-              <div className="field-group">
-                <label className="field-label" htmlFor="radar-desc-textarea">
-                  Câu mô tả chi tiết thứ cần tìm
-                </label>
-                <textarea
-                  id="radar-desc-textarea"
-                  className="textarea"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Mô tả rõ đối tượng, khu vực, tầm giá hoặc đặc điểm tin bạn muốn bắt…"
-                />
-              </div>
 
-              <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+              <details className="radar-advanced"><summary>Đối tượng bài viết & Loại trừ người cùng nghề</summary><div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span className="field-label">Ý định bài viết cần bắt:</span>
                   <select
@@ -702,9 +814,9 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                     value={wantIntent}
                     onChange={(e) => setWantIntent(e.target.value as WantIntent)}
                   >
-                    <option value="demand">Khách cần mua / thuê / tìm (demand)</option>
-                    <option value="supply">Người bán / cho thuê / tìm việc (supply)</option>
-                    <option value="any">Cả hai chiều / ghép chuyến (any)</option>
+                    <option value="demand">Khách cần mua / thuê / tìm</option>
+                    <option value="supply">Người bán / cho thuê / tìm việc</option>
+                    <option value="any">Cả hai chiều / ghép chuyến</option>
                   </select>
                 </div>
 
@@ -714,9 +826,9 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                     checked={excludePeers}
                     onChange={(e) => setExcludePeers(e.target.checked)}
                   />
-                  <span>Tự động loại bài của người cùng nghề (`peer`)</span>
+                  <span>Loại bài chào bán của người cùng nghề</span>
                 </label>
-              </div>
+              </div></details>
             </div>
           )}
 
@@ -765,7 +877,7 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
               )}
 
               {!clarifyingDismissed && clarifyingQuestions.length > 0 && (
-                <div className="card" style={{ background: "#fffbeb", borderColor: "#fde68a", marginBottom: 12 }}>
+                <div className="card" style={{ background: "var(--warning-soft)", borderColor: "var(--warning)", marginBottom: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <strong>Gợi ý làm rõ thêm từ AI (không bắt buộc):</strong>
                     <button
@@ -778,12 +890,20 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                   </div>
                   <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
                     {clarifyingQuestions.map((q) => (
-                      <li key={q}>{q}</li>
+                      <li key={q}><label>{q}<input className="input" value={answers[clarifyingQuestions.indexOf(q)]??""} onChange={e=>setAnswers(a=>({...a,[clarifyingQuestions.indexOf(q)]:e.target.value}))}/></label></li>
                     ))}
                   </ul>
+                  <button className="btn btn-sm" onClick={()=>{setDescription(d=>d+"\n"+clarifyingQuestions.map((q,i)=>answers[i]?`${q}: ${answers[i]}`:"").filter(Boolean).join("\n"));setClarifyingDismissed(true);}}>Bổ sung vào mô tả</button>
                 </div>
               )}
 
+              <div className="intent-summary"><h3>Radar sẽ tìm điều gì?</h3><p>{description}</p><p>Hướng tìm: <strong>{wantIntent==="demand"?"Khách có nhu cầu":wantIntent==="supply"?"Người cung cấp / người bán":"Cả hai chiều"}</strong> · {excludePeers?"Loại bài người cùng nghề":"Giữ mọi vai trò"}</p>
+                <h4>Điều kiện bắt buộc</h4><p className="field-hint">Mô tả giúp AI hiểu nhu cầu. Điều kiện bên dưới là giới hạn bắt buộc sau khi trích xuất.</p>
+                {hardFilters.map((filter,index)=>{const fd=fields.find(f=>f.key===filter.field);return <div className="hard-filter-row" key={index}><select className="select" aria-label={`Trường điều kiện ${index+1}`} value={filter.field} onChange={e=>setHardFilters(xs=>xs.map((x,i)=>i===index?{...x,field:e.target.value,value:null}:x))}>{fields.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select><select className="select" aria-label={`So sánh ${index+1}`} value={filter.op} onChange={e=>setHardFilters(xs=>xs.map((x,i)=>i===index?{...x,op:e.target.value as HardFilter["op"]}:x))}>{["eq","ne","lte","gte","contains","is_empty"].map(op=><option key={op} value={op}>{({eq:"Bằng",ne:"Khác",lte:"Không quá",gte:"Ít nhất",contains:"Chứa",is_empty:"Chưa có thông tin"} as Record<string,string>)[op]}</option>)}</select><input className="input" aria-label={`Giá trị điều kiện ${index+1}`} defaultValue={typeof filter.value==="object"?JSON.stringify(filter.value):String(filter.value??"")} onBlur={e=>{try{const raw=e.target.value;const val=fd&&["money","number","range"].includes(fd.type)?parseFieldValue({...fd,type:"number"},raw):raw;setHardFilters(xs=>xs.map((x,i)=>i===index?{...x,value:val}:x));}catch(err){setErrorMsg(String(err));}}}/><select className="select" aria-label={`Khi thiếu thông tin ${index+1}`} value={filter.when_missing} onChange={e=>setHardFilters(xs=>xs.map((x,i)=>i===index?{...x,when_missing:e.target.value as "pass"|"fail"}:x))}><option value="pass">Thiếu thông tin: giữ lại</option><option value="fail">Thiếu thông tin: loại</option></select><button className="btn btn-sm" onClick={()=>setHardFilters(xs=>xs.filter((_,i)=>i!==index))}>Bỏ</button></div>;})}
+                <button className="btn btn-sm" disabled={!fields.length} onClick={()=>setHardFilters(xs=>[...xs,{field:fields[0]!.key,op:"eq",value:"",when_missing:"pass"}])}>+ Điều kiện bắt buộc</button>
+              </div>
+              <button className="btn" aria-expanded={showFields} onClick={()=>setShowFields(v=>!v)}>{showFields?"Thu gọn":"Tùy chỉnh"} thông tin cần lấy ({fields.length} trường)</button>
+              <div hidden={!showFields}>
               <div className="table-wrap">
                 <table className="crm-table">
                   <thead>
@@ -919,6 +1039,7 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                 1 dòng), <code>intent</code>, <code>author_role</code>, <code>score</code>,{" "}
                 <code>reason</code>.
               </div>
+              </div>
             </div>
           )}
 
@@ -1036,25 +1157,40 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                       `(${previewState.evaluated_posts} / ${previewState.total_posts} bài)`}
                   </strong>
                   <div className="field-hint">
-                    Không tạo tin thật và không gửi Telegram. Bấm Đúng / Sai để dạy AI rồi bấm «Chạy lại».
+                    Không tạo cơ hội thật hoặc gửi thông báo. Phản hồi được lưu làm ví dụ; chạy lại để kiểm tra kết quả mới.
                   </div>
                 </div>
                 <button
                   type="button"
                   className="btn"
-                  disabled={previewLoading}
+                  disabled={previewBusy || saving}
                   onClick={() => void startPreviewRun()}
                 >
                   {previewLoading ? "Đang chấm thử…" : "↻ Chạy lại xem thử"}
                 </button>
               </div>
 
-              {previewState && previewState.status !== "done" && (
+              {previewRunning && (
                 <div className="health-banner info" style={{ borderRadius: 6, marginBottom: 12 }}>
                   <span>
-                    Đang xử lý theo lô: đã chấm {previewState.evaluated_posts}/
-                    {previewState.total_posts} bài — kết quả hiện dần ngay khi xong từng lô…
+                    {previewState?.status === "crawling"
+                      ? "Đang lấy bài từ Chrome; chờ tối đa 30 giây…"
+                      : `Đang chấm AI theo lô: đã chấm ${previewState?.evaluated_posts}/${previewState?.total_posts} bài. Lô đầu có thể mất tới 2 phút.`}
+                    {` Đã chờ ${previewSeconds} giây.`}
                   </span>
+                </div>
+              )}
+
+              {previewRunning && (
+                <button type="button" className="btn btn-sm" disabled={previewLoading} onClick={() => void stopPreview()}>
+                  Dừng xem thử
+                </button>
+              )}
+              {previewSyncError && <div role="status" className="health-banner warning">{previewSyncError}</div>}
+              {previewState?.status === "error" && (
+                <div role="alert" className="health-banner danger">
+                  {previewState.error || "Không chấm được bài. Hãy kiểm tra kết nối AI rồi chạy lại."}
+                  {` Đã chấm ${previewState.evaluated_posts}/${previewState.total_posts} bài; ${previewState.failed_posts ?? 0} bài lỗi.`}
                 </div>
               )}
 
@@ -1065,7 +1201,7 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                   className="health-banner warning"
                   style={{ borderRadius: 6, marginBottom: 10 }}
                 >
-                  <span>⚠️ {w.message}</span>
+                  <span>{w.message}</span>
                   {w.code === "missing_required_field" && w.field_key && (
                     <button
                       type="button"
@@ -1092,8 +1228,8 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
-                    background: "#eff6ff",
-                    borderColor: "#93c5fd",
+                    background: "var(--primary-soft)",
+                    borderColor: "var(--border-strong)",
                     marginBottom: 12,
                     cursor: "pointer",
                   }}
@@ -1112,9 +1248,18 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                 </label>
               )}
 
+              <OperationStatus health={health}/>
+              <div className="card notification-setup"><h3>Khi bật radar này</h3><p>{selectedSourceIds.length} nhóm, {fields.length} thông tin, {hardFilters.length} điều kiện bắt buộc. {editRadar?`Đang chỉnh radar “${editRadar.radar.name}”; chỉ áp dụng khi bấm nút cuối.`:"Bản nháp chưa tự thu thập bài."}</p>
+                <label>Chế độ thông báo<select className="select" value={notify.mode} onChange={e=>setNotify(n=>({...n,mode:e.target.value as "instant"|"digest"}))}><option value="instant">Báo ngay</option><option value="digest">Gửi gộp</option></select></label>
+                <label>Điểm tối thiểu để báo<input className="input" type="number" min={0.4} max={1} step={0.05} value={notify.min_score} onChange={e=>setNotify(n=>({...n,min_score:Number(e.target.value)}))}/></label>
+                <p className="field-hint">Điểm phù hợp dùng để ưu tiên, không phải xác suất đúng. Cơ hội dưới ngưỡng vẫn có thể xem trong ứng dụng.</p>
+                <fieldset><legend>Kênh nhận của radar này</legend>{channels.map(c=><label key={c.id}><input type="checkbox" checked={notify.channel_ids.includes(c.id)} onChange={e=>setNotify(n=>({...n,channel_ids:e.target.checked?[...n.channel_ids,c.id]:n.channel_ids.filter(id=>id!==c.id)}))}/>{c.name} {c.state!=="ok"?"(cần kết nối lại)":""}</label>)}{channels.length===0&&<p>Chưa có kênh ngoài. Xem cơ hội trong ứng dụng và dùng thông báo màn hình theo Cài đặt.</p>}</fieldset>
+                {(health?.automatic_scanning!==true||!health?.extension_connected||health?.crawl_paused)&&<label><input type="checkbox" checked={readyAck} onChange={e=>setReadyAck(e.target.checked)}/> Tôi hiểu radar đã bật chưa đồng nghĩa đang quét. Tôi sẽ mở tiện ích và bật quét tự động hoặc quét thủ công.</label>}
+              </div>
+              <div className="section-tabs"><button className={`btn ${previewTab==="match"?"btn-primary":""}`} onClick={()=>setPreviewTab("match")}>Khớp ({matchedPreviewItems.length})</button><button className={`btn ${previewTab==="no_match"?"btn-primary":""}`} onClick={()=>setPreviewTab("no_match")}>Bị loại ({unmatchedPreviewItems.length})</button></div>
               <div className="preview-columns">
                 {/* Column 1: KHỚP */}
-                <div>
+                <div hidden={previewTab!=="match"}>
                   <div style={{ marginBottom: 8, display: "flex", justifyContent: "space-between" }}>
                     <strong style={{ color: "var(--success)" }}>
                       ✓ Khớp ({matchedPreviewItems.length})
@@ -1177,7 +1322,7 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                               }`}
                               onClick={() => void handlePreviewFeedback(it, "correct")}
                             >
-                              👍 Đúng
+                              Đúng
                             </button>
                             <button
                               type="button"
@@ -1186,7 +1331,7 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                               }`}
                               onClick={() => void handlePreviewFeedback(it, "irrelevant")}
                             >
-                              👎 Chấm sai
+                              Chấm sai
                             </button>
                           </div>
                         </div>
@@ -1199,7 +1344,7 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                 </div>
 
                 {/* Column 2: KHÔNG KHỚP */}
-                <div>
+                <div hidden={previewTab!=="no_match"}>
                   <div style={{ marginBottom: 8, display: "flex", justifyContent: "space-between" }}>
                     <strong style={{ color: "var(--text-secondary)" }}>
                       ✕ Không khớp ({unmatchedPreviewItems.length})
@@ -1233,33 +1378,14 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                             }`}
                             onClick={() => void handlePreviewFeedback(it, "correct")}
                           >
-                            👍 Loại đúng
+                            Loại đúng
                           </button>
                           <button
                             type="button"
                             className="btn btn-sm"
-                            onClick={async () => {
-                              await api.leadFeedback({
-                                evaluation_id: it.evaluation_id,
-                                post_id: it.post_id,
-                                label: "missed",
-                                origin: "preview",
-                              });
-                              setPreviewState((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      items: prev.items.map((x) =>
-                                        x.evaluation_id === it.evaluation_id
-                                          ? { ...x, feedback_label: "missed" }
-                                          : x
-                                      ),
-                                    }
-                                  : prev
-                              );
-                            }}
+                            onClick={() => void handlePreviewFeedback(it, "missed")}
                           >
-                            ⚠️ Đáng lẽ phải khớp
+                            Đáng lẽ phải khớp
                           </button>
                         </div>
                       </div>
@@ -1271,33 +1397,38 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
           )}
         </div>
 
-        <div className="modal-footer">
+        <aside className="radar-live-summary" aria-label="Tóm tắt radar đang tạo"><h3>{radarName.trim()||"Radar chưa đặt tên"}</h3><p className="radar-summary-description">{description.trim()||"Mô tả nhu cầu để bắt đầu tìm đúng cơ hội."}</p><dl><div><dt>Thông tin cần lấy</dt><dd>{fields.length} trường</dd></div><div><dt>Điều kiện bắt buộc</dt><dd>{hardFilters.length?`${hardFilters.length} điều kiện`:"Theo mô tả"}</dd></div><div><dt>Nguồn đã chọn</dt><dd>{selectedSourceIds.length} nhóm</dd></div><div><dt>Cách nhận tin</dt><dd>{notify.mode==="digest"?"Gửi gộp":"Báo ngay"}</dd></div></dl>{selectedSourceIds.length>0&&<div className="radar-source-chips">{sources.filter(source=>selectedSourceIds.includes(source.id)).slice(0,3).map(source=><span key={source.id}>{source.name}</span>)}{selectedSourceIds.length>3&&<small>Và {selectedSourceIds.length-3} nhóm khác</small>}</div>}<div className="radar-draft-note"><strong>Bản nháp tự lưu trên máy</strong><p>Chưa áp dụng cho đến khi bạn xác nhận. Xem thử không gửi thông báo.</p></div></aside>
+        </div>
+        <div className="modal-footer radar-studio-footer">
           <div>
+            {step===1&&<span className="field-hint">Bạn có thể đóng và tiếp tục bản nhập sau.</span>}
             {step > 1 && (
               <button
                 type="button"
                 className="btn"
+                disabled={previewBusy || saving}
                 onClick={() => setStep((s) => Math.max(1, s - 1) as 1 | 2 | 3 | 4)}
               >
-                ← Quay lại bước {step - 1}
+                Quay lại bước {step - 1}
               </button>
             )}
           </div>
 
           <div style={{ display: "flex", gap: 8 }}>
+            {step!==4&&<button className="btn" disabled={saving||previewBusy} onClick={onClose}>Lưu bản nhập & Đóng</button>}
             {step === 1 && (
               <button type="button" className="btn btn-primary" onClick={() => void goToStep2()}>
-                Tiếp tục: Chọn trường →
+                Tiếp tục: Xác nhận cách hiểu
               </button>
             )}
             {step === 2 && (
               <button type="button" className="btn btn-primary" onClick={goToStep3}>
-                Tiếp tục: Chọn nguồn group →
+                Tiếp tục: Chọn nguồn group
               </button>
             )}
             {step === 3 && (
               <button type="button" className="btn btn-primary" onClick={() => void goToStep4()}>
-                Tiếp tục: Xem thử trên bài thật →
+                Tiếp tục: Xem thử trên bài thật
               </button>
             )}
             {step === 4 && (
@@ -1305,7 +1436,7 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                 <button
                   type="button"
                   className="btn"
-                  disabled={saving}
+                  disabled={saving || previewBusy}
                   onClick={() => void handleSaveRadar(false)}
                 >
                   Lưu nháp
@@ -1313,7 +1444,7 @@ export const RadarWizard: React.FC<RadarWizardProps> = ({
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={saving}
+                  disabled={saving || previewBusy || previewState?.status!=="done" || !previewState.total_posts}
                   onClick={() => void handleSaveRadar(true)}
                 >
                   {isEditingActive ? "Áp dụng & Bật radar" : "Bật radar"}

@@ -225,6 +225,7 @@ export interface Lead {
   evaluation_id: string;
   contact_id: string | null;
   status: LeadStatus;
+  read_at?: number | null;
   score: number;
   is_weak_match: boolean;
   summary: string;
@@ -250,7 +251,7 @@ export interface Lead {
 export interface LeadEvent {
   id: string;
   lead_id: string;
-  kind: "created" | "status_changed" | "field_edited" | "notified" | "noted" | "feedback";
+  kind: "created" | "status_changed" | "field_edited" | "notified" | "noted" | "feedback" | "follow_up_due";
   data: Record<string, unknown> | null;
   created_at: number;
 }
@@ -287,6 +288,8 @@ export interface DynamicFieldFilter {
 }
 
 export interface LeadFilterQuery {
+  unread_only?: boolean;
+  follow_up_before?: number;
   radar_id?: string | null;
   status?: LeadStatus[];
   include_weak?: boolean;
@@ -358,6 +361,10 @@ export type AiProviderId = "claude_cli" | "codex_cli" | "agy_cli";
 export type AiHealthState = "ok" | "not_configured" | "error" | "rate_limited" | "daily_cap_reached";
 
 export interface HealthStatus {
+  automatic_scanning?: boolean | null;
+  next_crawl_at?: number | null;
+  last_crawl_at?: number | null;
+  runtime_checked_at?: number | null;
   extension_connected: boolean;
   extension_version: string | null;
   facebook_session: FacebookSessionState;
@@ -663,6 +670,7 @@ export interface PreviewRunState {
   status: "crawling" | "evaluating" | "done" | "error";
   total_posts: number;
   evaluated_posts: number;
+  failed_posts?: number;
   items: PreviewItem[];
   warnings: PreviewWarning[];
   error: string | null;
@@ -731,9 +739,11 @@ export interface PreviewProgressEvent {
   radar_id: string;
   status: PreviewRunState["status"];
   evaluated_posts: number;
+  failed_posts?: number;
   total_posts: number;
   new_items: PreviewItem[];
   warnings: PreviewWarning[];
+  error?: string | null;
 }
 
 export interface JobFailedEvent {
@@ -745,6 +755,7 @@ export interface JobFailedEvent {
 
 export interface TauriEventMap {
   "lead:new": Lead;
+  "lead:reminder": Lead;
   "lead:updated": Lead;
   "preview:progress": PreviewProgressEvent;
   "health:changed": HealthStatus;

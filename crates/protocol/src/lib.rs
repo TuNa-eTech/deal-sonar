@@ -181,6 +181,8 @@ pub enum Body {
 
     #[serde(rename = "session.status")]
     SessionStatus {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime: Option<CrawlRuntimeStatus>,
         platform: String,
         state: SessionState,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -715,4 +717,13 @@ impl Default for ExtractorProfile {
             session_markers: empty_json_object(),
         }
     }
+}
+
+/// Optional extension capability; old extensions leave operation status unknown.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrawlRuntimeStatus {
+    pub automatic_scanning: bool,
+    pub paused: bool,
+    pub next_crawl_at: Option<i64>,
+    pub last_crawl_at: Option<i64>,
 }

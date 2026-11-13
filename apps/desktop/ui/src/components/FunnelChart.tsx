@@ -26,41 +26,41 @@ export const FunnelChart: React.FC<FunnelChartProps> = ({
       label: "Bài thu được từ group",
       value: stats.posts_captured,
       sub: "100% đầu vào",
-      color: "#334155",
+      color: "var(--text-main)",
       widthPct: 100,
     },
     {
-      label: "├─ Lọc trùng loại (trùng hẳn & SimHash)",
+      label: "Lọc trùng loại (trùng hẳn & SimHash)",
       value: stats.dedup_dropped,
       sub: pct(stats.dedup_dropped),
-      color: "#64748b",
+      color: "var(--text-muted)",
       widthPct: Math.min(100, (stats.dedup_dropped / total) * 100),
     },
     {
-      label: "├─ Lọc sơ bộ loại (ngắn, danh sách chặn, từ khoá loại)",
+      label: "Lọc sơ bộ loại (ngắn, danh sách chặn, từ khoá loại)",
       value: stats.prefilter_dropped,
       sub: pct(stats.prefilter_dropped),
-      color: "#475569",
+      color: "var(--text-secondary)",
       widthPct: Math.min(100, (stats.prefilter_dropped / total) * 100),
     },
     {
-      label: "├─ Bộ luật tự quyết định",
+      label: "Bộ luật tự quyết định",
       value: stats.rule_decided,
       sub: `${pct(stats.rule_decided)} · trong đó khớp: ${stats.rule_matched.toLocaleString("vi-VN")}`,
-      color: "#0284c7",
+      color: "var(--success)",
       widthPct: Math.min(100, (stats.rule_decided / total) * 100),
     },
     {
-      label: "└─ Gửi lên AI quyết định",
+      label: "Gửi lên AI quyết định",
       value: stats.ai_decided,
       sub: `${pct(stats.ai_decided)} · trong đó khớp: ${stats.ai_matched.toLocaleString("vi-VN")}`,
-      color: "#2563eb",
+      color: "var(--primary)",
       widthPct: Math.min(100, (stats.ai_decided / total) * 100),
     },
   ];
 
   return (
-    <div className="card">
+    <div className="funnel-chart">
       <div
         style={{
           display: "flex",
@@ -93,7 +93,7 @@ export const FunnelChart: React.FC<FunnelChartProps> = ({
             <div
               style={{
                 height: 6,
-                background: "#f1f5f9",
+                background: "var(--bg-subtle)",
                 borderRadius: 4,
                 overflow: "hidden",
               }}

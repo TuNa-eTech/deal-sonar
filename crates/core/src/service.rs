@@ -65,8 +65,8 @@ use crate::ipc_server::{push_crawl_request, spawn_ipc_server};
 use crate::license::{enforce_plan_limits_on_store, LicenseVerifier, LICENSE_TOKEN_SETTING_KEY};
 use crate::pipeline::{lead_detail_to_lead_dto, load_lead_dto, run_silent_backfill_24h};
 use crate::preview_rules::{
-    get_radar_preview, handle_negative_feedback_on_rule_eval, run_compile_ruleset_for_version,
-    save_user_ruleset, start_radar_preview,
+    cancel_radar_preview, get_radar_preview, handle_negative_feedback_on_rule_eval,
+    run_compile_ruleset_for_version, save_user_ruleset, start_radar_preview,
 };
 use crate::state::{
     AiRuntimeHealth, CoreConfig, CoreRuntime, IncidentTracker, InflightAiGuard, IpcHub,
@@ -228,6 +228,7 @@ impl CoreServiceBuilder {
         prepare_data_directories(&config)?;
         let db_path = config.data_dir.join("dealsonar.db");
         let backup_dir = config.data_dir.join("backups");
+        Store::apply_pending_restore(&db_path, &backup_dir)?;
         let store = Store::open(&db_path, &backup_dir)?;
 
         let secrets: Arc<dyn SecretStore> = if env_flag_enabled("DEALSONAR_IN_MEMORY_SECRETS") {
@@ -256,6 +257,7 @@ impl CoreServiceBuilder {
         prepare_data_directories(&config)?;
         let db_path = config.data_dir.join("dealsonar.db");
         let backup_dir = config.data_dir.join("backups");
+        Store::apply_pending_restore(&db_path, &backup_dir)?;
         let store = Store::open(&db_path, &backup_dir)?;
 
         Ok(Self::new(store)
@@ -359,6 +361,7 @@ impl CoreServiceBuilder {
             ai_health: Mutex::new(AiRuntimeHealth::default()),
             incidents: Mutex::new(IncidentTracker::default()),
             previews: Mutex::new(std::collections::HashMap::new()),
+            preview_cancellations: Mutex::new(std::collections::HashMap::new()),
             latest_preview_by_radar: Mutex::new(std::collections::HashMap::new()),
             last_emitted_health: Mutex::new(None),
             outbox_tracker: Mutex::new(BTreeMap::new()),
@@ -913,6 +916,14 @@ impl CoreService {
         start_radar_preview(&self.rt, input).await
     }
 
+    pub async fn radar_preview_cancel(
+        &self,
+        radar_id: &str,
+        preview_id: &str,
+    ) -> CoreResult<PreviewRunState> {
+        cancel_radar_preview(&self.rt, radar_id, preview_id).await
+    }
+
     pub fn radar_preview_get(
         &self,
         radar_id: &str,
@@ -954,13 +965,13 @@ impl CoreService {
         let cur_ver_dto = radar_version_from_store(&rw.current_version);
         let cand_ver_dto = rw.candidate_version.as_ref().map(radar_version_from_store);
 
-        let mut versions = vec![cur_ver_dto.clone()];
-        if let Some(cv) = &cand_ver_dto {
-            if cv.id != cur_ver_dto.id {
-                versions.push(cv.clone());
-            }
-        }
-        versions.sort_by(|a, b| b.version.cmp(&a.version));
+        let versions = self
+            .rt
+            .store
+            .radar_versions(&rw.radar.id)?
+            .iter()
+            .map(radar_version_from_store)
+            .collect();
 
         let radar_dto = Radar {
             id: rw.radar.id.clone(),
@@ -1172,12 +1183,19 @@ impl CoreService {
             }
         }
 
-        let total = items.len();
+        let total = page.total;
         Ok(LeadListResponse {
             items,
             total,
             next_cursor: page.next_cursor,
         })
+    }
+
+    pub fn lead_mark_read(&self, id: &str) -> CoreResult<LeadDetail> {
+        self.rt.store.lead_mark_read(id, now_ms())?;
+        let detail = self.lead_get(id)?;
+        self.rt.emit(CoreEvent::LeadUpdated(detail.lead.clone()));
+        Ok(detail)
     }
 
     pub fn lead_get(&self, id: &str) -> CoreResult<LeadDetail> {
@@ -1310,6 +1328,27 @@ impl CoreService {
         self.ensure_not_shutting_down()?;
         let now = now_ms();
 
+        if let Some(corrections) = &input.corrected_fields {
+            let evaluation = self
+                .rt
+                .store
+                .get_evaluation(&input.evaluation_id)?
+                .ok_or_else(|| CoreError::Validation("Không tìm thấy đánh giá".into()))?;
+            let version = self
+                .rt
+                .store
+                .radar_get_version(&evaluation.radar_version_id)?
+                .ok_or_else(|| CoreError::Validation("Không tìm thấy phiên bản radar".into()))?;
+            for (key, value) in corrections {
+                let field = version
+                    .fields
+                    .iter()
+                    .find(|f| &f.key == key)
+                    .ok_or_else(|| CoreError::Validation(format!("Trường không tồn tại: {key}")))?;
+                dealsonar_store::field_values::validate_field_value(field, value)?;
+            }
+        }
+
         // Optional corrected_fields conversion
         let corrected_store = input.corrected_fields.as_ref().map(|map| {
             map.iter()
@@ -1358,7 +1397,10 @@ impl CoreService {
         // If `label == Missed` on a rejected evaluation (`origin == App`), promote to Inbox lead silently
         let mut target_lead_id = input.lead_id.clone();
         let mut created_new_lead = false;
-        if input.label == FeedbackLabel::Missed && target_lead_id.is_none() {
+        if input.label == FeedbackLabel::Missed
+            && input.origin == crate::dto::FeedbackOrigin::App
+            && target_lead_id.is_none()
+        {
             if let Some(ver) = self.rt.store.radar_get_version(&fb_rec.radar_version_id)? {
                 let (created_lead, was_created) = self.rt.store.create_lead(&CreateLeadInput {
                     id: None,
@@ -1431,11 +1473,16 @@ impl CoreService {
         }
 
         let mut export_query = input.query.clone();
-        if export_query.limit.is_none() {
-            export_query.limit = Some(500);
+        export_query.limit = Some(500);
+        export_query.cursor = None;
+        let mut store_query = self.build_store_lead_query(&export_query)?;
+        let mut page = self.rt.store.lead_list(&store_query)?;
+        while let Some(cursor) = page.next_cursor.take() {
+            store_query.cursor = Some(cursor);
+            let next = self.rt.store.lead_list(&store_query)?;
+            page.items.extend(next.items);
+            page.next_cursor = next.next_cursor;
         }
-        let store_query = self.build_store_lead_query(&export_query)?;
-        let page = self.rt.store.lead_list(&store_query)?;
 
         // Collect union of field definitions across matching radars (or specific radar)
         let notify_fields: Vec<dealsonar_notify::FieldDef> =
@@ -1536,18 +1583,7 @@ impl CoreService {
     }
 
     fn build_store_lead_query(&self, q: &LeadFilterQuery) -> CoreResult<LeadListQuery> {
-        let min_score = if q.include_weak == Some(false) {
-            if let Some(rid) = &q.radar_id {
-                self.rt
-                    .store
-                    .radar_get(rid)?
-                    .map(|rw| rw.radar.notify.min_score)
-            } else {
-                Some(0.6)
-            }
-        } else {
-            None
-        };
+        let min_score = None;
 
         let filters = q
             .filters
@@ -1573,6 +1609,9 @@ impl CoreService {
         });
 
         Ok(LeadListQuery {
+            unread_only: q.unread_only,
+            follow_up_before: q.follow_up_before,
+            exclude_weak: Some(q.include_weak == Some(false)),
             radar_id: q.radar_id.clone(),
             status: q
                 .status
@@ -2735,6 +2774,84 @@ impl CoreService {
         )
     }
 
+    /// Workspace operations use the same domain boundary in WebView and contract tests.
+    pub fn workspace_action(&self, action: &str, input: Value) -> CoreResult<Value> {
+        self.ensure_not_shutting_down()?;
+        match action {
+            "backups" => {
+                let dir = self.rt.config.data_dir.join("backups");
+                let mut files = Vec::new();
+                if dir.exists() {
+                    for entry in fs::read_dir(dir)? {
+                        let path = entry?.path();
+                        if path.is_file()
+                            && matches!(
+                                path.extension().and_then(|s| s.to_str()),
+                                Some("sqlite3" | "db")
+                            )
+                        {
+                            files.push(path.to_string_lossy().into_owned());
+                        }
+                    }
+                }
+                files.sort();
+                files.reverse();
+                Ok(
+                    serde_json::json!({"paths":files,"pending":self.rt.config.data_dir.join("restore-pending.sqlite3").exists()}),
+                )
+            }
+            "restore" => {
+                if input["confirm"].as_str() != Some("KHOI PHUC") {
+                    return Err(CoreError::Validation("Nhập KHOI PHUC để xác nhận".into()));
+                }
+                let path = input["path"]
+                    .as_str()
+                    .ok_or_else(|| CoreError::Validation("Chọn tệp sao lưu".into()))?;
+                Store::stage_restore(std::path::Path::new(path), &self.rt.config.data_dir)?;
+                Ok(serde_json::json!({"restart_required":true}))
+            }
+            "restore_cancel" => {
+                let path = self.rt.config.data_dir.join("restore-pending.sqlite3");
+                if path.exists() {
+                    fs::remove_file(path)?;
+                }
+                Ok(serde_json::json!({"cancelled":true}))
+            }
+            "rollback" => {
+                let id = input["radar_id"]
+                    .as_str()
+                    .ok_or_else(|| CoreError::Validation("Thiếu radar".into()))?;
+                let expected = input["expected_version"]
+                    .as_i64()
+                    .ok_or_else(|| CoreError::Validation("Thiếu phiên bản hiện tại".into()))?;
+                let target = input["version"]
+                    .as_i64()
+                    .ok_or_else(|| CoreError::Validation("Chọn phiên bản".into()))?;
+                let current = self.radar_get(id)?;
+                if i64::from(current.radar.current_version) != expected {
+                    return Err(CoreError::Validation(
+                        "Radar đã thay đổi. Tải lại trước khi áp dụng.".into(),
+                    ));
+                }
+                let version = current
+                    .versions
+                    .iter()
+                    .find(|v| i64::from(v.version) == target)
+                    .ok_or_else(|| CoreError::Validation("Phiên bản không thuộc radar".into()))?;
+                // Publish the old definition as a new immutable version, keeping all history.
+                let update: UpdateRadarInput = serde_json::from_value(
+                    serde_json::json!({"id":id,"description":version.description,"user_profession":version.user_profession,"fields":version.fields,"match_policy":version.match_policy,"confirm_version_upgrade":true}),
+                )?;
+                let result = self.radar_update(update)?;
+                let _ = self.rt.bump_and_push_config()?;
+                Ok(serde_json::to_value(result.detail)?)
+            }
+            _ => Err(CoreError::Validation(
+                "Thao tác workspace không được hỗ trợ".into(),
+            )),
+        }
+    }
+
     pub fn data_backup(&self) -> CoreResult<DataBackupResult> {
         let now = now_ms();
         let backup_dir = self.rt.config.data_dir.join("backups");
@@ -2776,6 +2893,10 @@ impl CoreService {
 
         // Collect webhook secret keys before wiping DB
         let existing_channels = self.rt.store.channel_list().unwrap_or_default();
+        let pending_restore = self.rt.config.data_dir.join("restore-pending.sqlite3");
+        if pending_restore.exists() {
+            fs::remove_file(pending_restore)?;
+        }
         self.rt.store.delete_all_data()?;
 
         let _ = self.rt.secrets.delete_secret(TELEGRAM_BOT_TOKEN_KEY);

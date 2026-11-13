@@ -118,8 +118,8 @@ function renderScanControls(status: PopupStatusSnapshot): void {
     selectedSources.push(source);
     options.push(new Option(label, source.external_id));
   };
-  if (currentGroupCandidate) addSource(currentGroupCandidate, `Đang xem · ${currentGroupCandidate.name}`);
-  for (const source of status.scanSources ?? []) addSource(source, `Nhóm · ${source.external_id}`);
+  if (currentGroupCandidate) addSource(currentGroupCandidate, `Đang xem: ${currentGroupCandidate.name}`);
+  for (const source of status.scanSources ?? []) addSource(source, `Nhóm: ${source.external_id}`);
   if (!options.length) options.push(new Option("Chưa có nhóm để quét", ""));
   const unchanged = select.options.length === options.length && options.every((option, index) =>
     select.options[index]?.value === option.value && select.options[index]?.text === option.text);
@@ -134,7 +134,7 @@ function renderScanControls(status: PopupStatusSnapshot): void {
     ? "Mở tab riêng, tự cuộn trong giới hạn rồi đóng khi xong."
     : "Đọc bài đã tải ở tab hiện tại, không tự cuộn trang.";
   byId("scan-options-summary").textContent = validOptions
-    ? `${background ? "Tab nền" : "Tab hiện tại"} · ${preferences.maxPosts} bài${background ? ` · ${preferences.maxScrollSteps} cuộn` : ""}`
+    ? `${background ? "Tab nền" : "Tab hiện tại"}, ${preferences.maxPosts} bài${background ? `, ${preferences.maxScrollSteps} cuộn` : ""}`
     : "Kiểm tra giới hạn";
   const wrongTab = !background && (!currentGroupCandidate ||
     select.value.toLowerCase() !== currentGroupCandidate.external_id.toLowerCase());
@@ -144,18 +144,18 @@ function renderScanControls(status: PopupStatusSnapshot): void {
   button.textContent = running ? "Đang quét…" : "Quét ngay";
   button.setAttribute("aria-busy", String(running));
   byId("scan-scope").textContent = background
-    ? `Tab nền · tối đa ${validOptions ? preferences.maxPosts : "—"} bài, ${preferences.maxScrollSteps} lần cuộn. Có thể dừng sớm.`
-    : `Tab hiện tại · tối đa ${validOptions ? preferences.maxPosts : "—"} bài đã tải, không cuộn trang.`;
+    ? `Tab nền, tối đa ${validOptions ? preferences.maxPosts : "—"} bài, ${preferences.maxScrollSteps} lần cuộn. Có thể dừng sớm.`
+    : `Tab hiện tại, tối đa ${validOptions ? preferences.maxPosts : "—"} bài đã tải, không cuộn trang.`;
   byId("scan-feedback").textContent = running ? "Đang đọc bài viết. Bạn có thể tiếp tục duyệt web."
     : !status.connected || !status.desktopAvailable ? "Mở DealSonar Desktop để bắt đầu."
-    : status.pause.paused || status.pause.requiresDesktopResume ? "Đang tạm dừng · xem mục Tạm dừng & khôi phục."
+    : status.pause.paused || status.pause.requiresDesktopResume ? "Đang tạm dừng. Xem mục Tạm dừng & khôi phục."
     : status.session.state !== "ok" ? "Kiểm tra phiên Facebook ở phần Kết nối."
     : !selectedSources.length ? "Mở một nhóm Facebook để bắt đầu."
     : !validOptions ? "Số bài từ 1–100, số lần cuộn từ 0–5."
     : optionsSaving ? "Đang lưu tùy chọn…"
-    : optionsUnsaved ? "Tùy chọn chưa lưu · kiểm tra phần Tùy chọn quét."
+    : optionsUnsaved ? "Tùy chọn chưa lưu. Kiểm tra phần Tùy chọn quét."
     : wrongTab ? "Mở đúng nhóm đã chọn hoặc chuyển sang quét bằng tab nền."
-    : "Sẵn sàng · không cần chờ lịch quét";
+    : "Sẵn sàng, không cần chờ lịch quét";
   byId<HTMLInputElement>("automatic-scanning").checked = status.automaticScanning ?? false;
   byId("stat-queued").textContent = `${status.queuedPostsCount} bài`;
   const result = byId("last-scan-result");
@@ -165,7 +165,7 @@ function renderScanControls(status: PopupStatusSnapshot): void {
     const failed = scan.status === "error" || scan.status === "blocked";
     result.classList.toggle("err", failed);
     result.textContent = failed ? `Quét chưa thành công: ${scan.error || "Kiểm tra phiên Facebook và thử lại."}`
-      : `Lượt gần nhất · ${scan.postsSeen} bài đã đọc · ${scan.postsNew} bài mới`;
+      : `Lượt gần nhất: ${scan.postsSeen} bài đã đọc, ${scan.postsNew} bài mới`;
   }
 }
 
@@ -203,7 +203,7 @@ function renderGroupContext(
   if (metaParts.length === 0) {
     metaParts.push(`ID: ${group.external_id}`);
   }
-  byId("group-context-meta").textContent = metaParts.join(" · ");
+  byId("group-context-meta").textContent = metaParts.join(", ");
 
   const alreadyFollowed = isGroupAlreadyFollowed(
     group,
@@ -251,7 +251,7 @@ function renderStatus(status: PopupStatusSnapshot): void {
       desktopHelpMsg.textContent = status.connectionError;
     } else if (errLower.includes("forbidden")) {
       desktopHelpMsg.textContent =
-        `ID tiện ích chưa được ghép nối với ứng dụng Desktop${extIdSuffix}. Hãy mở DealSonar → bấm «Kiểm tra lại» (hoặc dán ID trên vào mục Kết nối Chrome), rồi bấm «Thử lại».`;
+        `ID tiện ích chưa được ghép nối với ứng dụng Desktop${extIdSuffix}. Hãy mở DealSonar, bấm «Kiểm tra lại» (hoặc dán ID trên vào mục Kết nối Chrome), rồi bấm «Thử lại».`;
     } else if (errLower.includes("not found")) {
       desktopHelpMsg.textContent =
         `Chưa tìm thấy cầu nối Native Host${extIdSuffix}. Hãy mở ứng dụng DealSonar trên máy tính trước, rồi bấm «Thử lại».`;
@@ -290,7 +290,7 @@ function renderStatus(status: PopupStatusSnapshot): void {
   byId("stat-next-crawl").textContent = status.pause.paused
     ? "Đang tạm dừng"
     : status.automaticScanning ? formatRelativeVietnameseTime(status.nextCrawlAt, now, "future")
-    : "Đã tắt · chỉ quét khi bạn yêu cầu";
+    : "Đã tắt, chỉ quét khi bạn yêu cầu";
   byId("stat-groups-count").textContent = `${status.followedGroupsCount} nhóm`;
   byId("stat-hourly-loads").textContent = `${status.loadsLastHour} / ${status.maxLoadsPerHour}`;
 
@@ -306,7 +306,7 @@ function renderStatus(status: PopupStatusSnapshot): void {
 
     if (status.pause.requiresDesktopResume) {
       pauseLabel.textContent =
-        "Đã khoá an toàn do cần xác minh — hãy bấm Tiếp tục trong app DealSonar.";
+        "Đã khoá an toàn do cần xác minh. Hãy bấm Tiếp tục trong app DealSonar.";
       resumeBtn.disabled = true;
     } else if (status.pause.until !== null) {
       const untilTime = new Date(status.pause.until).toLocaleTimeString("vi-VN", {
@@ -459,7 +459,7 @@ export async function initPopup(): Promise<void> {
     if (!optionsUnsaved || optionsSaving) return;
     const options = readScanOptions();
     if (!isQuickScanOptions(options)) {
-      byId("scan-options-feedback").textContent = "Chưa lưu · số bài 1–100, số lần cuộn 0–5, dùng số nguyên.";
+      byId("scan-options-feedback").textContent = "Chưa lưu: số bài từ 1 đến 100, số lần cuộn từ 0 đến 5, dùng số nguyên.";
       if (latestStatus) renderScanControls(latestStatus);
       return;
     }
@@ -471,7 +471,7 @@ export async function initPopup(): Promise<void> {
       if (disposed) return;
       renderResponse(status);
       optionsUnsaved = false;
-      byId("scan-options-feedback").textContent = "Đã lưu · áp dụng cho những lần quét sau.";
+      byId("scan-options-feedback").textContent = "Đã lưu, áp dụng cho những lần quét sau.";
     } catch (error) {
       if (disposed) return;
       byId("scan-options-feedback").textContent = "Chưa lưu được. Hãy thay đổi tùy chọn để thử lại.";

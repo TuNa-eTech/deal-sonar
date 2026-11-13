@@ -1,4 +1,8 @@
+import { AppIcon } from "./AppIcon";
 import React, { useCallback, useEffect, useState } from "react";
+import {UndoCenter,clearUndo} from "./components/UndoCenter";
+import { TodayScreen } from "./screens/TodayScreen";
+import { useWorkspace, useDialogAccessibility, clearWorkspace } from "./lib/workspace";
 import { api, onDesktopEvent } from "./lib/api";
 import type {
   HealthStatus,
@@ -10,7 +14,7 @@ import type {
   Source,
 } from "./types/ipc";
 import { GlobalHealthBanner } from "./components/GlobalHealthBanner";
-import { OnboardingModal } from "./components/OnboardingModal";
+import { GoalOnboarding as OnboardingModal } from "./components/GoalOnboarding";
 import { RadarWizard } from "./components/RadarWizard";
 import { InboxScreen } from "./screens/InboxScreen";
 import { LeadTableScreen } from "./screens/LeadTableScreen";
@@ -21,6 +25,7 @@ import { HealthScreen } from "./screens/HealthScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 
 export type ScreenKey =
+  | "today"
   | "inbox"
   | "table"
   | "radars"
@@ -30,7 +35,12 @@ export type ScreenKey =
   | "settings";
 
 export const App: React.FC = () => {
-  const [screen, setScreen] = useState<ScreenKey>("inbox");
+  useDialogAccessibility();
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const [screen, setScreen] = useWorkspace<ScreenKey>("screen", "today");
+  useEffect(()=>{const onHash=()=>{const v=location.hash.slice(1);if(["today","inbox","table","radars","sources","contacts","health","settings"].includes(v))setScreen(v as ScreenKey);};window.addEventListener("hashchange",onHash);onHash();return()=>window.removeEventListener("hashchange",onHash);},[]);
+  useEffect(()=>{if(location.hash.slice(1)!==screen)location.hash=screen;},[screen]);
+  useEffect(() => setNavigationOpen(false), [screen]);
   const [booting, setBooting] = useState(true);
   const [bootError, setBootError] = useState<string | null>(null);
 
@@ -75,7 +85,7 @@ export const App: React.FC = () => {
         api.templateList(),
         api.radarList(),
         api.sourceList(),
-        api.leadList({ status: ["new"], limit: 100 }),
+        api.leadList({ unread_only: true, include_weak:true, limit: 1 }),
       ]);
       setSettings(st);
       setLicense(lic);
@@ -108,7 +118,7 @@ export const App: React.FC = () => {
     const bind = async () => {
       try {
         const u1 = await onDesktopEvent("lead:new", (lead) => {
-          showToast(`🎯 Tin mới [${lead.radar_name}]: ${lead.summary}`);
+          showToast(`Tin mới [${lead.radar_name}]: ${lead.summary}`);
           setRefreshToken((n) => n + 1);
           void loadCoreData();
         });
@@ -122,14 +132,15 @@ export const App: React.FC = () => {
         const u4 = await onDesktopEvent("crawl:finished", () => {
           void api.sourceList().then(setSources);
         });
+        const u6 = await onDesktopEvent("lead:reminder", (lead)=>{showToast(`Đến hạn liên hệ: ${lead.summary}`);setRefreshToken(n=>n+1);});
         const u5 = await onDesktopEvent("job:failed", (ev) => {
-          showToast(`⚠️ Công việc nền lỗi (${ev.kind}): ${ev.error}`);
+          showToast(`Công việc nền lỗi (${ev.kind}): ${ev.error}`);
         });
 
         if (cancelled) {
-          [u1, u2, u3, u4, u5].forEach((fn) => fn());
+          [u1, u2, u3, u4, u5, u6].forEach((fn) => fn());
         } else {
-          unsubs.push(u1, u2, u3, u4, u5);
+          unsubs.push(u1, u2, u3, u4, u5, u6);
         }
       } catch (err) {
         console.error("[DealSonar] Không thể đăng ký nhận sự kiện thời gian thực:", err);
@@ -174,20 +185,20 @@ export const App: React.FC = () => {
 
   const healthAllOk =
     Boolean(health?.extension_connected) &&
-    health?.facebook_session === "ok" &&
+    health?.facebook_session === "ok" && health?.automatic_scanning===true && !health?.crawl_paused &&
     (health?.ai_state === "ok" || health?.ai_state === "not_configured");
 
   return (
     <div className="app-shell">
       {/* Fixed Left Sidebar (`03-ux-flows.md §3`) */}
-      <aside className="sidebar" aria-label="Điều hướng chính">
+      <aside className={`sidebar ${navigationOpen ? "navigation-open" : ""}`} aria-label="Điều hướng chính">
         <div className="sidebar-brand">
           <div className="sidebar-brand-title">
-            <span className="brand-dot" />
+            <AppIcon name="radar" className="brand-mark" />
             <span>DealSonar</span>
           </div>
           <span className="nav-badge">
-            {license.plan === "pro" ? "PRO" : "Cá nhân"}
+            {license.plan === "pro" ? "Pro" : "Cá nhân"}
           </span>
         </div>
 
@@ -209,80 +220,86 @@ export const App: React.FC = () => {
         </div>
 
         <nav className="sidebar-nav">
+          <div className="nav-section-label">Làm việc</div>
+          <button type="button" className={`nav-item ${screen==="today"?"active":""}`} aria-current={screen==="today"?"page":undefined} onClick={()=>setScreen("today")}><span className="nav-label"><AppIcon name="today" />Hôm nay</span></button>
           <button
             type="button"
-            className={`nav-item ${screen === "inbox" ? "active" : ""}`}
+            className={`nav-item ${(screen === "inbox" || screen === "table") ? "active" : ""}`}
+            aria-current={screen === "inbox" ? "page" : undefined}
             onClick={() => setScreen("inbox")}
           >
-            <span>Hộp tin</span>
+            <span className="nav-label"><AppIcon name="inbox" />Cơ hội</span>
             {unreadNewCount > 0 && <span className="nav-badge">{unreadNewCount}</span>}
           </button>
 
-          <button
-            type="button"
-            className={`nav-item ${screen === "table" ? "active" : ""}`}
-            onClick={() => setScreen("table")}
-          >
-            <span>Bảng tin</span>
-          </button>
-
+          <div className="nav-section-label">Thiết lập tìm tin</div>
           <button
             type="button"
             className={`nav-item ${screen === "radars" ? "active" : ""}`}
+            aria-current={screen === "radars" ? "page" : undefined}
             onClick={() => setScreen("radars")}
           >
-            <span>Radar</span>
+            <span className="nav-label"><AppIcon name="radars" />Radar</span>
             <span className="nav-badge">{radars.length}</span>
           </button>
 
           <button
             type="button"
             className={`nav-item ${screen === "sources" ? "active" : ""}`}
+            aria-current={screen === "sources" ? "page" : undefined}
             onClick={() => setScreen("sources")}
           >
-            <span>Nguồn</span>
+            <span className="nav-label"><AppIcon name="sources" />Nguồn</span>
             <span className="nav-badge">{sources.filter((s) => s.followed).length}</span>
           </button>
 
           <button
             type="button"
             className={`nav-item ${screen === "contacts" ? "active" : ""}`}
+            aria-current={screen === "contacts" ? "page" : undefined}
             onClick={() => setScreen("contacts")}
           >
-            <span>Danh bạ</span>
+            <span className="nav-label"><AppIcon name="contacts" />Liên hệ</span>
           </button>
 
           <button
             type="button"
             className={`nav-item ${screen === "health" ? "active" : ""}`}
+            aria-current={screen === "health" ? "page" : undefined}
             onClick={() => setScreen("health")}
           >
-            <span>Sức khoẻ</span>
-            <span className={`status-dot ${healthAllOk ? "ok" : "err"}`} />
+            <span className="nav-label"><AppIcon name="health" />Kết nối</span>
+            <AppIcon name={healthAllOk ? "check" : "alert"} className={`connection-indicator ${healthAllOk ? "ok" : "err"}`} />
           </button>
 
           <button
             type="button"
             className={`nav-item ${screen === "settings" ? "active" : ""}`}
+            aria-current={screen === "settings" ? "page" : undefined}
             onClick={() => setScreen("settings")}
           >
-            <span>Cài đặt</span>
+            <span className="nav-label"><AppIcon name="settings" />Cài đặt</span>
           </button>
         </nav>
 
         <div className="sidebar-footer">
           <div>
-            Đang chạy:{" "}
-            <strong style={{ color: "#ffffff" }}>
+            Đã bật:{" "}
+            <strong className="sidebar-active-count">
               {radars.filter((r) => r.status === "active").length} radar
             </strong>
           </div>
-          <div>Dữ liệu 100% lưu tại máy</div>
+          <div>Dữ liệu lưu trên máy. AI và kênh gửi theo cấu hình.</div>
         </div>
       </aside>
 
       {/* Main Content Area */}
       <div className="main-area">
+        <div className="workspace-bar">
+          <button type="button" className="btn navigation-toggle" aria-label="Mở điều hướng" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(!navigationOpen)}><AppIcon name="menu" /></button>
+          <span className="workspace-path">DealSonar <span aria-hidden="true">/</span> <strong>{{today:"Hôm nay",inbox:"Cơ hội",table:"Bảng tin",radars:"Radar",sources:"Nguồn",contacts:"Liên hệ",health:"Kết nối",settings:"Cài đặt"}[screen]}</strong></span>
+          <span className="workspace-local"><AppIcon name="device" /> Dữ liệu trên máy</span>
+        </div>
         <GlobalHealthBanner
           health={health}
           onRetryConnect={async () => {
@@ -290,6 +307,7 @@ export const App: React.FC = () => {
             const hl = await api.healthGet();
             setHealth(hl);
           }}
+          onRetryAi={async()=>{await api.aiProbe();setHealth(await api.healthGet());}}
           onResumeCrawl={async () => {
             await api.chromeConnect({ resume_crawl: true });
             const hl = await api.healthGet();
@@ -298,7 +316,9 @@ export const App: React.FC = () => {
           onOpenRadars={() => setScreen("radars")}
         />
 
-        <main className="screen-scroll">
+        <main className={`screen-scroll screen-${screen}`}>
+          {(screen==="inbox"||screen==="table")&&<div className="section-tabs" aria-label="Cách xem cơ hội"><button className={`btn ${screen==="inbox"?"btn-primary":""}`} onClick={()=>setScreen("inbox")} aria-pressed={screen==="inbox"}>Danh sách</button><button className={`btn ${screen==="table"?"btn-primary":""}`} onClick={()=>setScreen("table")} aria-pressed={screen==="table"}>Bảng tin</button></div>}
+          {screen==="today"&&<TodayScreen health={health} radars={radars} sources={sources} refreshToken={refreshToken} onOpenOpportunities={()=>setScreen("inbox")} onDiagnose={()=>setScreen("health")} onCreateRadar={()=>setWizardState({open:true,template:null,editRadar:null,initialStep:1})} onUpdated={()=>void loadCoreData()}/> }
           {screen === "inbox" && (
             <InboxScreen
               radars={radars}
@@ -377,6 +397,7 @@ export const App: React.FC = () => {
               onLicenseUpdated={setLicense}
               onReopenOnboarding={() => setOnboardingOpen(true)}
               onAllDataDeleted={() => {
+                clearWorkspace();clearUndo();
                 setScreen("inbox");
                 void loadCoreData();
               }}
@@ -424,6 +445,7 @@ export const App: React.FC = () => {
             })
           }
           onSaved={() => {
+            setScreen("radars");
             setWizardState({
               open: false,
               template: null,
@@ -436,7 +458,8 @@ export const App: React.FC = () => {
         />
       )}
 
-      {toast && <div className="toast-banner">{toast}</div>}
+      <UndoCenter/>
+      {toast && <div role="status" className="toast-banner">{toast}</div>}
     </div>
   );
 };

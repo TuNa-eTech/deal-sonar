@@ -1,0 +1,100 @@
+/* Hallmark · scope: app · theme: Furrow · redesign: full · signature: operational records · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: H, settings uses a dedicated section rail and paired fields */
+.management-header-actions,
+.management-row-actions,
+.management-row-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+.management-row-heading { justify-content: space-between; margin-bottom: var(--space-xs); }
+.management-header-actions { justify-content: flex-end; }
+.radar-directory { margin-bottom: var(--space-lg); }
+.radar-name-button {
+  appearance: none;
+  border: 0;
+  padding: var(--space-xs) 0;
+  background: transparent;
+  color: var(--text-main);
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+.radar-name-button:hover { text-decoration: underline; text-underline-offset: 4px; }
+.radar-name-button:active { transform: translateY(1px); }
+.radar-name-button:focus-visible,
+.management-header-actions .btn:focus-visible,
+.management-row-actions .btn:focus-visible,
+.settings-workspace :focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.radar-name-button:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+.radars-workspace .btn, .sources-workspace .btn, .health-workspace .btn, .settings-workspace .btn { white-space: nowrap; }
+.radar-inspector {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: var(--space-lg);
+  margin-top: var(--space-lg);
+  align-items: start;
+}
+.radar-inspector > * { min-width: 0; }
+.radar-rules > :first-child { gap: var(--space-sm); flex-wrap: wrap; }
+.radar-rules .field-group { margin-block: var(--space-md); }
+.source-directory .crm-table td:first-child { min-width: 220px; }
+.source-directory .crm-table .field-hint { margin-top: var(--space-2xs); }
+.priority-selected { background: var(--primary-soft); border-color: var(--primary); color: var(--text-main); }
+.connection-ledger {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--space-lg);
+  margin-block: var(--space-lg);
+  border-top: 1px solid var(--border-strong);
+}
+.connection-entry { padding-block: var(--space-lg); border-bottom: 1px solid var(--border); min-width: 0; }
+.connection-entry > :first-child { margin-bottom: var(--space-xs) !important; }
+.connection-entry > :nth-child(2) { color: var(--text-secondary); }
+.connection-entry .field-hint { margin-top: var(--space-xs); }
+.connection-entry .input { min-width: 0; }
+.health-analytics {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-lg);
+  align-items: start;
+  margin-bottom: var(--space-lg);
+}
+.health-analytics > * { min-width: 0; overflow-x: auto; }
+.health-log { padding-top: var(--space-lg); border-top: 1px solid var(--border-strong); }
+.settings-layout { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: var(--space-xl); margin-top: var(--space-lg); }
+.settings-navigation { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2xs); position: sticky; top: var(--space-lg); align-self: start; }
+.settings-navigation .btn { justify-content: flex-start; border-color: transparent; background: transparent; color: var(--text-secondary); }
+.settings-navigation .btn[aria-pressed="true"] { background: var(--bg-subtle); color: var(--text-main); }
+.settings-navigation .btn:hover { background: var(--bg-subtle); }
+.settings-content { min-width: 0; }
+.settings-content > .draft-status { padding-bottom: var(--space-md); border-bottom: 1px solid var(--border); margin-bottom: var(--space-lg); color: var(--text-secondary); font-size: 12px; }
+.settings-section { min-width: 0; }
+.settings-section h3 { font-size: 20px; line-height: 1.4; margin-bottom: var(--space-md) !important; }
+.settings-section > .field-hint { margin-bottom: var(--space-lg); max-width: 75ch; }
+.settings-section > :first-child:not(h3) { flex-wrap: wrap; }
+.settings-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-lg); margin-block: var(--space-lg); }
+.settings-fields > * { min-width: 0; }
+.settings-fields .field-label { display: block; margin-bottom: var(--space-xs); }
+.settings-fields .field-hint { margin-top: var(--space-xs); }
+.settings-webhook-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
+.settings-webhook-fields .btn { justify-self: start; }
+.settings-toggle-row { display: flex; flex-wrap: wrap; gap: var(--space-lg); align-items: center; margin-block: var(--space-lg); }
+.webhook-setup { margin-top: var(--space-lg); padding-top: var(--space-lg); border-top: 1px solid var(--border); }
+.settings-section input[type="time"] { min-width: 0; }
+.settings-section .btn { max-width: 100%; }
+@media (max-width: 1200px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+  .settings-navigation { position: static; flex-direction: row; overflow-x: auto; padding-bottom: var(--space-xs); }
+  .settings-navigation .btn { flex-shrink: 0; }
+  .radar-inspector { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 800px) {
+  .health-analytics, .connection-ledger { grid-template-columns: minmax(0, 1fr); }
+  .management-header-actions { justify-content: flex-start; }
+  .settings-fields, .settings-webhook-fields { grid-template-columns: minmax(0, 1fr); }
+  .settings-section .btn { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .radar-name-button:active { transform: none; } }

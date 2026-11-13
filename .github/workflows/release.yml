@@ -1,0 +1,179 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/prepare-release.mjs
+
+  ci:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  extension:
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/prepare-release.mjs
+      - run: pnpm ext:build
+      - run: pnpm ext:test
+      - name: Package unpacked extension
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p release-assets
+          cd apps/extension/dist
+          zip -r "../../../release-assets/DealSonar-extension-${RELEASE_TAG}.zip" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-extension
+          path: release-assets/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop:
+    needs: ci
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+          - os: macos-15
+            target: aarch64-apple-darwin
+            bundles: dmg
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            bundles: dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+      - run: pnpm install --frozen-lockfile
+      - name: Build native messaging relay
+        run: cargo build --locked --release -p dealsonar-native-host --target '${{ matrix.target }}'
+      - name: Prepare version and bundled relay
+        run: node scripts/prepare-release.mjs '${{ matrix.target }}'
+      - name: Build desktop installer without a signing certificate
+        working-directory: apps/desktop
+        env:
+          # AppImage packaging uses extraction instead of FUSE on hosted runners.
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: pnpm dlx @tauri-apps/cli@2.10.1 build --ci --target '${{ matrix.target }}' --bundles '${{ matrix.bundles }}' --config release.conf.json -- --locked
+      - name: Collect installers
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import shutil
+
+          target = os.environ['RELEASE_TARGET']
+          tag = os.environ['RELEASE_TAG']
+          root = pathlib.Path('target') / target / 'release' / 'bundle'
+          output = pathlib.Path('release-assets')
+          output.mkdir(exist_ok=True)
+          expected = ['.deb', '.AppImage'] if 'linux' in target else ['.exe'] if 'windows' in target else ['.dmg']
+          for suffix in expected:
+              files = list(root.rglob(f'*{suffix}'))
+              if len(files) != 1:
+                  raise SystemExit(f'Expected one {suffix} installer, found: {files}')
+              shutil.copy2(files[0], output / f'DealSonar-{tag}-{target}{suffix}')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-desktop-${{ matrix.target }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [extension, desktop]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-assets
+      - name: Generate checksums
+        working-directory: release-assets
+        run: sha256sum * > SHA256SUMS.txt
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          flags=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then flags+=(--prerelease); fi
+          cat > release-notes.md <<'EOF'
+          Download the installer matching your OS and architecture. The desktop installer includes the native messaging relay.
+
+          Extract the extension ZIP and use Chrome/Edge/Brave > Extensions > Developer mode > Load unpacked. This is not a signed CRX or a Chrome Web Store release.
+
+          These builds have no publisher signing certificate or notarization. macOS uses a local ad-hoc signature required by Apple Silicon; Gatekeeper or Windows SmartScreen may require approval to open the app.
+
+          Verify downloads against SHA256SUMS.txt.
+          EOF
+          # Publish only after every test and platform build succeeds. On rerun,
+          # update assets on the existing release rather than creating a duplicate.
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          else
+            gh release create "$RELEASE_TAG" release-assets/* --verify-tag \
+              --title "DealSonar $RELEASE_TAG" --notes-file release-notes.md \
+              --generate-notes "${flags[@]}"
+          fi

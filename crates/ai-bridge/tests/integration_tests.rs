@@ -1059,6 +1059,7 @@ fn dynamic_schema_supports_all_11_field_types_and_compile_rules_blocks_nested_qu
             "score": 0.9,
             "intent": "demand",
             "author_role": "end_user",
+            "is_spam": false,
             "summary": "Tóm tắt hợp lệ",
             "reason": "Khớp",
             "fields": {
@@ -1455,4 +1456,120 @@ fn auto_discovers_local_cli_models_for_claude_codex_and_agy() {
         dealsonar_ai_bridge::recommended_models_for_provider(ProviderId::AgyCli, &agy_models);
     assert_eq!(a_fast.as_deref(), Some("gemini-3.8-flash-medium"));
     assert_eq!(a_smart.as_deref(), Some("gemini-4-carbon-medium"));
+}
+
+#[tokio::test]
+async fn preview_schema_tracks_field_edits_with_same_version_id() {
+    let bridge = AiBridge::new(Arc::new(MockAiProvider::new()));
+    let mut radar = sample_bds_radar();
+    let posts = vec![PostPromptInput::sanitized(
+        "schema-post",
+        1,
+        "Nhóm",
+        None,
+        None,
+        None,
+        None,
+        "Gia đình cần thuê căn hộ 2 phòng ngủ Cầu Giấy ngân sách 12 triệu/tháng",
+        None,
+    )];
+    bridge.judge_extract_batch(&radar, &posts).await.unwrap();
+    radar.fields.retain(|f| f.key == "phone");
+    radar.fields[0].key = "new_phone".into();
+    let report = bridge.judge_extract_batch(&radar, &posts).await.unwrap();
+    assert_eq!(report.outcomes.len(), 1);
+    assert!(matches!(&report.outcomes[0], PostEvalOutcome::Done { .. }));
+    assert_eq!(bridge.schema_cache().len(), 2);
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn codex_adapter_sends_strict_schemas_and_decodes_every_task() {
+    let tmp = ScopedTempDir::new("codex-strict-contract-").unwrap();
+    let script = r#"#!/usr/bin/env python3
+import json, os, sys
+args = sys.argv[1:]
+if "--help" in args:
+    print("--json --output-schema --output-last-message --sandbox --skip-git-repo-check --ephemeral")
+    sys.exit(0)
+sys.stdin.read()
+with open(args[args.index("--output-schema") + 1]) as f:
+    schema = json.load(f)
+def check(node):
+    assert "type" in node or "anyOf" in node, node
+    if node.get("type") == "object":
+        assert node.get("additionalProperties") is False, node
+        assert set(node.get("required", [])) == set(node["properties"]), node
+        for child in node["properties"].values(): check(child)
+    if "items" in node: check(node["items"])
+    for child in node.get("anyOf", []): check(child)
+check(schema)
+expected = json.loads(os.environ["DEALSONAR_TEST_OUTPUT"])
+def encode(node, value):
+    if node.get("description", "").startswith("Return a JSON-encoded string"):
+        return json.dumps(value, ensure_ascii=False)
+    if "anyOf" in node:
+        if value is None: return None
+        # Fixtures use object/null optional unions and primitive optional fields.
+        return encode(node["anyOf"][0], value)
+    if node.get("type") == "object":
+        return {key: encode(child, value[key]) if key in value else None for key, child in node["properties"].items()}
+    if node.get("type") == "array":
+        return [encode(node["items"], item) for item in value]
+    return value
+with open(args[args.index("--output-last-message") + 1], "w") as f:
+    json.dump(encode(schema, expected), f)
+print(json.dumps({"type": "turn.completed"}))
+"#;
+    let bin = write_executable_script(tmp.path(), "strict-codex", script);
+    let fields = vec![sample_bds_radar().fields[3].clone()];
+    let judge = json!({"results": [{"ref": 1, "match": false, "score": 0.1, "intent": "other",
+        "author_role": "unknown", "is_spam": false, "summary": "Test", "reason": "Test",
+        "fields": {"phone": {"raw": null, "value": null, "confidence": 0.0}}}]});
+    let suggested = json!({"suggested_name": "Test radar", "want_intent": "demand",
+        "fields": [{"key": "phone", "label": "Điện thoại", "type": "phone", "description": "Số liên hệ", "required": false}],
+        "hard_filters": [{"field": "phone", "op": "in", "value": ["+84900000000"]}]});
+    let compiled = json!({"dsl": 1, "prefilter": {"any": ["can thue"], "none": []},
+        "classify": [{"id": "demand", "when": {"all": [{"kw_any": ["can thue"]}, {"not": {"kw_none": ["spam"]}}]},
+            "verdict": "match", "confidence": 0.95}],
+        "extract": [{"field": "phone", "extractor": "vn_phone"}],
+        "thresholds": {"accept": 0.9, "reject": 0.9}});
+    for (task, schema, expected) in [
+        (
+            TaskKind::JudgeExtract,
+            dealsonar_ai_bridge::build_judge_extract_schema(&fields),
+            judge,
+        ),
+        (
+            TaskKind::SuggestFields,
+            dealsonar_ai_bridge::suggest_fields_schema(),
+            suggested,
+        ),
+        (
+            TaskKind::CompileRules,
+            dealsonar_ai_bridge::compile_rules_schema(),
+            compiled,
+        ),
+    ] {
+        let provider = CodexCliProvider::new(
+            CliAdapterConfig::new("strict-codex")
+                .with_binary_path(&bin)
+                .with_env("DEALSONAR_TEST_OUTPUT", expected.to_string()),
+        );
+        let response = provider
+            .complete(AiRequest {
+                task,
+                schema,
+                system: "Test".into(),
+                prompt: "Test".into(),
+                tier: ModelTier::Fast,
+                timeout: Duration::from_secs(5),
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            response.output, expected,
+            "transport must preserve the domain result for {task:?}"
+        );
+    }
 }

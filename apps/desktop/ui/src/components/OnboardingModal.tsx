@@ -154,7 +154,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
         <div className="modal-panel" style={{ maxWidth: 680 }}>
           <div className="modal-header">
             <h2 style={{ margin: 0, fontSize: 17 }}>
-              Chào mừng tới DealSonar — Nguyên tắc riêng tư & an toàn
+              Chào mừng tới DealSonar: Nguyên tắc riêng tư & an toàn
             </h2>
           </div>
           <div className="modal-body">
@@ -186,9 +186,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   do chính bạn tạo.
                 </div>
               </div>
-              <div className="card" style={{ background: "#fffbeb", borderColor: "#fde68a" }}>
+              <div className="card" style={{ background: "var(--warning-soft)", borderColor: "var(--warning)" }}>
                 <strong>4. Rủi ro với tài khoản mạng xã hội & trách nhiệm liên hệ</strong>
-                <div className="field-hint" style={{ marginTop: 3, color: "#92400e" }}>
+                <div className="field-hint" style={{ marginTop: 3, color: "var(--warning)" }}>
                   Dù quét chậm và tự dừng ngay khi gặp trang xác minh (checkpoint), điều khoản nền
                   tảng hạn chế công cụ tự động. Khuyến nghị không dùng tài khoản duy nhất không thể
                   mất. Bạn cam kết chỉ dùng với group mình là thành viên hợp lệ và tự chịu trách
@@ -241,7 +241,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       <div className="modal-panel" style={{ maxWidth: 820 }}>
         <div className="modal-header">
           <div>
-            <h2 style={{ margin: 0, fontSize: 17 }}>Thiết lập lần đầu — Sẵn sàng trong vài phút</h2>
+            <h2 style={{ margin: 0, fontSize: 17 }}>Thiết lập lần đầu: Sẵn sàng trong vài phút</h2>
             <div className="field-hint">
               Mỗi bước tự phát hiện trạng thái và tự đánh dấu hoàn tất.
             </div>
@@ -347,20 +347,20 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 <div className="card" style={{ background: "var(--bg-subtle)", fontSize: 12.5 }}>
                   {osTab === "macos" && (
                     <div>
-                      Mở Chrome → <code>chrome://extensions</code> → bật <strong>Developer mode</strong>{" "}
+                      Mở Chrome, vào <code>chrome://extensions</code>, bật <strong>Developer mode</strong>{" "}
                       hoặc cài từ cửa hàng. File khai báo được đặt tự động tại{" "}
                       <code>~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.dealsonar.host.json</code>.
                     </div>
                   )}
                   {osTab === "windows" && (
                     <div>
-                      Mở Chrome → cài tiện ích DealSonar. Khoá Registry tự động ghi tại{" "}
+                      Mở Chrome, cài tiện ích DealSonar. Khoá Registry tự động ghi tại{" "}
                       <code>HKCU\Software\Google\Chrome\NativeMessagingHosts\com.dealsonar.host</code>.
                     </div>
                   )}
                   {osTab === "linux" && (
                     <div>
-                      Mở Google Chrome → cài tiện ích DealSonar. File khai báo đặt tại{" "}
+                      Mở Google Chrome, cài tiện ích DealSonar. File khai báo đặt tại{" "}
                       <code>~/.config/google-chrome/NativeMessagingHosts/com.dealsonar.host.json</code>.
                     </div>
                   )}
@@ -374,7 +374,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               <h3 style={{ marginTop: 0 }}>Bước 2: Kiểm tra phiên đăng nhập Facebook</h3>
               <p>
                 DealSonar đọc bài bằng chính phiên đăng nhập Facebook trong trình duyệt Chrome của
-                bạn — không bao giờ hỏi mật khẩu hay đọc cookie.
+                bạn, không bao giờ hỏi mật khẩu hay đọc cookie.
               </p>
               <div className="card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -581,7 +581,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               {tgStatus && (
                 <div className="card" style={{ marginBottom: 10, background: "var(--bg-subtle)" }}>
                   <div>
-                    Bot: <strong>@{tgStatus.bot_username}</strong> —{" "}
+                    Bot: <strong>@{tgStatus.bot_username}</strong>:{" "}
                     {tgStatus.waiting_for_start
                       ? "Đang chờ bạn bấm Start (/start) trong cuộc trò chuyện với bot…"
                       : "Đã nhận /start và tạo kênh báo thành công!"}
@@ -632,13 +632,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               <div
                 className="card"
                 style={{
-                  background: "#eff6ff",
-                  borderColor: "#bfdbfe",
+                  background: "var(--primary-soft)",
+                  borderColor: "var(--border-strong)",
                   marginBottom: 14,
                 }}
               >
-                <strong style={{ color: "#1e40af" }}>Lưu ý quan trọng khi sử dụng:</strong>
-                <p style={{ margin: "6px 0 0", color: "#1e3a8a" }}>
+                <strong style={{ color: "var(--text-main)" }}>Lưu ý quan trọng khi sử dụng:</strong>
+                <p style={{ margin: "6px 0 0", color: "var(--text-secondary)" }}>
                   Radar chỉ chạy khi máy bật, Chrome mở và DealSonar đang chạy ở khay hệ thống.
                 </p>
               </div>
@@ -672,7 +672,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   className="btn btn-primary"
                   onClick={() => void finishWizard(true)}
                 >
-                  Tạo radar đầu tiên ngay →
+                  Tạo radar đầu tiên ngay
                 </button>
                 <button type="button" className="btn" onClick={() => void finishWizard(false)}>
                   Vào màn hình chính
@@ -689,7 +689,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             disabled={step === 1}
             onClick={() => setStep((s) => Math.max(1, s - 1) as 1 | 2 | 3 | 4 | 5)}
           >
-            ← Quay lại
+            Quay lại
           </button>
           {step < 5 ? (
             <button
@@ -697,7 +697,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               className="btn btn-primary"
               onClick={() => setStep((s) => Math.min(5, s + 1) as 1 | 2 | 3 | 4 | 5)}
             >
-              Bước tiếp theo →
+              Bước tiếp theo
             </button>
           ) : (
             <span className="field-hint">Hoàn tất thiết lập ban đầu</span>

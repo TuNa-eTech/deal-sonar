@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { readWorkspace, saveWorkspace } from "../lib/workspace";
+import {BackupRestore} from "../components/BackupRestore";
 import { api } from "../lib/api";
 import type {
   AiModelOption,
@@ -119,7 +121,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onReopenOnboarding,
   onAllDataDeleted,
 }) => {
-  const [draft, setDraft] = useState<Settings>(settings);
+  const [draft, setDraft] = useState<Settings>(()=>({...settings,...readWorkspace<Partial<Settings>>("settings-draft",{})}));
+  const baseline = useRef(settings);
+  const [saving, setSaving] = useState(false);
+  const [section, setSection] = useState("ai");
+  const mergeSettings = (next:Settings, savedKeys:string[]=[]) => {
+    const before=baseline.current;
+    setDraft(current=>Object.fromEntries(Object.entries(next).map(([key,value])=>[key, savedKeys.includes(key)||JSON.stringify(current[key as keyof Settings])===JSON.stringify(before[key as keyof Settings])?value:current[key as keyof Settings]])) as unknown as Settings);
+    baseline.current=next;
+  };
+  const dirtyKeys=(Object.keys(draft) as (keyof Settings)[]).filter(k=>JSON.stringify(draft[k])!==JSON.stringify(settings[k]));
+  useEffect(()=>{saveWorkspace("settings-draft",Object.fromEntries(dirtyKeys.map(k=>[k,draft[k]])));},[draft,settings]);
   const [probes, setProbes] = useState<Record<AiProviderId, ProbeResult> | null>(null);
   const [probingAi, setProbingAi] = useState(false);
   const [customFastMode, setCustomFastMode] = useState(false);
@@ -139,7 +151,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [banner, setBanner] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   useEffect(() => {
-    setDraft(settings);
+    mergeSettings(settings);
   }, [settings]);
 
   const loadAux = async () => {
@@ -152,7 +164,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       ]);
       setProbes(p);
       setChannels(ch);
-      setDraft(refreshedSettings);
+      mergeSettings(refreshedSettings);
       onSettingsUpdated(refreshedSettings);
     } finally {
       setProbingAi(false);
@@ -164,14 +176,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   }, []);
 
   const savePatch = async (patch: Partial<Settings>, msg = "Đã lưu thay đổi cài đặt.") => {
+    if (saving) return;
+    setSaving(true);
     try {
       const updated = await api.settingsSet(patch);
-      setDraft(updated);
+      mergeSettings(updated, Object.keys(patch));
       onSettingsUpdated(updated);
       setBanner({ kind: "ok", text: msg });
     } catch (err) {
       setBanner({ kind: "err", text: err instanceof Error ? err.message : String(err) });
-    }
+    } finally { setSaving(false); }
   };
 
   const activeProvider: AiProviderId = draft.ai_provider ?? "claude_cli";
@@ -194,7 +208,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const smartOtherOptions = availableModels.filter((m) => m.recommended_tier !== "smart");
 
   return (
-    <div>
+    <div className="settings-workspace">
       <div className="screen-header">
         <div>
           <h1 className="screen-title">Cài đặt hệ thống</h1>
@@ -207,6 +221,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </button>
       </div>
 
+      <div className="settings-layout"><nav className="settings-navigation" aria-label="Nhóm cài đặt">{[["ai","AI & Kết nối"],["notifications","Thông báo"],["schedule","Lịch quét"],["license","Gói sử dụng"],["data","Dữ liệu"]].map(([id,label])=><button key={id} className={`btn ${section===id?"btn-primary":""}`} onClick={()=>setSection(id!)} aria-pressed={section===id}>{label}</button>)}</nav><div className="settings-content">
+      <div className="draft-status" role="status">{saving?"Đang lưu…":dirtyKeys.length?"Có thay đổi chưa áp dụng. Bản nhập được giữ trên máy khi chuyển mục.":"Tất cả thay đổi đã được lưu."}{dirtyKeys.length>0&&<button className="btn btn-sm" onClick={()=>setDraft(settings)}>Bỏ thay đổi chưa lưu</button>}</div>
       {banner && (
         <div
           className={`health-banner ${banner.kind === "err" ? "danger" : "info"}`}
@@ -216,9 +232,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="settings-panels">
         {/* 1. AI Provider & Daily Cap (`06-ai-bridge.md §2, §6, §7`) */}
-        <div className="card">
+        <div className="settings-section" hidden={section!=="ai"}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <h3 style={{ marginTop: 0, marginBottom: 4 }}>
               1. Nhà cung cấp CLI AI & Trần hạn mức ngày
@@ -236,7 +252,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             AI bạn chọn để chấm khớp. ID tài khoản và đường dẫn bài không được gửi.
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.35fr 1.35fr 0.8fr", gap: 10 }}>
+          <div className="settings-fields settings-model-fields">
             <div className="field-group">
               <label className="field-label">CLI AI đang dùng</label>
               <select
@@ -248,7 +264,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   setCustomFastMode(false);
                   setCustomSmartMode(false);
                   const s = await api.aiSetProvider(p);
-                  setDraft(s);
+                  mergeSettings(s);
                   onSettingsUpdated(s);
                 }}
               >
@@ -305,7 +321,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     ))}
                   </optgroup>
                 )}
-                <option value="__custom__">✍️ Tự nhập tên model khác…</option>
+                <option value="__custom__">Tự nhập tên model khác…</option>
               </select>
               {showCustomFastInput ? (
                 <input
@@ -372,7 +388,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     ))}
                   </optgroup>
                 )}
-                <option value="__custom__">✍️ Tự nhập tên model khác…</option>
+                <option value="__custom__">Tự nhập tên model khác…</option>
               </select>
               {showCustomSmartInput ? (
                 <input
@@ -480,7 +496,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
 
         {/* 2. Telegram & Quiet Hours / Digest (`07-notifications-export.md §2–4`) */}
-        <div className="card">
+        <div className="settings-section" hidden={section!=="notifications"}>
           <h3 style={{ marginTop: 0 }}>2. Kênh Telegram, Chế độ gửi gộp & Giờ yên lặng</h3>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <input
@@ -519,9 +535,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 12 }}>
+          <div className="settings-fields">
             <div>
-              <label className="field-label">Chế độ báo mặc định</label>
+              <label className="field-label">Chế độ báo cho radar tạo mới</label>
               <select
                 className="select"
                 value={draft.default_notify_mode}
@@ -616,7 +632,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
           {/* Connected Channels List + Webhook (`07-notifications-export.md §6`) */}
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-            <strong>Các kênh nhận tin đang hoạt động ({channels.length}) & Webhook (P1):</strong>
+            <strong>Các kênh nhận tin đang hoạt động ({channels.length}) & Webhook:</strong>
             <ul style={{ paddingLeft: 18, margin: "8px 0" }}>
               {channels.map((ch) => (
                 <li key={ch.id} style={{ marginBottom: 4 }}>
@@ -636,7 +652,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               ))}
             </ul>
 
-            <div className="card" style={{ background: "var(--bg-subtle)", marginTop: 8 }}>
+            <div className="webhook-setup">
               <div style={{ fontWeight: 600, marginBottom: 6 }}>
                 Thêm kênh Webhook (Gói Chuyên nghiệp · Chỉ nhận https:// hoặc http://localhost)
               </div>
@@ -651,7 +667,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   máy tính tới địa chỉ máy chủ tôi cấu hình.
                 </span>
               </label>
-              <div style={{ display: "grid", gridTemplateColumns: "180px 1fr 200px auto", gap: 8 }}>
+              <div className="settings-webhook-fields">
                 <input
                   type="text"
                   className="input"
@@ -701,14 +717,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
 
         {/* 3. Crawl Policy & Active Hours (`02-extension.md §6.1`) */}
-        <div className="card">
+        <div className="settings-section" hidden={section!=="schedule"}>
           <h3 style={{ marginTop: 0 }}>3. Chính sách tần suất quét & Giờ hoạt động</h3>
           <p className="field-hint">
             Chặn cứng bất biến trong Extension: tối đa tuyệt đối 90 lần tải/giờ, 900 lần/ngày, tối
             thiểu 4 phút/group, tự dừng ngay khi phiên bất thường.
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 12 }}>
+          <div className="settings-fields">
             <div>
               <label className="field-label">Chu kỳ mỗi group (10–120 phút)</label>
               <input
@@ -801,7 +817,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 18, alignItems: "center", marginBottom: 10 }}>
+          <div className="settings-toggle-row">
             <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <input
                 type="checkbox"
@@ -840,14 +856,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
 
         {/* 4. License (`03-desktop.md §5`, `02-radar-spec.md §8`) */}
-        <div className="card">
+        <div className="settings-section" hidden={section!=="license"}>
           <h3 style={{ marginTop: 0 }}>4. Bản quyền & Giới hạn gói</h3>
           <div style={{ marginBottom: 10 }}>
             Gói hiện tại:{" "}
             <span className="badge badge-primary">
               {license.plan === "pro" ? "Chuyên nghiệp" : "Cá nhân"}
             </span>{" "}
-            — Giới hạn:{" "}
+            Giới hạn:{" "}
             <strong>
               {license.limits.max_active_radars === null
                 ? "Không giới hạn radar"
@@ -885,8 +901,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
 
         {/* 5. Data Retention, Backup, Purge & Delete All (`04-data-model.md §5`, `03-risks-compliance.md §3.3`) */}
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>5. Lưu giữ, Sao lưu & Xoá dữ liệu</h3>
+        <div className="settings-section" hidden={section!=="data"}>
+          <h3 style={{ marginTop: 0 }}>5. Lưu giữ, Sao lưu & Xoá dữ liệu</h3><BackupRestore/>
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
             <label className="field-label">
               Giữ nội dung bài không khớp (7–90 ngày, mặc định 30):
@@ -925,7 +941,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 setBanner({ kind: "ok", text: `Đã sao lưu cơ sở dữ liệu tới: ${res.path}` });
               }}
             >
-              💾 Sao lưu cơ sở dữ liệu ngay
+              Sao lưu cơ sở dữ liệu ngay
             </button>
 
             <button
@@ -939,7 +955,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 });
               }}
             >
-              🧹 Dọn bài hết hạn ngay
+              Dọn bài hết hạn ngay
             </button>
 
             <button
@@ -950,11 +966,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 setDeleteStep(1);
               }}
             >
-              🗑 Xoá toàn bộ dữ liệu…
+              Xoá toàn bộ dữ liệu…
             </button>
           </div>
         </div>
       </div>
+
+      </div></div>
 
       {/* Double-Confirmation Delete All Modal */}
       {deleteStep > 0 && (
@@ -999,7 +1017,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   className="btn btn-danger"
                   onClick={() => setDeleteStep(2)}
                 >
-                  Tôi hiểu, tiếp tục bước xác nhận cuối →
+                  Tôi hiểu, tiếp tục bước xác nhận cuối
                 </button>
               ) : (
                 <button

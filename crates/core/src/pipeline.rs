@@ -1012,7 +1012,7 @@ pub fn build_radar_prompt_context(
     let feedback_examples: Vec<FeedbackExample> = raw_examples
         .into_iter()
         .map(|fb| {
-            let is_positive = matches!(fb.label.as_str(), "correct" | "missed" | "wrong_fields");
+            let is_positive = fb.expected_match;
             let author_role = (fb.label == "peer").then_some(AiAuthorRole::Peer);
             let corrected_fields = fb.corrected_fields.map(|m| {
                 m.into_iter()
@@ -1843,6 +1843,7 @@ pub fn lead_detail_to_lead_dto(
         evaluation_id: detail.lead.evaluation_id.clone(),
         contact_id: detail.lead.contact_id.clone(),
         status: LeadStatus::from_db(&detail.lead.status),
+        read_at: detail.lead.read_at,
         score: detail.lead.score,
         is_weak_match: detail.lead.score < min_score,
         summary: detail.lead.summary.clone(),

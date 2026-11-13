@@ -134,6 +134,46 @@ Startup flags supported by the `dealsonar` binary:
 | `pnpm lint` | Run TypeScript typechecks (`extension` + `desktop-ui`), `cargo clippy -D warnings`, and `cargo fmt --check` |
 | `pnpm test` | Run all Extension tests, Desktop UI tests, protocol fixture checks, and `cargo test --workspace` |
 
+### GitHub Actions CI and releases
+
+`.github/workflows/ci.yml` runs on branch pushes, pull requests, and manual dispatch.
+It builds/typechecks both frontends, runs their Vitest suites and protocol fixture
+checks, then runs the Rust workspace tests on Linux, Windows, macOS Apple Silicon,
+and macOS Intel. Rust formatting and Clippy remain available through `pnpm lint`.
+
+Push a version tag to run the same CI gates and build a GitHub Release:
+
+```bash
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+Use `vMAJOR.MINOR.PATCH` or a SemVer prerelease such as `v0.3.0-rc.1`.
+Prerelease tags create a GitHub prerelease. Version components must fit Chrome's
+0–65535 range and cannot all be zero. The tag sets the desktop bundle version and
+the extension manifest version (`version_name` also retains any prerelease suffix).
+Source package versions are not changed by the workflow.
+
+Release downloads include:
+
+- `DealSonar-extension-<tag>.zip`: extract and **Load unpacked** in Chrome/Edge/Brave.
+- Windows x64: NSIS `.exe` installer.
+- Linux x64: `.deb` and `.AppImage`.
+- macOS Intel and Apple Silicon: separate `.dmg` installers.
+- `SHA256SUMS.txt`: SHA-256 checksums for all downloads.
+
+Each desktop installer includes `dealsonar-native-host` alongside the app binary.
+The release is published only after every CI gate and platform build succeeds;
+successful build jobs also retain their downloads as Actions artifacts for 7 days.
+Rerunning the same tag replaces the assets on its existing release.
+
+No signing secrets or certificates are required. Windows installers are unsigned;
+macOS bundles use a local ad-hoc signature (`signingIdentity: "-"`) for Apple Silicon
+compatibility, without an Apple Developer certificate or notarization. The OS may
+ask for approval before opening these downloads. The extension is an unpacked ZIP,
+not a signed CRX or a Chrome Web Store publication. Publishing uses only the
+automatic `GITHUB_TOKEN`, with `contents: write` restricted to the final publish job.
+
 ### Full Verification Checklist
 
 ```bash

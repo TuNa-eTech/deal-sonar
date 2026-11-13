@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useWorkspace } from "../lib/workspace";
+import { parseVietnameseNumber } from "../lib/fieldValues";
 import { api } from "../lib/api";
 import {
   formatExactTime,
@@ -51,12 +53,20 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
   refreshToken,
   onLeadChanged,
 }) => {
-  const [selectedRadarId, setSelectedRadarId] = useState<string>(radars[0]?.id ?? "");
+  const [selectedRadarId, setSelectedRadarId] = useWorkspace<string>("opportunity-radar", "");
   const [radarFields, setRadarFields] = useState<FieldDef[]>([]);
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
-  const [filterRows, setFilterRows] = useState<FilterDraftRow[]>([]);
+  const [search, setSearch] = useWorkspace("opportunity-search", "");
+  const [statusFilter, setStatusFilter] = useWorkspace<LeadStatus | "all">("opportunity-status", "all");
+  const [filterRows, setFilterRows] = useWorkspace<FilterDraftRow[]>("opportunity-filters",[]);
+  const [includeWeak,setIncludeWeak]=useWorkspace("opportunity-weak",false);
+  const [unread,setUnread]=useWorkspace("opportunity-unread",false);
+  const [hiddenColumns,setHiddenColumns]=useWorkspace<string[]>("opportunity-hidden-columns",[]);
+  const [selectedRows,setSelectedRows]=useState<string[]>([]);
+  const [error,setError]=useState<string|null>(null);
+  const [loading,setLoading]=useState(false);
+  const [pageHistory,setPageHistory]=useState<(string|null)[]>([]);
+  const seq=useRef(0);
   const [sortBy, setSortBy] = useState<string>("created_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [cursor, setCursor] = useState<string | null>(null);
@@ -70,22 +80,18 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
   const [exportMsg, setExportMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedRadarId && radars[0]) {
-      setSelectedRadarId(radars[0].id);
-    }
-  }, [radars, selectedRadarId]);
-
-  useEffect(() => {
     if (!selectedRadarId) {
       setRadarFields([]);
       return;
     }
+    let cancelled=false;
     void api.radarGet(selectedRadarId).then((detail) => {
+      if(cancelled)return;
       const sorted = [...detail.current_version_data.fields].sort((a, b) => a.order - b.order);
       setRadarFields(sorted);
-      setFilterRows([]);
       setCursor(null);
-    });
+    }).catch(e=>setError(String(e)));
+    return()=>{cancelled=true;};
   }, [selectedRadarId]);
 
   const buildFilterQuery = useCallback(
@@ -104,7 +110,7 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
             return {
               field: row.field,
               op: "between",
-              value: [Number(row.rawInput) || 0, Number(row.rawInputMax) || 0],
+              value: (()=>{const a=parseVietnameseNumber(row.rawInput),b=parseVietnameseNumber(row.rawInputMax);if(a>b)throw new Error("Khoảng lọc: giá trị từ không được lớn hơn giá trị đến.");return [a,b];})(),
             };
           }
           if (row.op === "in") {
@@ -123,9 +129,9 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
               row.op === "lt" ||
               row.op === "gte" ||
               row.op === "gt" ||
-              row.op === "eq")
+              row.op === "eq" || row.op === "ne")
           ) {
-            return { field: row.field, op: row.op, value: Number(row.rawInput) };
+            return { field: row.field, op: row.op, value: parseVietnameseNumber(row.rawInput) };
           }
           return { field: row.field, op: row.op, value: row.rawInput.trim() };
         });
@@ -133,7 +139,7 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
       return {
         radar_id: selectedRadarId || null,
         status: statusFilter === "all" ? undefined : [statusFilter],
-        include_weak: true,
+        include_weak: includeWeak, unread_only:unread,
         filters: dynamicFilters,
         search: search.trim() || null,
         sort: { by: sortBy, dir: sortDir },
@@ -141,24 +147,23 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
         cursor: pageCursor,
       };
     },
-    [selectedRadarId, statusFilter, filterRows, radarFields, search, sortBy, sortDir]
+    [selectedRadarId, statusFilter, filterRows, radarFields, search, sortBy, sortDir,includeWeak,unread]
   );
 
   const loadTable = useCallback(async () => {
-    if (!selectedRadarId) {
-      setLeads([]);
-      setTotal(0);
-      return;
-    }
-    const res = await api.leadList(buildFilterQuery(cursor));
-    setLeads(res.items);
-    setTotal(res.total);
-    setNextCursor(res.next_cursor);
-  }, [selectedRadarId, buildFilterQuery, cursor]);
+    const request=++seq.current;setLoading(true);setError(null);
+    try {
+      const res=await api.leadList(buildFilterQuery(cursor));
+      if(request!==seq.current)return;
+      setLeads(res.items);setTotal(res.total);setNextCursor(res.next_cursor);setSelectedRows([]);
+    } catch(e){if(request===seq.current)setError(String(e));} finally {if(request===seq.current)setLoading(false);}
+  }, [buildFilterQuery,cursor]);
 
   useEffect(() => {
     void loadTable();
+    return()=>{seq.current++;};
   }, [loadTable, refreshToken]);
+  useEffect(()=>{setCursor(null);setPageHistory([]);},[selectedRadarId,statusFilter,filterRows,search,includeWeak,unread]);
 
   const toggleSort = (col: string) => {
     setCursor(null);
@@ -198,16 +203,16 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
   };
 
   return (
-    <div>
+    <div className="lead-table-workspace">
       <div className="screen-header">
         <div>
-          <h1 className="screen-title">Bảng tin (CRM Động)</h1>
+          <h1 className="screen-title">Cơ hội: Bảng tin</h1>
           <p className="screen-subtitle">
-            Cột tự động hiển thị theo các trường của Radar đang chọn · Lọc sâu & Xuất CSV / XLSX
+            Cột tự động hiển thị theo các trường của Radar đang chọn. Lọc sâu và xuất CSV / XLSX
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div className="screen-actions export-actions">
           <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5 }}>
             <input
               type="checkbox"
@@ -216,8 +221,8 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
             />
             <span>Kèm nội dung bài gốc</span>
           </label>
-          <button type="button" className="btn" onClick={() => void handleExport("csv")}>
-            ⬇ Xuất CSV
+          <button type="button" className="btn" onClick={() => void handleExport("csv").catch(e=>setError(String(e)))}>
+            Xuất CSV
           </button>
           <button
             type="button"
@@ -227,13 +232,17 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
                 ? "Xuất Excel XLSX"
                 : "Xuất XLSX (Gói Chuyên nghiệp)"
             }
-            onClick={() => void handleExport("xlsx")}
+            disabled={!license.limits.allow_xlsx_export}
+            onClick={() => void handleExport("xlsx").catch(e=>setError(String(e)))}
           >
-            ⬇ Xuất XLSX
+            Xuất XLSX
           </button>
         </div>
       </div>
 
+      {error&&<div className="health-banner danger" role="alert">{error}<button className="btn" onClick={()=>void loadTable()}>Thử lại</button></div>}
+      <div className="toolbar-row table-options"><label><input type="checkbox" checked={includeWeak} onChange={e=>setIncludeWeak(e.target.checked)}/> Bao gồm cơ hội cần xem thêm</label><label><input type="checkbox" checked={unread} onChange={e=>setUnread(e.target.checked)}/> Chỉ chưa đọc</label><details><summary>Cột hiển thị</summary>{radarFields.map(f=><label key={f.key}><input type="checkbox" checked={!hiddenColumns.includes(f.key)} onChange={e=>setHiddenColumns(xs=>e.target.checked?xs.filter(k=>k!==f.key):[...xs,f.key])}/>{f.label}</label>)}</details><button className="btn btn-sm" onClick={()=>{setSearch("");setStatusFilter("all");setFilterRows([]);setUnread(false);}}>Xoá bộ lọc</button></div>
+      {selectedRows.length>0&&<div className="bulk-actions"><strong>Đã chọn {selectedRows.length} cơ hội</strong><button className="btn" disabled={loading} onClick={()=>{setLoading(true);void Promise.all(selectedRows.map(id=>api.leadSetStatus(id,"contacted"))).then(()=>{onLeadChanged();return loadTable();}).catch(e=>setError(String(e))).finally(()=>setLoading(false));}}>Đánh dấu đã liên hệ</button><button className="btn" onClick={()=>setSelectedRows([])}>Bỏ chọn</button></div>}
       {exportMsg && (
         <div className="health-banner info" style={{ borderRadius: 6, marginBottom: 12 }}>
           <span>{exportMsg}</span>
@@ -241,14 +250,15 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
       )}
 
       {/* Primary Toolbar */}
-      <div className="toolbar-row">
+      <div className="toolbar-row table-filters">
         <select
           aria-label="Chọn Radar cho Bảng tin"
           className="select"
-          style={{ width: 260 }}
+          
           value={selectedRadarId}
           onChange={(e) => setSelectedRadarId(e.target.value)}
         >
+          <option value="">Tất cả radar</option>
           {radars.map((r) => (
             <option key={r.id} value={r.id}>
               Radar: {r.name}
@@ -259,7 +269,7 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
         <select
           aria-label="Trạng thái bảng tin"
           className="select"
-          style={{ width: 185 }}
+          
           value={statusFilter}
           onChange={(e) => {
             setCursor(null);
@@ -267,7 +277,7 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
           }}
         >
           <option value="all">Mọi trạng thái</option>
-          {(Object.keys(LEAD_STATUS_LABELS) as LeadStatus[]).map((st) => (
+          {(Object.keys(LEAD_STATUS_LABELS) as LeadStatus[]).filter(st=>st!=="viewed").map((st) => (
             <option key={st} value={st}>
               {LEAD_STATUS_LABELS[st]}
             </option>
@@ -278,7 +288,7 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
           type="search"
           aria-label="Tìm toàn văn trên Bảng tin"
           className="input"
-          style={{ width: 260 }}
+          
           placeholder="Tìm toàn văn nội dung & tóm tắt…"
           value={search}
           onChange={(e) => {
@@ -396,20 +406,23 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
       )}
 
       {/* Dynamic Columns Table */}
-      <div className="table-wrap">
+      <div className="table-wrap lead-table-scroll" aria-busy={loading}>
         <table className="crm-table" data-testid="dynamic-lead-table">
           <thead>
             <tr>
-              <th className="sortable" onClick={() => toggleSort("created_at")}>
+              <th>Chọn</th>
+              <th tabIndex={0} onKeyDown={e=>{if(e.key==="Enter")toggleSort("created_at");}} className="sortable" onClick={() => toggleSort("created_at")}>
                 Thời gian {sortBy === "created_at" ? (sortDir === "asc" ? "↑" : "↓") : ""}
               </th>
-              <th className="sortable" onClick={() => toggleSort("score")}>
+              <th tabIndex={0} onKeyDown={e=>{if(e.key==="Enter")toggleSort("score");}} className="sortable" onClick={() => toggleSort("score")}>
                 Điểm {sortBy === "score" ? (sortDir === "asc" ? "↑" : "↓") : ""}
               </th>
               <th>Trạng thái</th>
-              {radarFields.map((fd) => (
+              {radarFields.filter(f=>!hiddenColumns.includes(f.key)).map((fd) => (
                 <th
                   key={fd.key}
+                  tabIndex={0}
+                  onKeyDown={e=>{if(e.key==="Enter")toggleSort(fd.key);}}
                   className="sortable"
                   onClick={() => toggleSort(fd.key)}
                 >
@@ -425,8 +438,11 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
               <tr
                 key={lead.id}
                 style={{ cursor: "pointer" }}
+                tabIndex={0}
+                onKeyDown={e=>{if(e.key==="Enter")setActiveLeadId(lead.id);}}
                 onClick={() => setActiveLeadId(lead.id)}
               >
+                <td onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={`Chọn ${lead.summary}`} checked={selectedRows.includes(lead.id)} onChange={e=>setSelectedRows(xs=>e.target.checked?[...xs,lead.id]:xs.filter(id=>id!==lead.id))}/></td>
                 <td style={{ whiteSpace: "nowrap" }}>{formatExactTime(lead.post_created_at)}</td>
                 <td>
                   <span className={`badge ${lead.is_weak_match ? "badge-warning" : "badge-success"}`}>
@@ -436,7 +452,7 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
                 <td>
                   <span className="badge">{LEAD_STATUS_LABELS[lead.status]}</span>
                 </td>
-                {radarFields.map((fd) => (
+                {radarFields.filter(f=>!hiddenColumns.includes(f.key)).map((fd) => (
                   <td key={fd.key}>{formatExtractedFieldValue(fd, lead.fields[fd.key])}</td>
                 ))}
                 <td style={{ maxWidth: 280 }}>{lead.summary}</td>
@@ -458,22 +474,22 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
       </div>
 
       {/* Pagination */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
+      <div className="pagination table-pagination">
         <button
           type="button"
           className="btn btn-sm"
-          disabled={!cursor}
-          onClick={() => setCursor(null)}
+          disabled={!pageHistory.length}
+          onClick={() => {setCursor(pageHistory[pageHistory.length-1]??null);setPageHistory(xs=>xs.slice(0,-1));}}
         >
-          ← Về trang đầu
+          Trang trước
         </button>
         <button
           type="button"
           className="btn btn-sm"
           disabled={!nextCursor}
-          onClick={() => setCursor(nextCursor)}
+          onClick={() => {setPageHistory(xs=>[...xs,cursor]);setCursor(nextCursor);}}
         >
-          Trang tiếp theo →
+          Trang tiếp theo
         </button>
       </div>
 
@@ -483,6 +499,7 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
           <div className="modal-panel" style={{ maxWidth: 820 }}>
             <div className="modal-body">
               <LeadDetailPanel
+                key={activeLeadId}
                 leadId={activeLeadId}
                 onClose={() => setActiveLeadId(null)}
                 onUpdated={() => {

@@ -1,4 +1,5 @@
 pub mod contacts;
+pub mod field_values;
 pub mod leads;
 pub mod models;
 pub mod ops;
@@ -28,14 +29,26 @@ pub struct Migration {
 }
 
 /// Canonical migrations shipped with this binary.
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "0001_init",
-    sql: include_str!("../migrations/0001_init.sql"),
-}];
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "0001_init",
+        sql: include_str!("../migrations/0001_init.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "0002_durable_feedback",
+        sql: include_str!("../migrations/0002_durable_feedback.sql"),
+    },
+    Migration {
+        version: 3,
+        name: "0003_workflow",
+        sql: include_str!("../migrations/0003_workflow.sql"),
+    },
+];
 
 /// Latest schema version supported by this binary.
-pub const LATEST_SCHEMA_VERSION: i32 = 1;
+pub const LATEST_SCHEMA_VERSION: i32 = 3;
 
 /// Maximum number of pre-migration automatic backups retained in `backups/`.
 pub const MAX_PRE_MIGRATION_BACKUPS: usize = 5;
@@ -157,6 +170,51 @@ impl Store {
 
     pub(crate) fn lock_conn(&self) -> Result<MutexGuard<'_, Connection>, StoreError> {
         self.inner.conn.lock().map_err(|_| StoreError::LockPoisoned)
+    }
+
+    /// Validate and freeze an external backup before scheduling offline restoration.
+    pub fn stage_restore(source: &Path, data_dir: &Path) -> Result<(), StoreError> {
+        let source =
+            Connection::open_with_flags(source, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        validate_restore_connection(&source)?;
+        let temporary = data_dir.join("restore-staging.sqlite3");
+        backup_connection_to_path(&source, &temporary)?;
+        fs::rename(temporary, data_dir.join("restore-pending.sqlite3"))?;
+        Ok(())
+    }
+
+    /// Called before opening the live store or starting workers. Preserve a recovery backup.
+    pub fn apply_pending_restore(db: &Path, backups: &Path) -> Result<(), StoreError> {
+        let pending = db
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join("restore-pending.sqlite3");
+        if !pending.exists() {
+            return Ok(());
+        }
+        let source =
+            Connection::open_with_flags(&pending, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        validate_restore_connection(&source)?;
+        if db.exists() {
+            let live = Connection::open(db)?;
+            fs::create_dir_all(backups)?;
+            backup_connection_to_path(
+                &live,
+                &backups.join(format!("before-restore-{}.sqlite3", now_ms())),
+            )?;
+        }
+        backup_connection_to_path(&source, db)?;
+        // Never replay a historical backup's outbound queue with current keychain credentials.
+        let restored = Connection::open(db)?;
+        restored.execute(
+            "UPDATE outbox SET state='dropped' WHERE state IN ('pending','failed')",
+            [],
+        )?;
+        restored.execute("UPDATE channels SET state='error'", [])?;
+        drop(restored);
+        drop(source);
+        fs::remove_file(pending)?;
+        Ok(())
     }
 
     /// Return applied migrations ordered by version.
@@ -321,6 +379,7 @@ impl Store {
 
         // Delete in reverse foreign-key order for cleanliness.
         for table in [
+            "follow_up_deliveries",
             "jobs",
             "outbox",
             "blocklist",
@@ -593,6 +652,44 @@ fn backup_connection_to_path(src: &Connection, dest_path: &Path) -> Result<(), S
     {
         let backup = Backup::new(src, &mut dst)?;
         backup.run_to_completion(256, Duration::from_millis(10), None)?;
+    }
+    Ok(())
+}
+
+fn validate_restore_connection(conn: &Connection) -> Result<(), StoreError> {
+    let check: String = conn.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
+    if check != "ok" {
+        return Err(StoreError::InvalidArgument(
+            "Bản sao lưu không toàn vẹn".into(),
+        ));
+    }
+    let version: i32 = conn.query_row("SELECT MAX(version) FROM schema_migrations", [], |r| {
+        r.get(0)
+    })?;
+    if !(1..=LATEST_SCHEMA_VERSION).contains(&version) {
+        return Err(StoreError::InvalidArgument(
+            "Phiên bản bản sao lưu không tương thích".into(),
+        ));
+    }
+    for table in [
+        "radars",
+        "radar_versions",
+        "leads",
+        "posts",
+        "sources",
+        "settings",
+        "channels",
+    ] {
+        conn.prepare(&format!("SELECT * FROM {table} LIMIT 0"))?;
+    }
+    let violations: i64 =
+        conn.query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |r| {
+            r.get(0)
+        })?;
+    if violations > 0 {
+        return Err(StoreError::InvalidArgument(
+            "Bản sao lưu có liên kết dữ liệu không hợp lệ".into(),
+        ));
     }
     Ok(())
 }

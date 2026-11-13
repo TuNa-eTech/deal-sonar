@@ -146,11 +146,14 @@ async function emitSessionStatusDirect(
   sessionState: SessionState,
   detail?: string,
 ): Promise<void> {
-  const payload: { platform: "facebook"; state: SessionState; detail?: string } = {
-    platform: "facebook",
+  const local = await storage.read();
+  const payload = {
+    runtime: {automatic_scanning:local.automatic_scanning,paused:local.pause.paused,next_crawl_at:local.automatic_scanning?getNextScheduledTimestamp(local,Date.now()):null,last_crawl_at:local.last_crawl_at},
+    ...(detail ? {detail} : {}),
+    platform: "facebook" as const,
     state: sessionState,
   };
-  if (detail) payload.detail = detail;
+
   postOverNativePort(createEnvelope("session.status", payload));
 }
 
@@ -163,6 +166,7 @@ function abortActiveCrawlIfRunning(): void {
 function startIdlePingLoop(): void {
   if (pingIntervalId !== null) clearInterval(pingIntervalId);
   pingIntervalId = setInterval(() => {
+    if (nativePort) void storage.read().then(s=>emitSessionStatusDirect(s.session.state, s.session.detail));
     if (!nativePort) return;
     const now = Date.now();
     if (now - lastPortTrafficAt >= PING_IDLE_INTERVAL_MS) {
@@ -1169,6 +1173,7 @@ async function handleRuntimeMessage(
       if (typeof msg.enabled !== "boolean") throw new Error("Chế độ quét không hợp lệ");
       const state = await storage.update((s) => { s.automatic_scanning = msg.enabled; return s; });
       await syncSchedulerAlarm(state, now);
+      await emitSessionStatusDirect(state.session.state, state.session.detail);
       return buildPopupStatus(now);
     }
 

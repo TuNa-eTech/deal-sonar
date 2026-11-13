@@ -73,7 +73,7 @@ const TEMPLATES: RadarTemplate[] = [
 let ulidSeq = 1000;
 function nextId(prefix = "01JCF"): string {
   ulidSeq += 1;
-  return `${prefix}${String(ulidSeq).padStart(21, "0")}`.slice(0, 26);
+  return `${prefix}${String(ulidSeq).padStart(26-prefix.length, "0")}`;
 }
 
 type EventListenerFn<K extends keyof TauriEventMap> = (payload: TauriEventMap[K]) => void;
@@ -925,6 +925,7 @@ function createInitialState(): MockState {
       limits: buildPlanLimits("personal"),
     },
     health: {
+      automatic_scanning: true, next_crawl_at: now + 300000, last_crawl_at: now - 60000, runtime_checked_at: now,
       extension_connected: true,
       extension_version: "0.1.0",
       facebook_session: "ok",
@@ -1753,8 +1754,8 @@ export async function invokeMockCommand<T>(
         effectiveFields
       );
       const previewId = nextId("01JCFD");
-      const firstBatch = allItems.slice(0, 2);
-      const secondBatch = allItems.slice(2);
+      const firstBatch: PreviewItem[] = [];
+      const secondBatch = allItems;
 
       const initialState: PreviewRunState = {
         preview_id: previewId,
@@ -1772,6 +1773,7 @@ export async function invokeMockCommand<T>(
 
       if (secondBatch.length > 0) {
         setTimeout(() => {
+          if (state.previews[input.radar_id]?.preview_id !== previewId || state.previews[input.radar_id]?.status !== "evaluating") return;
           const warnings = buildPreviewWarnings(effectiveFields, allItems);
           const completed: PreviewRunState = {
             ...initialState,
@@ -1796,6 +1798,15 @@ export async function invokeMockCommand<T>(
       return structuredClone(initialState) as T;
     }
 
+    case "radar_preview_cancel": {
+      const preview = state.previews[String(args.radar_id)];
+      if (!preview || preview.preview_id !== args.preview_id) throw new Error("Không tìm thấy phiên xem thử.");
+      if (preview.status === "evaluating" || preview.status === "crawling") {
+        preview.status = "error";
+        preview.error = "Đã dừng xem thử.";
+      }
+      return structuredClone(preview) as T;
+    }
     case "radar_preview_get": {
       const radarId = String(args.radar_id ?? "");
       const existing = state.previews[radarId];
@@ -1897,6 +1908,8 @@ export async function invokeMockCommand<T>(
     case "lead_list": {
       const query = (args.query ?? args) as LeadFilterQuery;
       let items = [...state.leads];
+      if (query.unread_only) items = items.filter(l=>!l.read_at && l.status!=="viewed");
+      if (query.follow_up_before!=null) items=items.filter(l=>l.follow_up_at!=null && l.follow_up_at<=query.follow_up_before! && !["won","lost","ignored"].includes(l.status));
 
       if (query.radar_id) {
         // Validate dynamic filter keys against radar fields (mirroring 04-data-model.md §3)
@@ -1971,6 +1984,12 @@ export async function invokeMockCommand<T>(
       return resp as T;
     }
 
+    case "lead_mark_read": {
+      const lead=state.leads.find(l=>l.id===args.id);
+      if (!lead) throw new Error("Không tìm thấy tin");
+      lead.read_at ??= Date.now();
+      return invokeMockCommand<T>("lead_get", {id:lead.id});
+    }
     case "lead_get": {
       const id = String(args.id ?? "");
       const lead = state.leads.find((l) => l.id === id);
@@ -2610,6 +2629,19 @@ export async function invokeMockCommand<T>(
       } as T;
 
     // --- Data Lifecycle ---
+    case "workspace_action": {
+      const input=(args.input??{}) as Record<string,unknown>;
+      if(args.action==="backups")return {paths:["/mock/backups/dealsonar.sqlite3"],pending:false} as T;
+      if(args.action==="restore"){if(input.confirm!=="KHOI PHUC")throw new Error("Nhập KHOI PHUC để xác nhận");return {restart_required:true} as T;}
+      if(args.action==="restore_cancel")return {cancelled:true} as T;
+      if(args.action==="rollback"){
+        const d=getRadarDetail(String(input.radar_id));
+        if(d.radar.current_version!==input.expected_version)throw new Error("Radar đã thay đổi");
+        const v=d.versions.find(v=>v.version===input.version);if(!v)throw new Error("Phiên bản không tồn tại");
+        const result=await invokeMockCommand<RadarUpdateResult>("radar_update",{input:{id:d.radar.id,description:v.description,user_profession:v.user_profession,fields:v.fields,match_policy:v.match_policy,confirm_version_upgrade:true}});return result.detail as T;
+      }
+      throw new Error("Thao tác không được hỗ trợ");
+    }
     case "data_backup":
       return {
         path: `~/Library/Application Support/DealSonar/backups/dealsonar-manual-${Date.now()}.db`,

@@ -63,7 +63,7 @@ pub struct CoreConfig {
     pub batch_trigger_count: usize,
     /// Maximum wait time (`45_000ms` per `05-pipeline-rules.md §7`) before running a partial T5 batch.
     pub batch_max_wait_ms: i64,
-    /// Preview batch size (`10` per `05-pipeline-rules.md §10`).
+    /// Preview batch size (default `3` for faster first results; independently configurable).
     pub preview_batch_size: usize,
     /// Max stored posts evaluated in `radar_preview_start` (`50` per `02-radar-spec.md §5`).
     pub preview_max_posts: usize,
@@ -129,7 +129,7 @@ impl Default for CoreConfig {
             logs_dir,
             batch_trigger_count: 20,
             batch_max_wait_ms: 45_000,
-            preview_batch_size: 10,
+            preview_batch_size: 3,
             preview_max_posts: 50,
             preview_min_posts_before_crawl: 20,
             shadow_min_posts: 200,
@@ -198,6 +198,7 @@ pub struct ConnectedProfile {
     pub ext_version: String,
     pub browser: String,
     pub connected_at: i64,
+    pub crawl_runtime: Option<(i64, dealsonar_protocol::CrawlRuntimeStatus)>,
     pub tx: mpsc::UnboundedSender<Envelope>,
 }
 
@@ -339,6 +340,7 @@ pub struct CoreRuntime {
     pub ai_health: Mutex<AiRuntimeHealth>,
     pub incidents: Mutex<IncidentTracker>,
     pub previews: Mutex<HashMap<String, PreviewRunState>>,
+    pub preview_cancellations: Mutex<HashMap<String, watch::Sender<bool>>>,
     pub latest_preview_by_radar: Mutex<HashMap<String, String>>,
     pub last_emitted_health: Mutex<Option<HealthStatus>>,
     pub outbox_tracker: Mutex<BTreeMap<String, OutboxTrackerEntry>>,
@@ -462,6 +464,29 @@ impl CoreRuntime {
             )
         };
 
+        let (automatic_scanning, extension_paused, next_crawl_at, runtime_checked_at) = {
+            let guard = self.ipc_hub.state.lock().expect("ipc state lock");
+            let reports: Vec<_> = guard
+                .connections
+                .values()
+                .filter_map(|c| c.crawl_runtime.as_ref())
+                .filter(|(at, _)| now.saturating_sub(*at) < 90_000)
+                .collect();
+            let complete =
+                !guard.connections.is_empty() && reports.len() == guard.connections.len();
+            (
+                if complete {
+                    Some(reports.iter().any(|(_, s)| s.automatic_scanning))
+                } else {
+                    None
+                },
+                reports.iter().any(|(_, s)| s.paused),
+                reports.iter().filter_map(|(_, s)| s.next_crawl_at).min(),
+                reports.iter().map(|(at, _)| *at).min(),
+            )
+        };
+        let crawl_paused = crawl_paused || extension_paused;
+
         // Page loads in last hour and today from `crawl_runs`
         let runs = self.store.crawl_run_list(None, 500)?;
         let one_hour_ago = now.saturating_sub(3_600_000);
@@ -562,6 +587,14 @@ impl CoreRuntime {
         }
 
         Ok(HealthStatus {
+            automatic_scanning,
+            next_crawl_at,
+            runtime_checked_at,
+            last_crawl_at: runs
+                .iter()
+                .filter(|r| r.status == "ok" || r.status == "empty")
+                .filter_map(|r| r.ended_at)
+                .max(),
             extension_connected: ext_connected,
             extension_version: ext_version,
             facebook_session: fb_session,

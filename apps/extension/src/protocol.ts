@@ -267,6 +267,7 @@ export type SourcesDiscoveredPayload = {
 };
 
 export type SessionStatusPayload = {
+  runtime?: { automatic_scanning:boolean; paused:boolean; next_crawl_at:number|null; last_crawl_at:number|null };
   platform: Platform;
   state: SessionState;
   detail?: string;

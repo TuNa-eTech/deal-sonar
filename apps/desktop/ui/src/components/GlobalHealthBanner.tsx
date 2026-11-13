@@ -6,6 +6,7 @@ import { openSafeSetupUrl } from "../lib/security";
 interface GlobalHealthBannerProps {
   health: HealthStatus | null;
   onRetryConnect: () => void;
+  onRetryAi: () => void;
   onResumeCrawl: () => void;
   onOpenRadars: () => void;
 }
@@ -13,6 +14,7 @@ interface GlobalHealthBannerProps {
 export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
   health,
   onRetryConnect,
+  onRetryAi,
   onResumeCrawl,
   onOpenRadars,
 }) => {
@@ -106,7 +108,7 @@ export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
           <strong>{health.pending_ai_posts.toLocaleString("vi-VN")} bài</strong> đang xếp hàng chờ
           và sẽ tự động xử lý khi AI sẵn sàng trở lại{etaText}.
         </div>
-        <button type="button" className="btn btn-sm" onClick={onRetryConnect}>
+        <button type="button" className="btn btn-sm" onClick={onRetryAi}>
           Kiểm tra AI
         </button>
       </div>
@@ -131,6 +133,7 @@ export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
     );
   }
 
+  if (health.extension_connected && health.facebook_session==="ok" && (health.automatic_scanning!==true || health.crawl_paused) && !hasFbIssue) banners.push(<div key="operation" className="health-banner info" role="status"><span>{health.crawl_paused?"Thu thập đang tạm dừng.":health.automatic_scanning===false?"Chỉ quét thủ công. Bật Quét tự động trong tiện ích Chrome để nhận bài theo lịch.":"Chưa xác nhận chế độ quét. Mở tiện ích Chrome để đồng bộ trạng thái."}</span></div>);
   if (banners.length === 0) return null;
 
   return <div className="health-banner-stack">{banners}</div>;

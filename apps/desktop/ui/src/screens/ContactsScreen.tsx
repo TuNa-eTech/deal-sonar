@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
+import {LeadDetailPanel} from "../components/LeadDetailPanel";
+import {offerUndo} from "../components/UndoCenter";
 import { api } from "../lib/api";
 import { formatDomesticPhone, formatRelativeTime } from "../lib/format";
 import type {
@@ -14,6 +16,7 @@ interface ContactsScreenProps {
 }
 
 export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
+  const [leadId,setLeadId]=useState<string|null>(null);
   const [tab, setTab] = useState<"contacts" | "blocklist">("contacts");
 
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -59,7 +62,10 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
   };
 
   const handleBlockContact = async (c: Contact) => {
-    await api.contactBlock(c.id, "Chặn từ màn Danh bạ");
+    const before=new Set((await api.blocklistList()).map(b=>b.id));
+    const result=await api.contactBlock(c.id, "Chặn từ màn Danh bạ");
+    const added=result.blocked_entries.filter(b=>!before.has(b.id));
+    if(added.length)offerUndo(`Đã chặn ${c.display_name}`,async()=>{for(const b of added)await api.blocklistRemove(b.id);await loadContacts();await loadBlocklist();});
     await loadContacts();
     await loadBlocklist();
     if (selectedContact?.contact.id === c.id) {
@@ -70,12 +76,14 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
 
   const handleAddBlocklist = async () => {
     if (!newBlockVal.trim()) return;
-    await api.blocklistAdd(
+    const existing=new Set((await api.blocklistList()).map(b=>b.id));
+    const added=await api.blocklistAdd(
       newBlockKind,
       newBlockVal.trim(),
       newBlockReason.trim() || null,
       newBlockRadarId || null
     );
+    if(!existing.has(added.id))offerUndo("Đã thêm mục chặn",async()=>{await api.blocklistRemove(added.id);await loadBlocklist();await loadContacts();});
     setNewBlockVal("");
     setNewBlockReason("");
     await loadBlocklist();
@@ -83,19 +91,20 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
   };
 
   return (
-    <div>
+    <div className="contacts-workspace">
       <div className="screen-header">
         <div>
           <h1 className="screen-title">Danh bạ & Danh sách chặn</h1>
           <p className="screen-subtitle">
-            Gộp người đăng theo số điện thoại chuẩn hoá E.164 · Quản lý chặn tác giả, SĐT và từ khoá
+            Gộp người đăng theo số điện thoại chuẩn hoá E.164. Quản lý chặn tác giả, SĐT và từ khoá
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 6 }}>
+        <div className="contact-tabs" aria-label="Danh sách liên hệ">
           <button
             type="button"
             className={`btn ${tab === "contacts" ? "btn-primary" : ""}`}
+            aria-pressed={tab === "contacts"}
             onClick={() => setTab("contacts")}
           >
             Danh bạ liên hệ ({contacts.length})
@@ -103,6 +112,7 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
           <button
             type="button"
             className={`btn ${tab === "blocklist" ? "btn-primary" : ""}`}
+            aria-pressed={tab === "blocklist"}
             onClick={() => setTab("blocklist")}
           >
             Danh sách chặn ({blocklist.length})
@@ -110,6 +120,7 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
         </div>
       </div>
 
+      {leadId&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Cơ hội của liên hệ"><div className="modal-panel"><div className="modal-body"><LeadDetailPanel key={leadId} leadId={leadId} onClose={()=>setLeadId(null)} onUpdated={()=>void loadContacts()}/></div></div></div>}
       {statusMsg && (
         <div className="health-banner info" style={{ borderRadius: 6, marginBottom: 12 }}>
           <span>{statusMsg}</span>
@@ -117,12 +128,13 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
       )}
 
       {tab === "contacts" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 14 }}>
+        <div className="contacts-split">
           <div>
             <div className="toolbar-row">
               <input
                 type="search"
                 className="input"
+                aria-label="Tìm liên hệ"
                 placeholder="Tìm theo tên, số điện thoại, ghi chú…"
                 value={contactSearch}
                 onChange={(e) => setContactSearch(e.target.value)}
@@ -134,7 +146,7 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
                 <thead>
                   <tr>
                     <th>Tên hiển thị</th>
-                    <th>Số điện thoại (E.164 → Quốc nội)</th>
+                    <th>Số điện thoại (quốc nội)</th>
                     <th>Số tin</th>
                     <th>Thao tác</th>
                   </tr>
@@ -143,6 +155,9 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
                   {contacts.map((c) => (
                     <tr
                       key={c.id}
+                      className={selectedContact?.contact.id === c.id ? "contact-selected" : ""}
+                      tabIndex={0}
+                      onKeyDown={e => {if(e.key === "Enter") void openContact(c.id);}}
                       style={{ cursor: "pointer" }}
                       onClick={() => void openContact(c.id)}
                     >
@@ -184,7 +199,7 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
             </div>
           </div>
 
-          <div className="card">
+          <div className="contact-detail">
             {selectedContact ? (
               <div>
                 <h3 style={{ marginTop: 0 }}>{selectedContact.contact.display_name}</h3>
@@ -195,8 +210,9 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
                 </div>
 
                 <div className="field-group">
-                  <label className="field-label">Ghi chú liên hệ</label>
+                  <label className="field-label" htmlFor="contact-note">Ghi chú liên hệ</label>
                   <textarea
+                    id="contact-note"
                     className="textarea"
                     value={noteDraft}
                     onChange={(e) => setNoteDraft(e.target.value)}
@@ -213,27 +229,26 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
                 </div>
 
                 <strong>Lịch sử tin khớp ({selectedContact.leads.length}):</strong>
-                <ul style={{ paddingLeft: 18, marginTop: 6 }}>
+                <ul className="contact-history">
                   {selectedContact.leads.map((l) => (
                     <li key={l.id} style={{ marginBottom: 6 }}>
-                      <strong>[{l.radar_name}]</strong> {l.summary} (
-                      {formatRelativeTime(l.created_at)})
+                      <button className="contact-history-link" onClick={()=>setLeadId(l.id)}><span>{l.radar_name}</span><strong>{l.summary}</strong><small>{formatRelativeTime(l.created_at)}</small></button>
                     </li>
                   ))}
                 </ul>
               </div>
             ) : (
-              <div className="text-muted">Chọn một liên hệ bên trái để xem lịch sử tin và ghi chú.</div>
+              <div className="text-muted contact-empty">Chọn một liên hệ bên trái để xem lịch sử tin và ghi chú.</div>
             )}
           </div>
         </div>
       ) : (
         <div>
-          <div className="card" style={{ marginBottom: 14 }}>
+          <div className="blocklist-editor">
             <strong style={{ display: "block", marginBottom: 8 }}>
               Thêm mục chặn mới (Loại ngay ở tầng lọc sơ bộ T3, không gọi AI)
             </strong>
-            <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr 190px auto", gap: 8 }}>
+            <div className="blocklist-fields">
               <select
                 aria-label="Loại mục chặn"
                 className="select"
@@ -247,6 +262,7 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
               <input
                 type="text"
                 className="input"
+                aria-label="Giá trị chặn"
                 placeholder="ID/tên tác giả, +84912..., hoặc cụm từ khoá"
                 value={newBlockVal}
                 onChange={(e) => setNewBlockVal(e.target.value)}
@@ -254,6 +270,7 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
               <input
                 type="text"
                 className="input"
+                aria-label="Lý do chặn"
                 placeholder="Lý do chặn (tuỳ chọn)"
                 value={newBlockReason}
                 onChange={(e) => setNewBlockReason(e.target.value)}
@@ -321,6 +338,8 @@ export const ContactsScreen: React.FC<ContactsScreenProps> = ({ radars }) => {
                         className="btn btn-sm"
                         onClick={async () => {
                           await api.blocklistRemove(b.id);
+                          offerUndo("Đã bỏ chặn",async()=>{await api.blocklistAdd(b.kind,b.value,b.reason,b.radar_id);await loadBlocklist();await loadContacts();});
+                          await loadContacts();
                           await loadBlocklist();
                         }}
                       >

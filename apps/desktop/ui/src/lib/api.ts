@@ -81,6 +81,7 @@ export async function onDesktopEvent<K extends keyof TauriEventMap>(
  * Complete typed Tauri IPC client matching `03-desktop.md §4` (all snake_case commands).
  */
 export const api = {
+  workspaceAction: <T>(action:string,input:Record<string,unknown>={}) => callCommand<T>("workspace_action",{action,input}),
   // --- Radar ---
   radarList: () => callCommand<Radar[]>("radar_list"),
   radarGet: (id: string) => callCommand<RadarDetail>("radar_get", { id }),
@@ -94,6 +95,8 @@ export const api = {
     callCommand<Radar>("radar_set_status", { id, status }),
   radarPreviewStart: (input: PreviewStartInput) =>
     callCommand<PreviewRunState>("radar_preview_start", { input }),
+  radarPreviewCancel: (radar_id: string, preview_id: string) =>
+    callCommand<PreviewRunState>("radar_preview_cancel", { radar_id, preview_id }),
   radarPreviewGet: (radar_id: string, preview_id?: string) =>
     callCommand<PreviewRunState>("radar_preview_get", { radar_id, preview_id }),
   radarStats: (radar_id?: string | null, days = 7) =>
@@ -115,6 +118,7 @@ export const api = {
   // --- Leads ---
   leadList: (query: LeadFilterQuery) =>
     callCommand<LeadListResponse>("lead_list", { query }),
+  leadMarkRead: (id: string) => callCommand<LeadDetail>("lead_mark_read", { id }),
   leadGet: (id: string) => callCommand<LeadDetail>("lead_get", { id }),
   leadSetStatus: (
     id: string,

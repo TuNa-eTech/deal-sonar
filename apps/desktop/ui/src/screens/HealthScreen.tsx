@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
+import {PipelineDiagnosis} from "../components/PipelineDiagnosis";
+import { OperationStatus } from "../components/OperationStatus";
 import { api } from "../lib/api";
 import { formatExactTime, formatRelativeTime } from "../lib/format";
 import type { AiUsageStats, CrawlRun, FunnelStats, HealthStatus } from "../types/ipc";
@@ -81,26 +83,26 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
   );
 
   return (
-    <div>
+    <div className="health-workspace">
       <div className="screen-header">
         <div>
-          <h1 className="screen-title">Sức khoẻ hệ thống & Nhật ký vận hành</h1>
+          <h1 className="screen-title">Kết nối & Chẩn đoán</h1>
           <p className="screen-subtitle">
             Giám sát 4 thành phần cốt lõi, nhật ký quét group và hạn mức gọi CLI AI theo ngày
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="management-header-actions">
           <button
             type="button"
             className="btn"
             disabled={checking}
             onClick={() => void handleRecheck()}
           >
-            {checking ? "Đang kiểm tra…" : "↻ Chạy lại kiểm tra"}
+            {checking ? "Đang kiểm tra…" : "Chạy lại kiểm tra"}
           </button>
           <button type="button" className="btn btn-primary" onClick={() => void handleCreateBundle()}>
-            📦 Tạo gói chẩn đoán
+            Tạo gói chẩn đoán
           </button>
         </div>
       </div>
@@ -112,16 +114,17 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       )}
 
       {/* 4 Status Lamps (`03-ux-flows.md §3`) */}
-      <div className="lamp-grid">
-        <div className="card">
+      <PipelineDiagnosis health={health} onRefresh={onRefreshHealth}/>
+      <OperationStatus health={health}/>
+      <div className="connection-ledger">
+        <div className="connection-entry">
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span className={`status-dot ${health?.extension_connected ? "ok" : "err"}`} />
             <strong>1. Chrome Extension</strong>
           </div>
           <div>
             {health?.extension_connected
               ? `Đang kết nối (v${health.extension_version ?? "0.2.0"})`
-              : "Mất kết nối — cần mở Chrome / bấm Thử lại trong popup tiện ích"}
+              : "Mất kết nối, cần mở Chrome / bấm Thử lại trong popup tiện ích"}
           </div>
           {!health?.extension_connected && (
             <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
@@ -150,9 +153,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
           )}
         </div>
 
-        <div className="card">
+        <div className="connection-entry">
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span className={`status-dot ${health?.facebook_session === "ok" ? "ok" : "err"}`} />
             <strong>2. Phiên Facebook</strong>
           </div>
           <div>
@@ -166,17 +168,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
           </div>
         </div>
 
-        <div className="card">
+        <div className="connection-entry">
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span
-              className={`status-dot ${
-                health?.ai_state === "ok"
-                  ? "ok"
-                  : health?.ai_state === "not_configured"
-                    ? "warn"
-                    : "err"
-              }`}
-            />
             <strong>3. CLI AI ({health?.ai_provider ?? "chưa chọn"})</strong>
           </div>
           <div>
@@ -189,17 +182,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
           </div>
         </div>
 
-        <div className="card">
+        <div className="connection-entry">
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span
-              className={`status-dot ${
-                health?.telegram_state === "ok"
-                  ? "ok"
-                  : health?.telegram_state === "not_configured"
-                    ? "warn"
-                    : "err"
-              }`}
-            />
             <strong>4. Kênh Telegram</strong>
           </div>
           <div>
@@ -214,7 +198,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       </div>
 
       {/* AI Daily Usage & Funnel */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 14, marginBottom: 16 }}>
+      <div className="health-analytics">
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
             <strong style={{ fontSize: 14 }}>Mức dùng AI theo ngày (7 ngày qua)</strong>
@@ -261,7 +245,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                       }}
                       title={`${d.date}: ${d.items} bài (${d.calls} lời gọi)`}
                     />
-                    <span style={{ fontSize: 11 }} className="text-muted">
+                    <span style={{ fontSize: 12 }} className="text-muted">
                       {d.date.slice(5)}
                     </span>
                   </div>
@@ -301,7 +285,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       </div>
 
       {/* Crawl Runs Log */}
-      <div className="card">
+      <div className="health-log">
         <strong style={{ display: "block", marginBottom: 10, fontSize: 14 }}>
           Nhật ký các lần quét Group gần nhất (`crawl_runs`)
         </strong>

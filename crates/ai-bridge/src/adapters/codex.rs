@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use tokio::sync::RwLock;
 
+use super::codex_schema::{decode_strict_output, strict_output_schema};
 use crate::adapters::{
     build_probe_smoke_request, combine_system_and_prompt, discover_codex_models, fetch_cli_version,
     help_contains_flag, verify_mandatory_flags, CliAdapterConfig, SharedWorkdir, WorkdirHandle,
@@ -290,7 +291,8 @@ impl CodexCliProvider {
         let schema_path = call_tmp.path().join("schema.json");
         let out_path = call_tmp.path().join("last_message.json");
 
-        let schema_bytes = serde_json::to_vec(&req.schema)
+        let wire_schema = strict_output_schema(&req.schema);
+        let schema_bytes = serde_json::to_vec(&wire_schema)
             .map_err(|e| AiError::InvalidOutput(format!("invalid schema JSON: {e}")))?;
         tokio::fs::write(&schema_path, &schema_bytes)
             .await
@@ -382,7 +384,9 @@ impl CodexCliProvider {
                 .unwrap_or_else(|| raw.stdout.clone()),
         };
 
-        let output = extract_json_value(&raw_message)?;
+        let wire_output = extract_json_value(&raw_message)?;
+        validate_json_schema(&wire_schema, &wire_output).map_err(AiError::InvalidOutput)?;
+        let output = decode_strict_output(&req.schema, wire_output)?;
         validate_json_schema(&req.schema, &output).map_err(AiError::InvalidOutput)?;
 
         Ok(AiResponse {

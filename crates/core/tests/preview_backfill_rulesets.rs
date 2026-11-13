@@ -40,6 +40,26 @@ use dealsonar_store::models::{
 use dealsonar_store::Store;
 use serde_json::json;
 
+async fn wait_preview(
+    service: &dealsonar_core::CoreService,
+    radar_id: &str,
+    preview_id: &str,
+) -> dealsonar_core::dto::PreviewRunState {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let state = service
+                .radar_preview_get(radar_id, Some(preview_id))
+                .unwrap();
+            if matches!(state.status, PreviewStatus::Done | PreviewStatus::Error) {
+                return state;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("preview completes")
+}
+
 async fn recv_host_env(stream: &mut IpcStream) -> Envelope {
     let bytes = tokio::time::timeout(
         Duration::from_secs(3),
@@ -218,6 +238,7 @@ async fn streaming_preview_crawl_request_and_all_three_quality_warnings() {
         .await
         .expect("preview zero matches");
 
+    let prev_zero = wait_preview(&service, &radar_id, &prev_zero.preview_id).await;
     assert_eq!(prev_zero.status, PreviewStatus::Done);
     assert_eq!(prev_zero.total_posts, 5);
     assert!(
@@ -263,6 +284,7 @@ async fn streaming_preview_crawl_request_and_all_three_quality_warnings() {
         .await
         .expect("preview broad + missing required");
 
+    let prev_broad = wait_preview(&service, &radar_id, &prev_broad.preview_id).await;
     assert_eq!(prev_broad.status, PreviewStatus::Done);
     assert_eq!(prev_broad.total_posts, 25);
     assert_eq!(prev_broad.evaluated_posts, 25);
@@ -464,6 +486,18 @@ async fn active_radar_edit_confirmation_and_silent_24h_unpause_backfill() {
         leads.items[0].notified_at.is_none(),
         "24h unpause backfill leads MUST be silent in Inbox (notified_at == None)"
     );
+
+    let before_rollback = service.radar_get(&rid).unwrap();
+    let rolled=service.workspace_action("rollback",json!({"radar_id":rid,"version":1,"expected_version":before_rollback.radar.current_version})).unwrap();
+    assert_eq!(
+        rolled["current_version_data"]["description"],
+        json!(draft.current_version_data.description)
+    );
+    let restored = service.radar_get(&rid).unwrap();
+    assert!(restored.radar.current_version > before_rollback.radar.current_version);
+    assert_eq!(restored.radar.source_ids, before_rollback.radar.source_ids);
+    assert_eq!(restored.radar.notify, before_rollback.radar.notify);
+    assert!(service.workspace_action("rollback",json!({"radar_id":rid,"version":1,"expected_version":before_rollback.radar.current_version})).is_err());
 
     service.shutdown().await.expect("shutdown");
 }
@@ -1361,4 +1395,233 @@ async fn ruleset_roundtrip_lossless_audit_queue_durability_and_missed_feedback_e
     }
 
     service.shutdown().await.expect("shutdown");
+}
+
+// A hanging provider proves that start returns before AI completes and cancel
+// actually drops the in-flight call, rather than merely hiding its spinner.
+struct PreviewRegressionProvider {
+    mode: std::sync::atomic::AtomicUsize,
+    entered: tokio::sync::Notify,
+    inner: MockAiProvider,
+}
+
+#[async_trait]
+impl AiProvider for PreviewRegressionProvider {
+    fn id(&self) -> ProviderId {
+        ProviderId::Mock
+    }
+    async fn probe(&self) -> ProbeResult {
+        self.inner.probe().await
+    }
+    async fn complete(&self, req: AiRequest) -> Result<AiResponse, AiError> {
+        match self.mode.load(Ordering::SeqCst) {
+            1 => {
+                self.entered.notify_one();
+                std::future::pending().await
+            }
+            2 => Err(AiError::Timeout),
+            3 => Err(AiError::InvalidOutput("malformed test output".into())),
+            _ => self.inner.complete(req).await,
+        }
+    }
+}
+
+#[tokio::test]
+async fn preview_returns_immediately_cancels_reports_errors_and_preserves_feedback() {
+    let tmp = tempfile::tempdir().unwrap();
+    let provider = Arc::new(PreviewRegressionProvider {
+        mode: std::sync::atomic::AtomicUsize::new(1),
+        entered: tokio::sync::Notify::new(),
+        inner: MockAiProvider::new(),
+    });
+    let service = CoreServiceBuilder::new(Store::open_in_memory().unwrap())
+        .with_config(CoreConfig {
+            data_dir: tmp.path().into(),
+            spawn_background_workers: false,
+            ..CoreConfig::default()
+        })
+        .with_ai_provider(provider.clone())
+        .start()
+        .unwrap();
+    let now = now_ms();
+    service
+        .store()
+        .upsert_discovered_sources(
+            &[DiscoveredSourceInput {
+                platform: "facebook".into(),
+                kind: "group".into(),
+                external_id: "regression".into(),
+                name: "Regression source".into(),
+                url: "https://www.facebook.com/groups/regression".into(),
+                privacy: None,
+                member_count: None,
+            }],
+            Some(true),
+            None,
+            now,
+        )
+        .unwrap();
+    let source_id = service.source_list().unwrap()[0].id.clone();
+    for i in 0..7 {
+        seed_post(
+            service.store(),
+            &source_id,
+            &format!("regression_{i}"),
+            &format!("Thanh lý bàn ghế văn phòng cũ tại Quận 1 số {i}"),
+            now + i,
+        );
+    }
+    let radar = service
+        .radar_create_draft(CreateRadarDraftInput {
+            name: "Regression radar".into(),
+            description: "Tìm khách cần thuê căn hộ Quận 7".into(),
+            template_id: None,
+            language_hint: Some("vi".into()),
+            user_profession: None,
+            fields: vec![FieldDef {
+                key: "budget".into(),
+                label: "Ngân sách".into(),
+                r#type: FieldType::Money,
+                description: "Ngân sách thuê".into(),
+                required: false,
+                options: None,
+                show_in_alert: true,
+                order: 1,
+            }],
+            match_policy: MatchPolicy {
+                want_intent: WantIntent::Demand,
+                exclude_roles: vec![],
+                hard_filters: vec![],
+            },
+            source_ids: vec![source_id],
+            notify: None,
+        })
+        .unwrap();
+    let input = PreviewStartInput {
+        radar_id: radar.radar.id.clone(),
+        description: None,
+        user_profession: None,
+        fields: None,
+        match_policy: None,
+        source_ids: None,
+    };
+    let first = tokio::time::timeout(
+        Duration::from_secs(1),
+        service.radar_preview_start(input.clone()),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(first.status, PreviewStatus::Evaluating);
+    assert_eq!((first.evaluated_posts, first.total_posts), (0, 7));
+    tokio::time::timeout(Duration::from_secs(1), provider.entered.notified())
+        .await
+        .unwrap();
+    assert!(
+        service.radar_preview_start(input.clone()).await.is_err(),
+        "a second run cannot race cleanup"
+    );
+    let stopped = tokio::time::timeout(
+        Duration::from_secs(1),
+        service.radar_preview_cancel(&input.radar_id, &first.preview_id),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(stopped.status, PreviewStatus::Error);
+    assert!(stopped.error.unwrap().contains("dừng"));
+    assert_eq!(
+        service.runtime().inflight_ai_calls.load(Ordering::SeqCst),
+        0
+    );
+
+    provider.mode.store(2, Ordering::SeqCst);
+    let started = service.radar_preview_start(input.clone()).await.unwrap();
+    let failed = wait_preview(&service, &input.radar_id, &started.preview_id).await;
+    assert_eq!(failed.status, PreviewStatus::Error);
+    assert!(failed.error.is_some());
+    assert_eq!(failed.failed_posts, 3);
+    assert_eq!(service.store().table_row_counts().unwrap()["ai_calls"], 1);
+    let mut events = service.subscribe_events();
+    provider.mode.store(3, Ordering::SeqCst);
+    let started = service.radar_preview_start(input.clone()).await.unwrap();
+    let failed = wait_preview(&service, &input.radar_id, &started.preview_id).await;
+    assert_eq!(failed.status, PreviewStatus::Error);
+    assert_eq!(failed.failed_posts, 7);
+    assert_eq!(failed.evaluated_posts, 0);
+    assert!(std::iter::from_fn(|| events.try_recv().ok()).any(|e| {
+        matches!(e, CoreEvent::PreviewProgress(p) if p.status == PreviewStatus::Error && p.error.is_some() && p.failed_posts == 7)
+    }));
+
+    provider.mode.store(0, Ordering::SeqCst);
+    let started = service.radar_preview_start(input.clone()).await.unwrap();
+    let complete = wait_preview(&service, &input.radar_id, &started.preview_id).await;
+    assert_eq!(complete.status, PreviewStatus::Done);
+    assert_eq!(complete.evaluated_posts, 7);
+    let rejected = complete
+        .items
+        .iter()
+        .find(|i| i.verdict == "no_match")
+        .unwrap();
+    for label in [FeedbackLabel::Correct, FeedbackLabel::Missed] {
+        let result = service
+            .lead_feedback(LeadFeedbackInput {
+                lead_id: None,
+                evaluation_id: rejected.evaluation_id.clone(),
+                post_id: Some(rejected.post_id.clone()),
+                label,
+                corrected_fields: None,
+                block_author: None,
+                origin: FeedbackOrigin::Preview,
+                radar_version_id: None,
+                duplicate_of_lead_id: None,
+            })
+            .unwrap();
+        assert!(
+            result.updated_lead.is_none(),
+            "preview feedback cannot create live leads"
+        );
+    }
+    let examples = service
+        .store()
+        .get_prompt_feedback_examples(&radar.current_version_data.id, 8)
+        .unwrap();
+    assert!(examples
+        .iter()
+        .any(|f| f.label == "correct" && !f.expected_match));
+    let started = service.radar_preview_start(input.clone()).await.unwrap();
+    let complete = wait_preview(&service, &input.radar_id, &started.preview_id).await;
+    assert_eq!(complete.status, PreviewStatus::Done);
+    assert_eq!(
+        service
+            .store()
+            .get_prompt_feedback_examples(&radar.current_version_data.id, 8)
+            .unwrap()
+            .len(),
+        2
+    );
+    let last_request = provider.inner.recorded_requests().pop().unwrap();
+    assert!(
+        last_request.prompt.contains(&rejected.post_text),
+        "rerun prompt uses durable feedback"
+    );
+    assert!(service
+        .lead_list(LeadFilterQuery::default())
+        .unwrap()
+        .items
+        .is_empty());
+    // Shutdown immediately after start must also stop a worker that has not
+    // polled yet (watch subscriptions can otherwise miss the shutdown signal).
+    provider.mode.store(1, Ordering::SeqCst);
+    let pending = service.radar_preview_start(input.clone()).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(2), service.shutdown())
+        .await
+        .unwrap()
+        .unwrap();
+    let interrupted = wait_preview(&service, &input.radar_id, &pending.preview_id).await;
+    assert_eq!(interrupted.status, PreviewStatus::Error);
+    assert_eq!(
+        service.runtime().inflight_ai_calls.load(Ordering::SeqCst),
+        0
+    );
 }

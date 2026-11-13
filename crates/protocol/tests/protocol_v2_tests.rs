@@ -376,6 +376,7 @@ async fn length_prefixed_framing_sync_and_async_with_size_guards() {
     let env2 = Envelope::reply(
         &env1.id,
         Body::SessionStatus {
+            runtime: None,
             platform: "facebook".to_owned(),
             state: SessionState::Checkpoint,
             detail: Some("redirected to /checkpoint/".to_owned()),

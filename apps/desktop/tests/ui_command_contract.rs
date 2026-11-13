@@ -675,7 +675,7 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
         json!({
             "id": lead_id,
             "field_key": "price",
-            "value": 13_500_000,
+            "value": {"min":13_500_000,"max":13_500_000,"currency":"VND","period":"month"},
             "raw": "13.5 triệu/tháng"
         }),
     )
@@ -993,6 +993,38 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
         .await
         .expect("data_backup");
     assert!(std::path::Path::new(backup["path"].as_str().unwrap()).is_file());
+
+    let restore = invoke_command_json(
+        &state,
+        "workspace_action",
+        json!({"action":"restore","input":{"path":backup["path"],"confirm":"KHOI PHUC"}}),
+    )
+    .await
+    .expect("stage restore through UI command");
+    assert_eq!(restore["restart_required"], json!(true));
+    let listed = invoke_command_json(
+        &state,
+        "workspace_action",
+        json!({"action":"backups","input":{}}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(listed["pending"], json!(true));
+    invoke_command_json(
+        &state,
+        "workspace_action",
+        json!({"action":"restore_cancel","input":{}}),
+    )
+    .await
+    .expect("cancel staged restore");
+    let listed = invoke_command_json(
+        &state,
+        "workspace_action",
+        json!({"action":"backups","input":{}}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(listed["pending"], json!(false));
 
     let purge = invoke_command_json(
         &state,

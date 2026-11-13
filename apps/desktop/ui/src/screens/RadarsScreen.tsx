@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import {VersionHistory} from "../components/VersionHistory";
 import { api } from "../lib/api";
 import { RADAR_STATUS_LABELS } from "../lib/format";
 import type {
@@ -128,7 +129,7 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
   const aiPct = activeRuleset ? 100 - rulePct : 100;
 
   return (
-    <div>
+    <div className="radars-workspace">
       <div className="screen-header">
         <div>
           <h1 className="screen-title">Quản lý Radar</h1>
@@ -154,7 +155,7 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
       )}
 
       {/* Radar List Table */}
-      <div className="table-wrap" style={{ marginBottom: 18 }}>
+      <div className="table-wrap radar-directory">
         <table className="crm-table">
           <thead>
             <tr>
@@ -172,13 +173,14 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
               <tr
                 key={r.id}
                 style={{
-                  background: selectedId === r.id ? "var(--primary-soft)" : undefined,
+                  background: selectedId === r.id ? "var(--bg-subtle)" : undefined,
+                  boxShadow: selectedId === r.id ? "inset 3px 0 0 var(--primary)" : undefined,
                   cursor: "pointer",
                 }}
                 onClick={() => setSelectedId(r.id)}
               >
                 <td>
-                  <strong>{r.name}</strong>
+                  <button type="button" className="radar-name-button" aria-pressed={selectedId === r.id} onClick={() => setSelectedId(r.id)}>{r.name}</button>
                 </td>
                 <td>
                   <span
@@ -198,7 +200,7 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
                 <td>{(r.leads_24h ?? 0).toLocaleString("vi-VN")} tin</td>
                 <td>{Math.round((r.false_positive_rate ?? 0) * 100)}%</td>
                 <td onClick={(e) => e.stopPropagation()}>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <div className="management-row-actions">
                     <button
                       type="button"
                       className="btn btn-sm"
@@ -221,7 +223,7 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
                     </button>
                     <button
                       type="button"
-                      className="btn btn-sm btn-primary"
+                      className="btn btn-sm"
                       onClick={() => void handleToggleStatus(r)}
                     >
                       {r.status === "active" ? "Tạm dừng" : "Bật"}
@@ -241,20 +243,21 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
         </table>
       </div>
 
+      {detail&&<VersionHistory key={detail.radar.id+detail.radar.current_version} detail={detail} onChanged={()=>{onChanged();void loadInspector(detail.radar.id);}}/>}
       {/* Selected Radar Funnel & Ruleset Inspector (`05-pipeline-rules.md §6.5, §11`) */}
       {detail && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.15fr", gap: 14 }}>
+        <div className="radar-inspector">
           <FunnelChart
             stats={funnel}
-            title={`Phễu 7 ngày — ${detail.radar.name}`}
+            title={`Phễu 7 ngày: ${detail.radar.name}`}
           />
 
-          <div className="card">
+          <div className="card radar-rules">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <strong style={{ fontSize: 14 }}>Bộ luật tự động (Ruleset)</strong>
               {activeRuleset ? (
                 <span className="badge badge-success">
-                  r{activeRuleset.revision} · {activeRuleset.state} · nguồn: {activeRuleset.origin}
+                  r{activeRuleset.revision}, {activeRuleset.state}, nguồn: {activeRuleset.origin}
                 </span>
               ) : (
                 <span className="badge">Chưa có bộ luật (100% qua AI)</span>
@@ -320,7 +323,7 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
               />
             </div>
 
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="management-row-actions">
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
@@ -337,7 +340,7 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
                   await loadInspector(detail.radar.id);
                 }}
               >
-                ✨ Sinh lại bộ luật bằng AI
+                Sinh lại bộ luật bằng AI
               </button>
             </div>
           </div>

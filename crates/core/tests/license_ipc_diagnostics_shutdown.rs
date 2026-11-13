@@ -376,6 +376,7 @@ async fn ipc_malformed_frames_extractor_broken_and_checkpoint_pause_resume() {
     // 2a. Three `CrawlStatus::Empty` reports while `facebook_session != Ok` (`LoggedOut`)
     //     MUST NOT falsely flag `extractor_broken` (`02-extension.md §4`)!
     let sess_lo = Envelope::new(Body::SessionStatus {
+        runtime: None,
         platform: "facebook".to_string(),
         state: SessionState::LoggedOut,
         detail: Some("cookie expired".to_string()),
@@ -424,6 +425,7 @@ async fn ipc_malformed_frames_extractor_broken_and_checkpoint_pause_resume() {
 
     // Restore `SessionState::Ok` before testing healthy-session empty crawl detection
     let sess_restore_ok = Envelope::new(Body::SessionStatus {
+        runtime: None,
         platform: "facebook".to_string(),
         state: SessionState::Ok,
         detail: None,
@@ -474,6 +476,7 @@ async fn ipc_malformed_frames_extractor_broken_and_checkpoint_pause_resume() {
     // 3. `SessionStatus(Checkpoint)` halts crawl (`CrawlPause` pushed), transitions to
     //    `CheckpointAwaitingResume` when `SessionStatus(Ok)` arrives, and resumes on `chrome_connect(resume_crawl: true)`!
     let sess_cp = Envelope::new(Body::SessionStatus {
+        runtime: None,
         platform: "facebook".to_string(),
         state: SessionState::Checkpoint,
         detail: Some("checkpoint challenge".to_string()),
@@ -495,6 +498,7 @@ async fn ipc_malformed_frames_extractor_broken_and_checkpoint_pause_resume() {
 
     // Extension reports `SessionState::Ok` after user solves checkpoint -> stays paused in `CheckpointAwaitingResume`!
     let sess_ok = Envelope::new(Body::SessionStatus {
+        runtime: None,
         platform: "facebook".to_string(),
         state: SessionState::Ok,
         detail: None,

@@ -212,6 +212,7 @@ fn handle_body(
                         ext_version,
                         browser,
                         connected_at: now,
+                        crawl_runtime: None,
                         tx: tx.clone(),
                     },
                 );
@@ -524,10 +525,17 @@ fn handle_body(
         }
 
         Body::SessionStatus {
+            runtime,
             platform: _,
             state,
             detail,
         } => {
+            if let Some(runtime) = runtime {
+                let mut hub = rt.ipc_hub.state.lock().expect("ipc state lock");
+                if let Some(conn) = hub.connections.get_mut(&conn_id) {
+                    conn.crawl_runtime = Some((now, runtime));
+                }
+            }
             handle_session_status(rt, state, detail, now)?;
             let _ = tx.send(Envelope::reply(
                 msg_id,

@@ -14,7 +14,7 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole("heading", { name: "Hộp tin" });
+    await screen.findByRole("heading", { name: "Cơ hội" });
 
     // Open Radar Wizard
     await user.click(screen.getAllByRole("button", { name: "+ Tạo radar" })[0]!);
@@ -40,11 +40,12 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     expect(descTextarea.value).toContain("Quận Cầu Giấy");
 
     // Advance to Step 2: Fields
-    await user.click(within(dialog).getByRole("button", { name: /Tiếp tục: Chọn trường/i }));
+    await user.click(within(dialog).getByRole("button", { name: /Tiếp tục: Xác nhận cách hiểu/i }));
     expect(
       await within(dialog).findByText(/Danh sách trường thông tin sẽ trích/i)
     ).toBeInTheDocument();
 
+    await user.click(within(dialog).getByRole("button", {name:/Tùy chỉnh thông tin/}));
     // Add a custom field and customize its label
     await user.click(within(dialog).getByRole("button", { name: "+ Thêm trường" }));
     const customLabelInput = within(dialog).getByLabelText("Tên trường 5");
@@ -72,7 +73,7 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     expect(within(dialog).getByText(/✕ Không khớp \(3\)/)).toBeInTheDocument();
 
     // Give feedback on a preview item
-    const correctBtns = within(dialog).getAllByRole("button", { name: /👍 Đúng/i });
+    const correctBtns = within(dialog).getAllByRole("button", { name: /^Đúng$/i });
     await user.click(correctBtns[0]!);
 
     // Activate radar
@@ -93,21 +94,20 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole("heading", { name: "Hộp tin" });
+    await screen.findByRole("heading", { name: "Cơ hội" });
 
     // 1. Test Lead feedback ("Sai ▾" -> "Người cùng nghề…" -> "Chặn luôn tác giả này") & inline field edit in Inbox
     const inlineEditBtns = await screen.findAllByTitle("Bấm để sửa tay trường này");
     await user.click(inlineEditBtns[0]!);
     const editInput = screen.getByLabelText(/Giá trị mới cho/i);
-    await user.clear(editInput);
-    await user.type(editInput, "thuê dài hạn");
+    await user.selectOptions(editInput, "thuê");
     await user.click(screen.getByRole("button", { name: "Lưu" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Sửa tay \(user\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Bạn đã sửa/)).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: /❌ Sai/i }));
+    await user.click(screen.getByRole("button", { name: /^Sai/i }));
     await user.click(screen.getByRole("button", { name: /Người cùng nghề/i }));
     expect(screen.getByText(/Đánh dấu «Người cùng nghề»/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Chặn luôn tác giả này" }));
@@ -124,6 +124,8 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     await user.click(screen.getByRole("button", { name: "Bảng tin" }));
     await screen.findByRole("heading", { name: /Bảng tin/i });
 
+    await user.selectOptions(screen.getByLabelText("Chọn Radar cho Bảng tin"), screen.getByLabelText("Chọn Radar cho Bảng tin").querySelectorAll("option")[1]!.value);
+    await waitFor(()=>expect(screen.getAllByRole("columnheader").some(h=>h.textContent?.includes("Loại giao dịch"))).toBe(true));
     const table = await screen.findByTestId("dynamic-lead-table");
     const headers = within(table)
       .getAllByRole("columnheader")
@@ -174,17 +176,12 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     expect(acceptBtn).not.toBeDisabled();
     await user.click(acceptBtn);
 
-    // Onboarding 5-step wizard opens; jump to Step 5 and enter main app
-    const onboardingDialog = await screen.findByRole("dialog", {
-      name: /Hướng dẫn cài đặt lần đầu/i,
-    });
-    await user.click(within(onboardingDialog).getByRole("button", { name: /5\. Radar đầu tiên/i }));
-    expect(
-      within(onboardingDialog).getByText(
-        /Radar chỉ chạy khi máy bật, Chrome mở và DealSonar đang chạy ở khay hệ thống/i
-      )
-    ).toBeInTheDocument();
-    await user.click(within(onboardingDialog).getByRole("button", { name: "Vào màn hình chính" }));
+    const onboardingDialog=await screen.findByRole("dialog",{name:/Hướng dẫn cài đặt lần đầu/i});
+    await user.type(within(onboardingDialog).getByLabelText("Mục tiêu tìm cơ hội"),"Khách cần thuê căn hộ");
+    await user.click(within(onboardingDialog).getByRole("button",{name:"Tiếp tục"}));
+    await within(onboardingDialog).findByText("Chrome: Đã kết nối");
+    await user.click(within(onboardingDialog).getByRole("button",{name:"Tiếp tục"}));
+    await user.click(within(onboardingDialog).getByRole("button",{name:"Vào không gian làm việc"}));
 
     // Trigger Facebook checkpoint health state -> "Tiếp tục" must be disabled!
     act(() => {

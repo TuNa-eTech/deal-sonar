@@ -512,7 +512,7 @@ pub fn build_judge_extract_schema(fields: &[FieldDef]) -> Value {
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "required": ["ref", "match", "score", "intent", "author_role", "summary", "reason", "fields"],
+                    "required": ["ref", "match", "score", "intent", "author_role", "is_spam", "summary", "reason", "fields"],
                     "additionalProperties": false,
                     "properties": {
                         "ref": { "type": "integer", "minimum": 0 },
@@ -711,11 +711,11 @@ pub fn compile_rules_schema() -> Value {
     })
 }
 
-/// Thread-safe cache of dynamically generated `judge_extract` schemas keyed by `radar_version_id`
+/// Thread-safe cache of dynamically generated `judge_extract` schemas keyed by version and field definitions
 /// (`06-ai-bridge.md §5.2`).
 #[derive(Debug, Default)]
 pub struct SchemaCache {
-    by_version: RwLock<HashMap<String, Value>>,
+    by_version: RwLock<HashMap<(String, String), Value>>,
 }
 
 impl SchemaCache {
@@ -724,14 +724,18 @@ impl SchemaCache {
     }
 
     pub fn get_or_build(&self, radar_version_id: &str, fields: &[FieldDef]) -> Value {
+        let key = (
+            radar_version_id.to_string(),
+            serde_json::to_string(fields).expect("field definitions serialize"),
+        );
         if let Ok(guard) = self.by_version.read() {
-            if let Some(cached) = guard.get(radar_version_id) {
+            if let Some(cached) = guard.get(&key) {
                 return cached.clone();
             }
         }
         let built = build_judge_extract_schema(fields);
         if let Ok(mut guard) = self.by_version.write() {
-            guard.insert(radar_version_id.to_string(), built.clone());
+            guard.insert(key, built.clone());
         }
         built
     }

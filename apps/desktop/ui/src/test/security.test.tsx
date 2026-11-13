@@ -97,7 +97,7 @@ describe("XSS & Link Security (`03-risks-compliance.md §4`)", () => {
     const user = userEvent.setup();
 
     render(<App />);
-    await screen.findByRole("heading", { name: "Hộp tin" });
+    await screen.findByRole("heading", { name: "Cơ hội" });
 
     const maliciousLead: Lead = {
       id: "01JCF7XSS00000000000000099",

@@ -1,4 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { FieldValueInput } from "./FieldValueInput";
+import { localDateTime, parseFieldValue, editFieldText } from "../lib/fieldValues";
+import { readWorkspace, saveWorkspace } from "../lib/workspace";
+import {offerUndo} from "./UndoCenter";
 import { api } from "../lib/api";
 import {
   formatExactTime,
@@ -39,28 +43,35 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
   const [followUpInput, setFollowUpInput] = useState("");
   const [actionAlert, setActionAlert] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
+  const requestRef = useRef(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const loadDetail = async (id: string) => {
+    const request = ++requestRef.current;
+    setLoadError(null);
     setLoading(true);
     setActionAlert(null);
     try {
-      const res = await api.leadGet(id);
+      let res = await api.leadGet(id);
+      if (!res.lead.read_at) res = await api.leadMarkRead(id);
+      if (request !== requestRef.current) return;
       setDetail(res);
-      setNoteInput(res.lead.note ?? "");
-      setTagsInput(res.lead.tags.join(", "));
-      setFollowUpInput(
-        res.lead.follow_up_at
-          ? new Date(res.lead.follow_up_at).toISOString().slice(0, 16)
-          : ""
-      );
+      const saved = readWorkspace<{note:string;tags:string;follow:string}|null>(`lead-${id}`,null);
+      setNoteInput(saved?.note ?? res.lead.note ?? "");
+      setTagsInput(saved?.tags ?? res.lead.tags.join(", "));
+      setFollowUpInput(saved?.follow ?? localDateTime(res.lead.follow_up_at));
+    } catch (err) {
+      if (request === requestRef.current) setLoadError(String(err));
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     void loadDetail(leadId);
+    return () => { requestRef.current++; };
   }, [leadId]);
 
+  if (loadError) return <div role="alert">{loadError}<button className="btn" onClick={()=>void loadDetail(leadId)}>Thử lại</button></div>;
   if (loading || !detail) {
     return <div className="text-muted">Đang tải chi tiết tin…</div>;
   }
@@ -74,36 +85,8 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     })
     .filter((x): x is { raw: string; fieldLabel: string } => Boolean(x));
 
-  const parseEditedValue = (fd: FieldDef, textVal: string): unknown => {
-    const trimmed = textVal.trim();
-    if (!trimmed) return null;
-    if (fd.type === "number") {
-      const n = Number(trimmed);
-      return Number.isFinite(n) ? n : trimmed;
-    }
-    if (fd.type === "boolean") {
-      return trimmed.toLowerCase() === "true" || trimmed.toLowerCase() === "có";
-    }
-    if (fd.type === "money") {
-      const n = Number(trimmed.replace(/[^\d.-]/g, ""));
-      if (Number.isFinite(n) && n > 0) {
-        const prev = lead.fields[fd.key]?.value as Record<string, unknown> | undefined;
-        return {
-          min: n,
-          max: n,
-          currency: (prev?.currency as string) ?? "VND",
-          period: (prev?.period as string | null) ?? null,
-        };
-      }
-    }
-    if (fd.type === "multi_enum") {
-      return trimmed
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    }
-    return trimmed;
-  };
+  const parseEditedValue = (fd: FieldDef, text: string): unknown => parseFieldValue(fd, text, lead.fields[fd.key]?.value);
+  const safely = async (work: () => Promise<void>) => { try { await work(); } catch (err) { setActionAlert({kind:"err",text:err instanceof Error ? err.message : String(err)}); } };
 
   const handleSaveInlineField = async (fd: FieldDef) => {
     const updated = await api.leadUpdateField(
@@ -123,7 +106,8 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
   ) => {
     setWrongMenuOpen(false);
     setPeerPromptOpen(false);
-    await api.leadFeedback({
+    const previousBlocks=new Set((await api.blocklistList()).map(b=>b.id));
+    const feedback=await api.leadFeedback({
       evaluation_id: lead.evaluation_id,
       lead_id: lead.id,
       post_id: lead.post_id,
@@ -133,6 +117,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
       corrected_fields: opts?.corrected ?? null,
       origin: "app",
     });
+    if(feedback.blocked_entry&&!previousBlocks.has(feedback.blocked_entry.id)){const id=feedback.blocked_entry.id;offerUndo(`Chặn từ phản hồi ${lead.author_name}`,async()=>{await api.blocklistRemove(id);onUpdated();});}
     await loadDetail(lead.id);
     setActionAlert({
       kind: "ok",
@@ -154,12 +139,14 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
   };
 
   const handleBlockAuthorDirect = async () => {
-    await api.blocklistAdd(
+    const before=new Set((await api.blocklistList()).map(b=>b.id));
+    const added=await api.blocklistAdd(
       "author",
       lead.author_id ?? lead.author_name,
       `Chặn trực tiếp từ tin ${lead.id}`
     );
     await api.leadSetStatus(lead.id, "ignored");
+    offerUndo(`Đã chặn ${lead.author_name}`,async()=>{if(!before.has(added.id))await api.blocklistRemove(added.id);const current=await api.leadGet(lead.id);if(current.lead.status==="ignored")await api.leadSetStatus(lead.id,lead.status);onUpdated();});
     await loadDetail(lead.id);
     setActionAlert({ kind: "ok", text: `Đã chặn tác giả «${lead.author_name}».` });
     onUpdated();
@@ -176,15 +163,16 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
       tags,
       follow_up_at: Number.isFinite(followUpMs) ? followUpMs : null,
     });
+    saveWorkspace(`lead-${lead.id}`, null);
     setDetail(updated);
-    setActionAlert({ kind: "ok", text: "Đã lưu ghi chú CRM, nhãn và lịch nhắc." });
+    setActionAlert({ kind: "ok", text: "Đã lưu ghi chú và lịch liên hệ. Lịch đến hạn xuất hiện trong Hôm nay; thông báo màn hình được phát khi ứng dụng đang chạy." });
     onUpdated();
   };
 
   const permalinkSafe = isSafeFacebookPermalink(lead.permalink);
 
   return (
-    <div>
+    <div className="lead-detail-content">
       {/* Header (`03-ux-flows.md §3.1`) */}
       <div
         style={{
@@ -204,18 +192,16 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             </span>
             <span className="badge">{LEAD_STATUS_LABELS[lead.status]}</span>
           </div>
-          <h3 style={{ margin: "8px 0 4px", fontSize: 15.5 }}>{lead.summary}</h3>
-          <div className="field-hint">
-            Group: <strong>{lead.source_name}</strong> · Tác giả:{" "}
-            <strong>{lead.author_name}</strong> · Đăng{" "}
-            <span title={formatExactTime(lead.post_created_at)}>
-              {formatRelativeTime(lead.post_created_at)} ({formatExactTime(lead.post_created_at)})
-            </span>
-          </div>
+          <h3 className="lead-detail-title">{lead.summary}</h3>
+          <dl className="lead-origin">
+            <div><dt>Group</dt><dd>{lead.source_name}</dd></div>
+            <div><dt>Tác giả</dt><dd>{lead.author_name}</dd></div>
+            <div><dt>Đăng</dt><dd title={formatExactTime(lead.post_created_at)}>{formatRelativeTime(lead.post_created_at)} ({formatExactTime(lead.post_created_at)})</dd></div>
+          </dl>
         </div>
         {onClose && (
           <button type="button" className="btn btn-sm" onClick={onClose}>
-            Đóng ✕
+            Đóng
           </button>
         )}
       </div>
@@ -232,14 +218,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
       {/* Action Bar (`03-ux-flows.md §3.1`) */}
       <div
-        className="toolbar-row"
-        style={{
-          padding: "10px 12px",
-          background: "var(--bg-subtle)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          position: "relative",
-        }}
+        className="toolbar-row lead-actions"
       >
         <button
           type="button"
@@ -251,15 +230,15 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
               : "Cảnh báo: liên kết không thuộc tên miền Facebook hợp lệ"
           }
         >
-          Mở trên Facebook ↗
+          Mở trên Facebook
         </button>
 
         <button
           type="button"
           className={`btn btn-sm ${lead.feedback_label === "correct" ? "btn-success" : ""}`}
-          onClick={() => void handleFeedback("correct")}
+          onClick={() => void safely(()=>handleFeedback("correct"))}
         >
-          ✅ Đúng
+          Đúng
         </button>
 
         <div style={{ position: "relative" }}>
@@ -268,7 +247,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             className="btn btn-sm"
             onClick={() => setWrongMenuOpen((v) => !v)}
           >
-            ❌ Sai ▾
+            Sai ▾
           </button>
           {wrongMenuOpen && (
             <div
@@ -289,7 +268,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                 type="button"
                 className="btn btn-sm"
                 style={{ justifyContent: "flex-start" }}
-                onClick={() => void handleFeedback("irrelevant")}
+                onClick={() => void safely(()=>handleFeedback("irrelevant"))}
               >
                 Không liên quan
               </button>
@@ -301,7 +280,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                   setWrongMenuOpen(false);
                   const init: Record<string, string> = {};
                   for (const fd of radar_fields) {
-                    init[fd.key] = formatExtractedFieldValue(fd, lead.fields[fd.key]);
+                    init[fd.key] = editFieldText(fd, lead.fields[fd.key]);
                     if (init[fd.key] === "—") init[fd.key] = "";
                   }
                   setBatchFieldDrafts(init);
@@ -325,7 +304,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                 type="button"
                 className="btn btn-sm"
                 style={{ justifyContent: "flex-start" }}
-                onClick={() => void handleFeedback("duplicate")}
+                onClick={() => void safely(()=>handleFeedback("duplicate"))}
               >
                 Trùng bài đã có
               </button>
@@ -333,7 +312,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                 type="button"
                 className="btn btn-sm"
                 style={{ justifyContent: "flex-start" }}
-                onClick={() => void handleFeedback("spam")}
+                onClick={() => void safely(()=>handleFeedback("spam"))}
               >
                 Rác / Quảng cáo
               </button>
@@ -341,9 +320,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
           )}
         </div>
 
-        <button type="button" className="btn btn-sm" onClick={handleBlockAuthorDirect}>
-          🚫 Chặn tác giả
-        </button>
+        <details className="secondary-actions"><summary>Thao tác khác</summary><p>Chặn sẽ loại bài của tác giả này ở mọi radar.</p><button type="button" className="btn btn-sm" onClick={()=>void safely(handleBlockAuthorDirect)}>Chặn tác giả ở mọi radar</button></details>
 
         <select
           aria-label="Đổi trạng thái tin"
@@ -357,7 +334,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             onUpdated();
           }}
         >
-          {(Object.keys(LEAD_STATUS_LABELS) as LeadStatus[]).map((st) => (
+          {(Object.keys(LEAD_STATUS_LABELS) as LeadStatus[]).filter(st=>st!=="viewed").map((st) => (
             <option key={st} value={st}>
               Trạng thái: {LEAD_STATUS_LABELS[st]}
             </option>
@@ -369,9 +346,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
       {peerPromptOpen && (
         <div
           className="card"
-          style={{ background: "#fffbeb", borderColor: "#fde68a", marginBottom: 12 }}
+          style={{ background: "var(--warning-soft)", borderColor: "var(--warning)", marginBottom: 12 }}
         >
-          <strong>Đánh dấu «Người cùng nghề» — Chặn luôn tác giả «{lead.author_name}»?</strong>
+          <strong>Đánh dấu «Người cùng nghề»: Chặn luôn tác giả «{lead.author_name}»?</strong>
           <div className="field-hint" style={{ margin: "4px 0 8px" }}>
             Nếu chặn, mọi bài đăng sau này của tác giả này sẽ bị loại ngay ở tầng lọc sơ bộ mà không
             tốn lượt gọi AI.
@@ -380,14 +357,14 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             <button
               type="button"
               className="btn btn-sm btn-danger"
-              onClick={() => void handleFeedback("peer", { blockAuthor: true })}
+              onClick={() => void safely(()=>handleFeedback("peer", { blockAuthor: true }))}
             >
               Chặn luôn tác giả này
             </button>
             <button
               type="button"
               className="btn btn-sm"
-              onClick={() => void handleFeedback("peer", { blockAuthor: false })}
+              onClick={() => void safely(()=>handleFeedback("peer", { blockAuthor: false }))}
             >
               Chỉ ẩn tin này, không chặn
             </button>
@@ -404,7 +381,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
       {/* Form when marking "Trích sai trường" (`02-radar-spec.md §6`) */}
       {batchFieldEditOpen && (
-        <div className="card" style={{ marginBottom: 12, background: "#eff6ff" }}>
+        <div className="card" style={{ marginBottom: 12, background: "var(--primary-soft)" }}>
           <strong>Sửa lại giá trị đúng cho các trường bị trích sai:</strong>
           <div
             style={{
@@ -417,15 +394,8 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             {radar_fields.map((fd) => (
               <div key={fd.key}>
                 <label className="field-hint">{fd.label}</label>
-                <input
-                  type="text"
-                  aria-label={`Sửa trường ${fd.label}`}
-                  className="input"
-                  value={batchFieldDrafts[fd.key] ?? ""}
-                  onChange={(e) =>
-                    setBatchFieldDrafts((prev) => ({ ...prev, [fd.key]: e.target.value }))
-                  }
-                />
+                <FieldValueInput field={fd} label={`Sửa trường ${fd.label}`} value={batchFieldDrafts[fd.key] ?? ""} previous={lead.fields[fd.key]?.value} onChange={v=>setBatchFieldDrafts(prev=>({...prev,[fd.key]:v}))}/>
+
               </div>
             ))}
           </div>
@@ -433,16 +403,16 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              onClick={() => {
+              onClick={() => void safely(async () => {
                 const corrected: Record<string, unknown> = {};
                 for (const fd of radar_fields) {
-                  if (batchFieldDrafts[fd.key]?.trim()) {
+                  if (batchFieldDrafts[fd.key] !== editFieldText(fd, lead.fields[fd.key])) {
                     corrected[fd.key] = parseEditedValue(fd, batchFieldDrafts[fd.key]!);
                   }
                 }
+                await handleFeedback("wrong_fields", { corrected });
                 setBatchFieldEditOpen(false);
-                void handleFeedback("wrong_fields", { corrected });
-              }}
+              })}
             >
               Lưu giá trị đúng & Gửi phản hồi
             </button>
@@ -457,8 +427,50 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
         </div>
       )}
 
+      {/* CRM Notes, Tags & Follow-up Reminder */}
+      <div className="lead-section crm-action-card" style={{ marginBottom: 12 }}>
+        {lead.follow_up_at && <div className="toolbar-row"><span className="badge badge-warning">Hẹn: {formatExactTime(lead.follow_up_at)}</span><button className="btn btn-sm" onClick={()=>void safely(async()=>{await api.leadSetStatus(lead.id,lead.status,{follow_up_at:null});saveWorkspace(`lead-${lead.id}`,null);await loadDetail(lead.id);onUpdated();})}>Hoàn tất việc liên hệ</button><button className="btn btn-sm" onClick={()=>{const v=localDateTime(Date.now()+3600000);setFollowUpInput(v);saveWorkspace(`lead-${lead.id}`,{note:noteInput,tags:tagsInput,follow:v});}}>Dời 1 giờ (chưa lưu)</button></div>}
+        <strong style={{ display: "block", marginBottom: 8 }}>Việc tiếp theo & Ghi chú</strong>
+        <div className="field-group">
+          <textarea
+            aria-label="Ghi chú trao đổi"
+            className="textarea"
+            style={{ minHeight: 60 }}
+            placeholder="Ghi chú trao đổi với khách (chỉ lưu trên máy bạn)…"
+            value={noteInput}
+            onChange={(e) => {setNoteInput(e.target.value);saveWorkspace(`lead-${lead.id}`,{note:e.target.value,tags:tagsInput,follow:followUpInput});}}
+          />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) auto", gap: 8, alignItems: "end" }}>
+          <div>
+            <label className="field-hint">Nhãn (cách nhau dấu phẩy)</label>
+            <input
+              type="text"
+              className="input"
+              placeholder="khách nét, gọi chiều nay"
+              aria-label="Nhãn cơ hội"
+              value={tagsInput}
+              onChange={(e) => {setTagsInput(e.target.value);saveWorkspace(`lead-${lead.id}`,{note:noteInput,tags:e.target.value,follow:followUpInput});}}
+            />
+          </div>
+          <div>
+            <label className="field-hint">Nhắc liên hệ lại</label>
+            <input
+              type="datetime-local"
+              aria-label="Nhắc liên hệ lại"
+              className="input"
+              value={followUpInput}
+              onChange={(e) => {setFollowUpInput(e.target.value);saveWorkspace(`lead-${lead.id}`,{note:noteInput,tags:tagsInput,follow:e.target.value});}}
+            />
+          </div>
+          <button type="button" className="btn btn-primary" onClick={()=>void safely(handleSaveCrmNotes)}>
+            Lưu ghi chú
+          </button>
+        </div>
+      </div>
+
       {/* Extracted Fields Block — Click-to-edit (`03-ux-flows.md §3.1`) */}
-      <div className="card" style={{ marginBottom: 12 }}>
+      <div className="lead-section" style={{ marginBottom: 12 }}>
         <div
           style={{
             display: "flex",
@@ -467,7 +479,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
           }}
         >
           <strong>Các trường đã trích xuất</strong>
-          <span className="field-hint">Bấm vào giá trị bất kỳ để sửa tay (`source: user`)</span>
+          <span className="field-hint">Sửa thông tin để lưu giá trị chính xác</span>
         </div>
 
         <table className="crm-table">
@@ -481,17 +493,11 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                   <td>
                     {isEditing ? (
                       <div style={{ display: "flex", gap: 6 }}>
-                        <input
-                          type="text"
-                          aria-label={`Giá trị mới cho ${fd.label}`}
-                          className="input"
-                          value={editingFieldVal}
-                          onChange={(e) => setEditingFieldVal(e.target.value)}
-                        />
+                        <FieldValueInput field={fd} label={`Giá trị mới cho ${fd.label}`} value={editingFieldVal} previous={ef?.value} onChange={setEditingFieldVal}/>
                         <button
                           type="button"
                           className="btn btn-sm btn-primary"
-                          onClick={() => void handleSaveInlineField(fd)}
+                          onClick={() => void safely(()=>handleSaveInlineField(fd))}
                         >
                           Lưu
                         </button>
@@ -517,7 +523,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         title="Bấm để sửa tay trường này"
                         onClick={() => {
                           setEditingFieldKey(fd.key);
-                          const cur = formatExtractedFieldValue(fd, ef);
+                          const cur = editFieldText(fd, ef);
                           setEditingFieldVal(cur === "—" ? "" : cur);
                         }}
                       >
@@ -537,7 +543,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         }`}
                       >
                         {ef.source === "user"
-                          ? "Sửa tay (user)"
+                          ? "Bạn đã sửa"
                           : ef.source === "rule"
                             ? "Bộ luật"
                             : "AI"}
@@ -557,8 +563,8 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
       {/* Original Post Text with plain-text `raw` highlights (`03-risks-compliance.md §4`) */}
       <div style={{ marginBottom: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-          <strong style={{ fontSize: 13 }}>Nội dung bài viết gốc (văn bản thuần an toàn)</strong>
-          <span className="field-hint">Đoạn tô vàng là bằng chứng `raw` trích nguyên văn</span>
+          <strong style={{ fontSize: 13 }}>Nội dung bài viết gốc</strong>
+          <span className="field-hint">Đoạn tô vàng là thông tin trích từ bài gốc</span>
         </div>
         <div className="post-plain-text" data-testid="lead-post-plaintext">
           {renderHighlightedPostText(post.text, rawSpans)}
@@ -567,8 +573,8 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
       {/* Also Seen In (`03-ux-flows.md §3.1`, `01-prd.md US-3`) */}
       {lead.also_seen_in.length > 0 && (
-        <div className="card" style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>
-          <strong>🔁 Cũng xuất hiện ở {lead.also_seen_in.length} group khác:</strong>
+        <div className="lead-section" style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>
+          <strong>Cũng xuất hiện ở {lead.also_seen_in.length} group khác:</strong>
           <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
             {lead.also_seen_in.map((dup) => (
               <li key={`${dup.source_id}-${dup.captured_at}`}>
@@ -579,51 +585,14 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
         </div>
       )}
 
-      {/* CRM Notes, Tags & Follow-up Reminder */}
-      <div className="card" style={{ marginBottom: 12 }}>
-        <strong style={{ display: "block", marginBottom: 8 }}>Ghi chú CRM, Nhãn & Nhắc việc</strong>
-        <div className="field-group">
-          <textarea
-            className="textarea"
-            style={{ minHeight: 60 }}
-            placeholder="Ghi chú trao đổi với khách (chỉ lưu trên máy bạn)…"
-            value={noteInput}
-            onChange={(e) => setNoteInput(e.target.value)}
-          />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 220px auto", gap: 8, alignItems: "end" }}>
-          <div>
-            <label className="field-hint">Nhãn (cách nhau dấu phẩy)</label>
-            <input
-              type="text"
-              className="input"
-              placeholder="khách nét, gọi chiều nay"
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="field-hint">Nhắc liên hệ lại</label>
-            <input
-              type="datetime-local"
-              className="input"
-              value={followUpInput}
-              onChange={(e) => setFollowUpInput(e.target.value)}
-            />
-          </div>
-          <button type="button" className="btn btn-primary" onClick={handleSaveCrmNotes}>
-            Lưu ghi chú
-          </button>
-        </div>
-      </div>
-
+      <details className="activity-history"><summary>Lịch sử hoạt động ({detail.events.length})</summary>{detail.events.slice().reverse().map(ev=><div key={ev.id} className="activity-row"><time>{formatExactTime(ev.created_at)}</time> · {({created:"Tạo cơ hội",status_changed:"Đổi trạng thái",field_edited:"Sửa thông tin",notified:"Gửi thông báo",noted:"Lưu ghi chú / lịch",feedback:"Ghi nhận phản hồi",follow_up_due:"Đã phát nhắc liên hệ"} as Record<string,string>)[ev.kind]??ev.kind}</div>)}</details>
       {/* Provenance Footer (`03-ux-flows.md §3.1`) */}
       <div className="field-hint" style={{ borderTop: "1px solid var(--border)", paddingTop: 10 }}>
         Nguồn gốc đánh giá:{" "}
         <strong>{lead.decided_by === "rule" ? "Bộ luật tự động (Ruleset)" : "Mô hình AI"}</strong> ·
         Phiên bản Radar: <strong>v{lead.radar_version}</strong>
         {lead.reason ? ` · Giải thích: ${lead.reason}` : ""}
-        {lead.notified_at ? ` · Đã báo Telegram lúc ${formatExactTime(lead.notified_at)}` : ""}
+        {lead.notified_at ? ` · Đã gửi thông báo lúc ${formatExactTime(lead.notified_at)}` : ""}
       </div>
     </div>
   );

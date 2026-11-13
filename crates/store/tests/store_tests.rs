@@ -191,11 +191,12 @@ fn test_migrations_wal_backups_and_future_schema_guard() {
     let backup_dir = tmp.path().join("backups");
 
     // 1. Fresh file-backed open applies 0001_init in WAL mode without creating a pre-migration backup.
-    let store = Store::open(&db_path, &backup_dir).expect("open v1 store");
+    let store = Store::open_with_migrations(&db_path, &backup_dir, &MIGRATIONS[..1])
+        .expect("open v1 store");
     assert_eq!(store.journal_mode().expect("journal_mode"), "wal");
     let applied = store.list_schema_migrations().expect("migrations");
     assert_eq!(applied.len(), 1);
-    assert_eq!(applied[0].version, LATEST_SCHEMA_VERSION);
+    assert_eq!(applied[0].version, 1);
     assert_eq!(applied[0].name, "0001_init");
     assert!(!backup_dir.exists() || fs::read_dir(&backup_dir).unwrap().count() == 0);
 
@@ -208,7 +209,7 @@ fn test_migrations_wal_backups_and_future_schema_guard() {
 
     // 2. Simulate 7 subsequent migrations (v2..=v8) and verify automatic pre-migration backups
     //    are created AND pruned to keep only the latest 5!
-    let mut extended: Vec<Migration> = MIGRATIONS.to_vec();
+    let mut extended: Vec<Migration> = MIGRATIONS[..1].to_vec();
     let extra_migrations = [
         (
             2,
@@ -945,6 +946,9 @@ fn test_dynamic_lead_list_filters_fts_pagination_and_sql_injection_guard() {
     let page = store
         .lead_list(&LeadListQuery {
             radar_id: Some(radar.radar.id.clone()),
+            unread_only: None,
+            follow_up_before: None,
+            exclude_weak: None,
             status: Some(vec!["new".into(), "viewed".into()]),
             since: Some(BASE_TS),
             min_score: None,
@@ -2077,4 +2081,81 @@ fn test_thread_safe_send_sync_fts_integrity_and_stroked_d_search() {
         .verify_fts_integrity()
         .expect("FTS integrity after purging text to NULL");
     assert!(store.post_search("cau giay", None, 10).unwrap().is_empty());
+}
+
+#[test]
+fn durable_feedback_migrates_rejection_labels_and_survives_preview_cleanup() {
+    let tmp = TempDir::new().unwrap();
+    let db = tmp.path().join("old.db");
+    let backups = tmp.path().join("backups");
+    let store = Store::open_with_migrations(&db, &backups, &MIGRATIONS[..1]).unwrap();
+    let source = seed_source(&store, "feedback-migration", "Migration", true);
+    let radar = store
+        .radar_create_draft(&CreateRadarDraftInput {
+            id: None,
+            name: "Migration".into(),
+            template_id: None,
+            description: "Radar".into(),
+            language_hint: None,
+            user_profession: None,
+            fields: sample_bds_fields(),
+            match_policy: MatchPolicy::default(),
+            notify: NotifyConfig::default(),
+            source_ids: vec![source.clone()],
+            now_ms: BASE_TS,
+        })
+        .unwrap();
+    let (post, _) = store
+        .insert_post(&make_post(
+            &source,
+            "migration-post",
+            "author",
+            "Author",
+            "Bài không khớp nhưng đã được xác nhận loại đúng",
+            "hash",
+            123,
+            BASE_TS,
+        ))
+        .unwrap();
+    drop(store);
+    let conn = rusqlite::Connection::open(&db).unwrap();
+    conn.execute("INSERT INTO evaluations (id,post_id,radar_version_id,state,verdict,is_preview,created_at) VALUES ('old-eval',?1,?2,'done','no_match',1,?3)",
+        rusqlite::params![post.id, radar.current_version.id, BASE_TS]).unwrap();
+    conn.execute("INSERT INTO feedback (id,evaluation_id,radar_version_id,post_id,label,post_text,origin,created_at) VALUES ('old-feedback','old-eval',?1,?2,'correct','Snapshot','preview',?3)",
+        rusqlite::params![radar.current_version.id, post.id, BASE_TS]).unwrap();
+    drop(conn);
+    let store = Store::open(&db, &backups).unwrap();
+    assert_eq!(
+        store.list_schema_migrations().unwrap().len(),
+        dealsonar_store::LATEST_SCHEMA_VERSION as usize
+    );
+    let examples = store
+        .get_prompt_feedback_examples(&radar.current_version.id, 8)
+        .unwrap();
+    assert_eq!(examples.len(), 1);
+    assert!(
+        !examples[0].expected_match,
+        "correct rejection must remain a negative example"
+    );
+    assert_eq!(
+        store
+            .cleanup_preview_evaluations(Some(&radar.current_version.id), None)
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        store
+            .get_prompt_feedback_examples(&radar.current_version.id, 8)
+            .unwrap(),
+        examples
+    );
+    let dataset = store
+        .get_labeled_dataset(&radar.current_version.id)
+        .unwrap();
+    assert_eq!(dataset.len(), 1);
+    assert!(!dataset[0].is_match);
+    assert!(
+        fs::read_dir(&backups).unwrap().count() > 0,
+        "existing databases are backed up before migrating"
+    );
 }
