@@ -1,0 +1,64 @@
+- generic [ref=e3]:
+  - complementary "Điều hướng chính" [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: DealSonar
+      - generic [ref=e9]: Cá nhân
+    - button "+ Tạo radar" [ref=e11] [cursor=pointer]
+    - navigation [ref=e12]:
+      - generic [ref=e13]: LÀM VIỆC
+      - button "Hôm nay" [ref=e14] [cursor=pointer]:
+        - generic [aria-hidden] [ref=e16]: ◷
+      - button "Cơ hội 2" [ref=e17] [cursor=pointer]:
+        - generic [ref=e18]: Cơ hội
+        - generic [ref=e19]: "2"
+      - generic [ref=e20]: THIẾT LẬP TÌM TIN
+      - button "Radar 1" [ref=e21] [cursor=pointer]:
+        - generic [ref=e22]: Radar
+        - generic [ref=e23]: "1"
+      - button "Nguồn 2" [ref=e24] [cursor=pointer]:
+        - generic [ref=e25]: Nguồn
+        - generic [ref=e26]: "2"
+      - button "Liên hệ" [ref=e27] [cursor=pointer]
+      - button "Kết nối" [ref=e29] [cursor=pointer]
+      - button "Cài đặt" [ref=e32] [cursor=pointer]
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - text: "Đã bật:"
+        - strong [ref=e36]: 1 radar
+      - generic [ref=e37]: Dữ liệu lưu trên máy · AI và kênh gửi theo cấu hình
+  - main [ref=e39]:
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - text: KHÔNG GIAN LÀM VIỆC
+          - heading "Hôm nay" [level=1] [ref=e43]
+          - paragraph [ref=e44]: Ưu tiên cơ hội mới và những cuộc liên hệ bạn đã hẹn.
+        - button "+ Tạo radar" [ref=e45] [cursor=pointer]
+      - generic [ref=e46]:
+        - generic [ref=e47]:
+          - strong [ref=e48]: Đã bật lịch thu thập
+          - paragraph [ref=e49]: Lượt kế tiếp dự kiến 15:05 12/11/2026
+          - generic [ref=e50]: Quét thành công 19 giờ trước · 1 radar đã bật · 2 nhóm đang theo dõi
+        - button "Kiểm tra kết nối" [ref=e51] [cursor=pointer]
+      - generic [ref=e52]:
+        - button "2 Cơ hội chưa đọc Mở danh sách cơ hội →" [ref=e53]:
+          - strong [ref=e54]: "2"
+          - generic [ref=e55]: Cơ hội chưa đọc
+          - generic [ref=e56]: Mở danh sách cơ hội →
+        - generic [ref=e57]:
+          - strong [ref=e58]: "1"
+          - generic [ref=e59]: Việc đến hạn hôm nay và quá hạn
+          - generic [ref=e60]: Lịch được giữ khi đóng ứng dụng
+      - generic [ref=e61]:
+        - heading "Liên hệ cần thực hiện" [level=2] [ref=e62]
+        - paragraph [ref=e63]: Hoàn tất hoặc đặt lịch mới sau khi trao đổi. Nếu máy tắt, nhắc việc quá hạn được xử lý khi mở lại DealSonar.
+        - button "16:00 12/11/2026 Tìm thuê căn hộ 1–2PN khu Mỹ Đình, Nam Từ Liêm, dưới 10 triệu/tháng Trần Thu Hà · Khách thuê căn hộ Cầu Giấy Mở →" [ref=e64] [cursor=pointer]:
+          - generic [ref=e65]: 16:00 12/11/2026
+          - generic [ref=e66]:
+            - strong [ref=e67]: Tìm thuê căn hộ 1–2PN khu Mỹ Đình, Nam Từ Liêm, dưới 10 triệu/tháng
+            - generic [ref=e68]: Trần Thu Hà · Khách thuê căn hộ Cầu Giấy
+          - generic [ref=e69]: Mở →
+        - generic [ref=e70]:
+          - button "Về trang đầu" [disabled] [ref=e71]
+          - button "Trang tiếp" [disabled] [ref=e72]
+  - complementary "Thao tác có thể hoàn tác"

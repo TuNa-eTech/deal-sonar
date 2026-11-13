@@ -1,0 +1,17 @@
+{
+  "scanned": "2026-11-13",
+  "findings": {
+    "framework": "React 18 / Vite / Tauri",
+    "fonts": "system stack, app.css:44",
+    "palette": "blue/slate defaults, app.css:1",
+    "screens": 8
+  },
+  "preserve": [
+    "all routes and business handlers",
+    "existing dirty changes"
+  ],
+  "introduce": [
+    "Furrow app design system",
+    "action-led screen compositions"
+  ]
+}
