@@ -1,0 +1,25 @@
+{
+  "name": "@dealsonar/desktop-core",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "DealSonar Electron backend: SQLite store, services, credential adapters and utilityProcess entry (port of the Rust crates).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:backend": "node scripts/build-backend.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.9.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}
