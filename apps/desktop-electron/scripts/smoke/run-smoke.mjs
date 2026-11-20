@@ -206,7 +206,19 @@ function installAppImage(image) {
   chmodSync(copy, 0o755);
   step("appimage_executable", true, copy);
   evidence.limits.push("AppImage: run with APPIMAGE_EXTRACT_AND_RUN=1 and --no-sandbox (no FUSE/SUID on CI)");
-  return { launch: { cmd: copy, args: [], extraArgs: ["--no-sandbox"], env: { APPIMAGE_EXTRACT_AND_RUN: "1" } }, cleanup: async () => {} };
+  // Both launches share the AppImage extraction cache. The second launcher can exit
+  // while the first still needs it, so let the test harness remove its private cache.
+  const appImageCache = join(work, "appimage-cache");
+  mkdirSync(appImageCache);
+  return {
+    launch: {
+      cmd: copy,
+      args: [],
+      extraArgs: ["--no-sandbox"],
+      env: { APPIMAGE_EXTRACT_AND_RUN: "1", NO_CLEANUP: "1", TMPDIR: appImageCache },
+    },
+    cleanup: async () => {},
+  };
 }
 
 // Linux CI has no display: start a private Xvfb and point DISPLAY at it.
@@ -306,6 +318,7 @@ async function runApp(l) {
     step("app_exit_after_quit", false, "did not exit");
   } else {
     step("app_exit_code", result.code === 0, `exit ${result.code} signal ${result.signal}`);
+    if (result.code !== 0) evidence.app_log_tail = first.log().split("\n").slice(-40);
   }
   const rep = readReport();
   if (!rep) return false;
