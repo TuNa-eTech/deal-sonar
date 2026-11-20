@@ -110,6 +110,7 @@ Startup flags supported by the `dealsonar` binary:
    ```bash
    ./scripts/install-native-host-dev.sh <YOUR_32_CHAR_EXTENSION_ID>
    ```
+   On Windows, run `./scripts/install-native-host-dev.ps1 <YOUR_32_CHAR_EXTENSION_ID>`. The installer builds the helper with Node 24. Set `DEALSONAR_NATIVE_HOST_BIN` to use a prebuilt helper.
 4. In the DealSonar Desktop App, click **Kiểm tra lại** in **Onboarding — Bước 1: Kết nối Chrome Extension** (or verify connection status in **Sức khoẻ**).
    - DealSonar preserves your paired `chrome-extension://<ID>/` origin in `com.dealsonar.host.json` and automatically refreshes the `dealsonar-native-host` binary path on future app updates (`refresh_native_host_manifest_if_paired`).
 
