@@ -1,0 +1,30 @@
+{
+  "name": "@dealsonar/native-host",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Chrome Native Messaging relay, local IPC transport, MCP stdio server and native-host provisioning for DealSonar (Electron migration of crates/native-host).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:bundle": "node scripts/build-bundle.mjs",
+    "build:sea": "node scripts/build-sea.mjs",
+    "smoke:chrome": "DEALSONAR_CHROME_SMOKE=1 vitest run test/chrome-smoke.test.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.24.0",
+    "postject": "1.0.0-alpha.6",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
