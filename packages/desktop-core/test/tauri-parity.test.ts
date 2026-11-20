@@ -113,9 +113,22 @@ suite("Tauri SQLite fixtures (schema v1 upgrade)", () => {
     const backups = fs.readdirSync(path.join(tmp, "bk"));
     expect(backups).toHaveLength(1);
     expect(backups[0]).toMatch(/^dealsonar-pre-v0002-\d+\.db$/);
-    // data survived and the 0003 workflow columns exist
+    // data survived: 3 legacy leads (statuses new / contacted / viewed) and the 0003 workflow columns
     expect((store.db.prepare("SELECT COUNT(*) AS c FROM leads").get() as { c: number }).c).toBe(3);
-    expect((store.db.prepare("SELECT COUNT(*) AS c FROM leads WHERE read_at IS NULL").get() as { c: number }).c).toBe(3);
+    // 0003: read_at = updated_at for every lead whose status was not 'new'; legacy 'viewed' becomes 'new'
+    const leads = store.db.prepare("SELECT id, status, read_at, updated_at FROM leads ORDER BY id").all() as Array<{
+      id: string;
+      status: string;
+      read_at: number | null;
+      updated_at: number;
+    }>;
+    expect(leads.map((l) => [l.status, l.read_at !== null])).toEqual([
+      ["new", false],
+      ["contacted", true],
+      ["new", true],
+    ]);
+    for (const l of leads) if (l.read_at !== null) expect(l.read_at).toBe(l.updated_at);
+    expect((store.db.prepare("SELECT COUNT(*) AS c FROM lead_events").get() as { c: number }).c).toBe(3);
     expect(store.settings.get("launch_at_login")).toBe(true);
     store.verifyFtsIntegrity();
     store.close();

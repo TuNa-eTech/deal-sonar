@@ -7,12 +7,13 @@
 //    use the synchronous `VACUUM INTO` snapshot. Runtime `backupDatabase` uses SQLite's online
 //    backup API (`db.backup`) so it does not block writers.
 
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { StoreError } from "./errors";
+import { openDatabase } from "./sqlite";
 import { foldVi, nowMs } from "./util";
 import { Blocklist, Contacts } from "./contacts";
 import { Leads } from "./leads";
@@ -137,7 +138,7 @@ export class Store {
 
   /** In-memory store with all migrations applied. */
   static openInMemory(options: StoreOpenOptions = {}): Store {
-    const db = new Database(":memory:");
+    const db = openDatabase(":memory:");
     configureConnection(db);
     applyMigrations(db, null, options.migrations ?? loadMigrations());
     return new Store(db, null, null);
@@ -150,7 +151,7 @@ export class Store {
   static open(dbPath: string, backupDir: string, options: StoreOpenOptions = {}): Store {
     const parent = path.dirname(dbPath);
     if (parent) fs.mkdirSync(parent, { recursive: true });
-    const db = new Database(dbPath);
+    const db = openDatabase(dbPath);
     try {
       configureConnection(db);
       applyMigrations(db, backupDir, options.migrations ?? loadMigrations());
@@ -167,7 +168,7 @@ export class Store {
 
   /** Validate and freeze an external backup before scheduling offline restoration. */
   static stageRestore(source: string, dataDir: string): void {
-    const src = new Database(source, { readonly: true, fileMustExist: true });
+    const src = openDatabase(source, { readonly: true, fileMustExist: true });
     try {
       validateRestoreConnection(src);
       const temporary = path.join(dataDir, "restore-staging.sqlite3");
@@ -182,11 +183,11 @@ export class Store {
   static applyPendingRestore(dbPath: string, backups: string): void {
     const pending = path.join(path.dirname(dbPath), "restore-pending.sqlite3");
     if (!fs.existsSync(pending)) return;
-    const src = new Database(pending, { readonly: true, fileMustExist: true });
+    const src = openDatabase(pending, { readonly: true, fileMustExist: true });
     try {
       validateRestoreConnection(src);
       if (fs.existsSync(dbPath)) {
-        const live = new Database(dbPath);
+        const live = openDatabase(dbPath);
         try {
           fs.mkdirSync(backups, { recursive: true });
           backupConnectionToPathSync(live, path.join(backups, `before-restore-${nowMs()}.sqlite3`));
@@ -196,7 +197,7 @@ export class Store {
       }
       backupConnectionToPathSync(src, dbPath);
       // Never replay a historical backup's outbound queue with current keychain credentials.
-      const restored = new Database(dbPath);
+      const restored = openDatabase(dbPath);
       try {
         restored.prepare("UPDATE outbox SET state='dropped' WHERE state IN ('pending','failed')").run();
         restored.prepare("UPDATE channels SET state='error'").run();

@@ -32,6 +32,17 @@ test/                  vitest suites (see below)
 
 ## Compatibility notes
 
+- **Numbered SQL parameters (`?1, ?2`)**: better-sqlite3 treats `?N` as a *named* parameter and rejects positional
+  arguments. Every connection the store opens goes through `openDatabase()` (`src/store/sqlite.ts`), which rewrites
+  `?N` to anonymous `?` once per statement (cached) and re-orders the arguments by placeholder number. Rules, matching
+  rusqlite: repeats allowed (`?5, ?5`); holes allowed (an argument whose number is never referenced is ignored);
+  the argument count must equal the highest referenced number, else
+  `Wrong number of parameters passed to query. Got X, needed Y` (this is what reproduces the Rust dynamic-filter quirk
+  below); `?` inside string literals, `"..."`, `` `...` ``, `[...]` and comments is left alone; statements without `?N`
+  are passed through unchanged; mixing `?` and `?N` in one statement throws; `stmt.bind()` is unsupported on translated
+  statements. The migration SQL files are executed with `db.exec` and are untouched.
+  A test fails if any file under `src/` (other than `sqlite.ts`) calls `new Database(`, so a bypassing connection cannot
+  slip in. New code that opens a connection must use `openDatabase`.
 - **Schema/data dir**: `dealsonar.db`, `backups/`, `ai-workdir/`, `logs/`, `agent-access` under `DEALSONAR_DATA_DIR`.
   The migration list is the Rust one; a database written here opens in Tauri and vice versa
   (`tauri-parity.test.ts` compares `sqlite_master` and runs `integrity_check` / `foreign_key_check`).
@@ -85,6 +96,10 @@ pnpm --filter @dealsonar/desktop-core test
 # differential fixtures from the real Rust store (needs cargo; synthetic data only):
 cargo run --manifest-path packages/desktop-core/tools/gen-tauri-fixture/Cargo.toml -- packages/desktop-core/test/fixtures/tauri
 pnpm --filter @dealsonar/desktop-core test -- tauri-parity
+# The v1 database is seeded with the current Store API for everything except leads: schema v1 has no
+# `leads.read_at`, so its 3 leads (statuses new / contacted / viewed) are inserted with plain 0001-column SQL
+# (a second `rusqlite` connection). The v3 database and golden.json come entirely from the current Rust Store.
+# Generated outputs (test/fixtures/tauri/*, tools/gen-tauri-fixture/target + Cargo.lock) are gitignored.
 
 # backend bundle (rebuild better-sqlite3 for Electron's ABI first):
 pnpm exec electron-rebuild -f -w better-sqlite3 -v <electron version>

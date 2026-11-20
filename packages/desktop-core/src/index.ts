@@ -16,5 +16,6 @@ export * from "./store/ops";
 export * from "./store/posts";
 export * from "./store/radars";
 export * from "./store/sources";
+export * from "./store/sqlite";
 export * from "./store/store";
 export * from "./store/util";

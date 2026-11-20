@@ -11,3 +11,6 @@ publish = false
 [dependencies]
 dealsonar-store = { path = "../../../../crates/store" }
 serde_json = "1"
+# Same version/feature set as crates/store (bundled SQLite); used only to write schema-v1 legacy
+# rows with the 0001 columns, because the current Store API already depends on later columns.
+rusqlite = { version = "0.32", features = ["bundled"] }

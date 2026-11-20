@@ -9,7 +9,7 @@
 //!   tauri-v3.sqlite3        schema v3 database with sources, radar, posts, leads, contacts, queue rows
 //!   golden.json             what the Rust store returns for fixed queries over tauri-v3.sqlite3
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use dealsonar_store::models::*;
 use dealsonar_store::{Store, MIGRATIONS};
@@ -54,7 +54,7 @@ fn new_post(n: i64, source_id: &str, text: &str, author: Option<AuthorInput>) ->
     }
 }
 
-fn seed(store: &Store) -> (String, RadarWithVersion, Vec<LeadRecord>) {
+fn seed(store: &Store, legacy_v1_db: Option<&Path>) -> (String, RadarWithVersion, Vec<String>) {
     let sources = store
         .upsert_discovered_sources(
             &[DiscoveredSourceInput {
@@ -161,29 +161,105 @@ fn seed(store: &Store) -> (String, RadarWithVersion, Vec<LeadRecord>) {
                 T + n,
             )
             .unwrap();
-        let (lead, _) = store
-            .create_lead(&CreateLeadInput {
-                id: Some(format!("01LEAD{n:021}")),
-                radar_id: radar.radar.id.clone(),
-                radar_version_id: radar.current_version.id.clone(),
-                post_id: post.id.clone(),
-                evaluation_id: ev.id.clone(),
-                contact_id: contact.map(|c| c.id),
-                status: "new".into(),
-                score: 0.9 - n as f64 / 100.0,
-                summary: (*text).into(),
-                fields,
-                also_seen_in: None,
-                notified_at: None,
-                follow_up_at: None,
-                note: None,
-                tags: None,
-                now_ms: T + n,
-            })
-            .unwrap();
-        leads.push(lead);
+        let lead_id = format!("01LEAD{n:021}");
+        let contact_id = contact.map(|c| c.id);
+        let score = 0.9 - n as f64 / 100.0;
+        if let Some(db_path) = legacy_v1_db {
+            // Schema v1 has no `leads.read_at` (added by migration 0003), and the current
+            // `Store::create_lead` reads it, so legacy rows are written the way the v1 app did:
+            // plain SQL with the 0001 columns only. Statuses cover what 0003 rewrites on upgrade.
+            let status = ["new", "contacted", "viewed"][i];
+            insert_legacy_v1_lead(
+                db_path,
+                &LegacyLead {
+                    id: &lead_id,
+                    radar_id: &radar.radar.id,
+                    radar_version_id: &radar.current_version.id,
+                    post_id: &post.id,
+                    evaluation_id: &ev.id,
+                    contact_id: contact_id.as_deref(),
+                    status,
+                    score,
+                    summary: *text,
+                    fields_json: &serde_json::to_string(&fields).unwrap(),
+                    now_ms: T + n,
+                },
+            );
+        } else {
+            store
+                .create_lead(&CreateLeadInput {
+                    id: Some(lead_id.clone()),
+                    radar_id: radar.radar.id.clone(),
+                    radar_version_id: radar.current_version.id.clone(),
+                    post_id: post.id.clone(),
+                    evaluation_id: ev.id.clone(),
+                    contact_id,
+                    status: "new".into(),
+                    score,
+                    summary: (*text).into(),
+                    fields,
+                    also_seen_in: None,
+                    notified_at: None,
+                    follow_up_at: None,
+                    note: None,
+                    tags: None,
+                    now_ms: T + n,
+                })
+                .unwrap();
+        }
+        leads.push(lead_id);
     }
     (sid, radar, leads)
+}
+
+struct LegacyLead<'a> {
+    id: &'a str,
+    radar_id: &'a str,
+    radar_version_id: &'a str,
+    post_id: &'a str,
+    evaluation_id: &'a str,
+    contact_id: Option<&'a str>,
+    status: &'a str,
+    score: f64,
+    summary: &'a str,
+    fields_json: &'a str,
+    now_ms: i64,
+}
+
+/// Inserts a lead (and its `created` event) using only the schema-0001 columns.
+fn insert_legacy_v1_lead(db_path: &Path, lead: &LegacyLead<'_>) {
+    let conn = rusqlite::Connection::open(db_path).unwrap();
+    conn.execute(
+        "INSERT INTO leads (
+           id, radar_id, radar_version_id, post_id, evaluation_id, contact_id,
+           status, score, summary, fields, also_seen_in,
+           notified_at, follow_up_at, note, tags, created_at, updated_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, NULL, NULL, NULL, NULL, ?11, ?11)",
+        rusqlite::params![
+            lead.id,
+            lead.radar_id,
+            lead.radar_version_id,
+            lead.post_id,
+            lead.evaluation_id,
+            lead.contact_id,
+            lead.status,
+            lead.score,
+            lead.summary,
+            lead.fields_json,
+            lead.now_ms,
+        ],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO lead_events (id, lead_id, kind, data, created_at) VALUES (?1, ?2, 'created', ?3, ?4)",
+        rusqlite::params![
+            format!("{}-created", lead.id),
+            lead.id,
+            json!({ "score": lead.score }).to_string(),
+            lead.now_ms,
+        ],
+    )
+    .unwrap();
 }
 
 fn main() {
@@ -197,7 +273,7 @@ fn main() {
     let _ = std::fs::remove_file(&v1_path);
     {
         let store = Store::open_with_migrations(&v1_path, scratch.join("bk1"), &MIGRATIONS[..1]).unwrap();
-        let _ = seed(&store);
+        let _ = seed(&store, Some(&v1_path));
         store.set_setting("launch_at_login", &true).unwrap();
     }
 
@@ -205,7 +281,7 @@ fn main() {
     let v3_path = out.join("tauri-v3.sqlite3");
     let _ = std::fs::remove_file(&v3_path);
     let store = Store::open(&v3_path, scratch.join("bk3")).unwrap();
-    let (sid, radar, leads) = seed(&store);
+    let (sid, radar, leads) = seed(&store, None);
     store.set_setting("launch_at_login", &true).unwrap();
     let ch = store
         .channel_upsert("01CHAN0000000000000000001", "webhook", "Hook", &json!({"url": "https://example.test/h"}), "ok", T)
@@ -214,9 +290,9 @@ fn main() {
         .enqueue_outbox(&EnqueueOutboxInput {
             id: Some("01OUTBOX00000000000000001".into()),
             channel_id: ch.id.clone(),
-            lead_id: Some(leads[0].id.clone()),
+            lead_id: Some(leads[0].clone()),
             kind: "lead".into(),
-            payload: json!({"lead_id": leads[0].id}),
+            payload: json!({"lead_id": leads[0]}),
             next_try_at: T,
             now_ms: T,
         })
@@ -238,7 +314,7 @@ fn main() {
         "radar_get": serde_json::to_value(store.radar_get(&radar.radar.id).unwrap()).unwrap(),
         "source_list": serde_json::to_value(store.source_list(T + 1000).unwrap()).unwrap(),
         "radar_stats": serde_json::to_value(store.radar_stats(Some(&radar.radar.id), T + 1000).unwrap()).unwrap(),
-        "lead_get_1": serde_json::to_value(store.lead_get(&leads[0].id).unwrap()).unwrap(),
+        "lead_get_1": serde_json::to_value(store.lead_get(&leads[0]).unwrap()).unwrap(),
         "table_row_counts": serde_json::to_value(store.table_row_counts().unwrap()).unwrap(),
     });
     std::fs::write(out.join("golden.json"), serde_json::to_string_pretty(&golden).unwrap()).unwrap();
