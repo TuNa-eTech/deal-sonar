@@ -297,6 +297,16 @@ describe("startBackend / DesktopRuntime", () => {
     port.send({ id: 1, command: "source_list", args: {} });
     expect(await port.reply(1)).toEqual({ id: 1, ok: true, value: [] });
 
+    const runtime = started!.runtime;
+    await runtime.invoke("radar_create_draft", {
+      input: { name: "Fixture Radar", description: "Tìm nhà", template_id: "bds.khach-thue" },
+    });
+    const [radar] = runtime.context.store.radars.list(false, Date.now());
+    const [seed] = await runtime.invoke("ruleset_list", { radar_id: radar.radar.id }) as Array<{ body: unknown }>;
+    await expect(runtime.invoke("ruleset_save_user", {
+      radar_id: radar.radar.id, radar_version_id: radar.current_version.id, body: seed.body,
+    })).resolves.toMatchObject({ revision: 2, state: "active", origin: "user" });
+
     port.send({ id: 2, command: BACKEND_CONTROL.shutdown, args: { grace_ms: 100 } });
     expect(await port.reply(2)).toEqual({ id: 2, ok: true, value: null });
     expect(fh.isClosed()).toBe(true);

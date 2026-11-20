@@ -230,6 +230,7 @@ export const DISCONNECTED_IPC: IpcHealthSnapshot = {
 export interface IntegrationHooks {
   /** Chrome IPC hub state for `health_get`/diagnostics. Default: extension disconnected. */
   ipcSnapshot?(ctx: RuntimeContext): IpcHealthSnapshot;
+  emitHealthIfChanged?(now: number): Promise<HealthStatus>;
   /** Resume crawling (Telegram `/resume`, clears pause + `crawl.resume`). Returns true if it resumed. Default: false. */
   resumeCrawl?(ctx: RuntimeContext): boolean;
   /** Recompute plan/policy and push `config.update` to connected profiles. Default: no-op. */
@@ -255,6 +256,7 @@ export interface IntegrationDeps {
   hooks?: IntegrationHooks;
   /** AI provider override (tests, or a future mock mode). Default: CLI adapter per settings. */
   aiProvider?: AiProvider;
+  aiHealth?: AiRuntimeHealth;
   licenseVerifier?: LicenseVerifier;
   telegram?: TelegramClient;
   telegramConfig?: Partial<TelegramClientConfig>;
@@ -284,12 +286,7 @@ export class IntegrationState {
   readonly telegram: TelegramClient;
   readonly webhook: WebhookClient;
   readonly bridge: AiBridge;
-  readonly aiHealth: AiRuntimeHealth = {
-    lastError: null,
-    rateLimitResetAt: null,
-    firstUnavailableAt: null,
-    dailyCapReachedDate: null,
-  };
+  readonly aiHealth: AiRuntimeHealth;
   readonly incidents = {
     fbSessionAlerted: false,
     extDisconnectedAlerted: false,
@@ -312,6 +309,9 @@ export class IntegrationState {
 
   constructor(deps: IntegrationDeps, provider: AiProvider) {
     this.hooks = deps.hooks ?? {};
+    this.aiHealth = deps.aiHealth ?? {
+      lastError: null, rateLimitResetAt: null, firstUnavailableAt: null, dailyCapReachedDate: null,
+    };
     this.licenseVerifier = deps.licenseVerifier ?? new LicenseVerifier();
     this.telegram = deps.telegram ?? new TelegramClient(deps.telegramConfig);
     this.webhook = deps.webhook ?? new WebhookClient(deps.webhookConfig);
@@ -595,6 +595,7 @@ export async function computeHealthStatus(ctx: RuntimeContext, now: number): Pro
 /** Emit `health:changed` only when an operational field differs from the last snapshot. */
 export async function emitHealthIfChanged(ctx: RuntimeContext, now: number): Promise<HealthStatus> {
   const state = getIntegrations(ctx);
+  if (state.hooks.emitHealthIfChanged) return state.hooks.emitHealthIfChanged(now);
   const current = await computeHealthStatus(ctx, now);
   const prev = state.lastEmittedHealth;
   const changed = prev === null || JSON.stringify({ ...prev, checked_at: current.checked_at }) !== JSON.stringify(current);

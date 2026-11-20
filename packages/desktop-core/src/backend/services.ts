@@ -121,7 +121,8 @@ export function createDesktopServices(
           },
         },
       });
-      startIntegrations(ctx, { log, hooks: {
+      startIntegrations(ctx, { log, aiHealth: rt.aiHealth, hooks: {
+        emitHealthIfChanged: (now) => rt.emitHealthIfChanged(now),
         ipcSnapshot: () => rt.ipcSnapshot(rt.now()),
         resumeCrawl: () => {
           if (!rt.crawlPaused || rt.facebookSession !== "ok") return false;
@@ -133,7 +134,11 @@ export function createDesktopServices(
         onDataDeleted: () => { rt.previews.clear(); rt.latestPreviewByRadar.clear(); },
         radar: { get: radarGet, update: (ctx, input) => radarUpdate(ctx, catalog, parseArg({ input }, "input", dUpdateRadarInput)) },
       } });
-      if (provisioning) await refreshNativeHostManifestIfPaired(ctx, chromeDeps(ctx));
+      if (provisioning) {
+        await refreshNativeHostManifestIfPaired(ctx, chromeDeps(ctx)).catch(() => {
+          log?.("Could not refresh the Chrome Native Messaging manifest");
+        });
+      }
       svc.start();
     },
     onStopping: async (ctx) => {
