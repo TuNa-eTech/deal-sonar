@@ -61,7 +61,7 @@ Crash policy: unexpected exit after ready restarts the backend (500ms x n backof
 ## Commands
 
 ```sh
-pnpm install                       # updates the root pnpm-lock.yaml (Shell owns it)
+pnpm install --frozen-lockfile
 pnpm electron:test                 # unit + integration tests (stub backend over real child processes)
 pnpm electron:typecheck
 pnpm ui:build && pnpm electron:build
@@ -77,11 +77,11 @@ pnpm --filter @dealsonar/desktop-electron dist:linux-x64   # DEB + AppImage
 node scripts/smoke/run-smoke.mjs --mode installed --artifact release/<file> [--system-install]
 ```
 
-Smoke runs with a throwaway `HOME`, data dir and Chromium profile, with autostart sync and browser spawn disabled. It
+Smoke runs with a temporary home, data directory and Chromium profile. It uses in-memory credentials and disables autostart sync and browser launch. It
 records: resources outside ASAR, native helper executable, backend handshake, renderer isolation (no `require`/`process`),
 IPC round trip, unknown-command and external-URL rejection, `window.open`/navigation guards, tray, single-instance
 second launch, graceful shutdown (SIGTERM; in-app hold timer on Windows), and for macOS the ad-hoc signature.
-Result: `release/smoke/smoke-<platform>-<arch>-<mode>.json`. Stub-backed runs say `backend_kind: "stub"`.
+The result is written to `release/smoke/smoke-<platform>-<arch>-<mode>.json`. Stub-backed runs report `backend_kind: "stub"`. The manual GitHub Actions workflow builds the SQLite backend and the Node 24 native helper on each target by default.
 
 ## Known limits
 

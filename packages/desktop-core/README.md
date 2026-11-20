@@ -12,11 +12,8 @@ The Rust crates stay in the tree as the behavior oracle until the cutover task.
 | Store domain: sources/crawl runs, posts (ingest, authors, phones, exact + SimHash dedup, clusters, peer signals, search/pagination), evaluations + pending-AI queue, leads (CRM, events, follow-ups, feedback, labeled data, dynamic filter/sort/FTS list), contacts + blocklist, radars/versions/rulesets/funnel stats, jobs, channels, outbox, AI usage, settings | ported + tested |
 | Credential adapters (macOS Keychain, Windows Credential Manager, Linux Secret Service) over the original `DealSonar` entries | ported + unit tested with a fake runner; **not yet exercised against a real OS keychain** |
 | utilityProcess entry: `backend:ready/fatal/shutdown/toggle_crawl_paused`, `os:notification`, wire errors, candidate IPC isolation, Host integration seam, `main.cjs` bundle script | ported + tested with fake parentPort/Host |
-| **Service layer (`CoreService`) and command handlers** | **not ported**: all 58 commands answer `not_implemented` (`unportedCommands()`) |
-| Pipeline T0-T7, rules, preview, scheduler, workers (jobs/outbox/Telegram/health), Protocol v2 handler (`ipc_server.rs`), AI bridge (Codex/Claude/agy), notifications, license, diagnostics, exports, templates | **not ported** |
-
-Nothing returns fabricated data: an unported command fails with `{code:"not_implemented"}`, extension
-connections are refused and agent calls are rejected until their handlers exist.
+| Service layer and IPC | 58 backend command IDs registered. The startup test exercises a renderer command, a Chrome Protocol v2 handshake, an MCP method and a ruleset write. |
+| Pipeline, rules, preview, scheduler, workers, notifications, license, diagnostics, exports and templates | Connected to the Electron backend. Pipeline AI prompts, validators and task orchestration are tracked separately. |
 
 ## Layout
 
@@ -25,7 +22,7 @@ migrations/            retained SQL (0001-0003), copied verbatim
 src/store/             Store + repositories (Rust crates/store)
 src/secrets/           SecretStore + OS adapters (Rust crates/notify secrets.rs)
 src/backend/           wire contract, server (handshake), runtime (data owner), config, host seam, entry
-scripts/build-backend.mjs   esbuild bundle -> dist/backend/{main.cjs,migrations,node_modules/better-sqlite3}
+scripts/build-backend.mjs   esbuild bundle -> dist/backend/{main.cjs,migrations,vendor/better-sqlite3}
 tools/gen-tauri-fixture/    Rust program that writes fixtures + golden JSON with the real Rust store
 test/                  vitest suites (see below)
 ```
@@ -68,6 +65,8 @@ test/                  vitest suites (see below)
 | Windows | Credential Manager generic credential, `TargetName = <key>.DealSonar`, `UserName = <key>`, UTF-16LE blob, persist enterprise; PowerShell script on stdin |
 | Linux | Secret Service item `{service: DealSonar, username: <key>}` via `secret-tool` (lookup ignores the legacy `application=rust-keyring` attribute) |
 
+Candidate profiles use the credential service `DealSonar Candidate`. Production uses the service in the table.
+
 Keys: `telegram:bot_token`, `telegram:<channel_id>`, `webhook:<channel_id>`. `DEALSONAR_IN_MEMORY_SECRETS=1` selects the in-memory
 store for tests. Secrets are never logged: errors pass through `redactSecret`.
 Open item: Linux needs `libsecret-tools` (`secret-tool`) on the machine; if absent the adapter reports `unavailable` (retryable).
@@ -82,7 +81,7 @@ close IPC + SQLite, reply, exit 0), `backend:toggle_crawl_paused`, `os:notificat
 
 `main.ts` loads the package dynamically and adapts it through `HostBindings` (`host.ts`):
 `resolveDesktopDataDir`, `resolveDesktopIpcEndpoint`, `DesktopIpcServer.bind`, `issueAgentToken`, `AgentError`.
-Candidate profiles: Protocol v2 connections are closed and agent methods rejected until the corresponding ports exist.
+The backend validates Protocol v2 frames and dispatches them to the pipeline peer for that connection. The same IPC server routes authenticated Radar MCP calls to the agent service.
 **Windows candidate pipe**: `\\.\pipe\dealsonar-candidate-<user>` (explicit, distinct from Tauri's `dealsonar-<user>`); an explicit
 `DEALSONAR_IPC_PATH` still wins. The relay/native helper launched by Chrome does not inherit that env, so Host must make the helper
 derive the same pipe for the candidate (open item for the Host task).
@@ -105,5 +104,4 @@ pnpm --filter @dealsonar/desktop-core test -- tauri-parity
 pnpm --filter @dealsonar/desktop-core build:backend      # -> dist/backend (point DEALSONAR_BACKEND_BUNDLE_DIR at it)
 ```
 
-The pnpm workspace needs `packages/*` in `pnpm-workspace.yaml` (root; left to the Shell/coordinator, as is the lockfile).
 Tests never touch a real keychain, browser profile, network or the user's data directory.
