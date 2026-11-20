@@ -291,14 +291,16 @@ async function runApp(l) {
   if (secondResult === "timeout") second.child.kill("SIGKILL");
   step("single_instance_second_exit", secondResult !== "timeout" && secondResult.code === 0, secondResult === "timeout" ? "timeout" : `exit ${secondResult.code}`);
 
-  // Graceful shutdown: SIGTERM on unix; on Windows a plain kill is a hard stop, so the smoke hold timer
-  // (60s) is shortened by the app only when asked. Use the hold override instead.
-  if (platform === "win32") {
-    evidence.limits.push("Windows: graceful quit is exercised by the in-app smoke hold timer, not by a signal");
+  // Windows signals terminate the app directly. In extract-and-run mode the AppImage launcher
+  // is a wrapper, so signaling it would skip the Electron shutdown handshake as well.
+  const appImageWrapper = l.env?.APPIMAGE_EXTRACT_AND_RUN === "1";
+  const quitViaTimer = platform === "win32" || appImageWrapper;
+  if (quitViaTimer) {
+    evidence.limits.push(`${appImageWrapper ? "AppImage" : "Windows"}: graceful quit is exercised by the in-app smoke hold timer`);
   } else {
     process.kill(first.child.pid, "SIGTERM");
   }
-  const result = await Promise.race([first.exited, sleep(platform === "win32" ? 90_000 : 45_000).then(() => "timeout")]);
+  const result = await Promise.race([first.exited, sleep(quitViaTimer ? 90_000 : 45_000).then(() => "timeout")]);
   if (result === "timeout") {
     first.child.kill("SIGKILL");
     step("app_exit_after_quit", false, "did not exit");
