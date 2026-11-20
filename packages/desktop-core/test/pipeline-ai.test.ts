@@ -400,7 +400,7 @@ describe("task schemas", () => {
     });
     expect(validateJsonSchemaError(schema, { results: [item] })).toBeNull();
     const badEnum = judgeItem(1, { fields: { ...(item.fields as object), kind: { raw: "c", value: "c", confidence: 1 } } });
-    expect(validateJsonSchemaError(schema, { results: [badEnum] })).toMatch(/fields\.kind\.value/);
+    expect(validateJsonSchemaError(schema, { results: [badEnum] })).toMatch(/^\$\.results\[0\]\.fields\.kind\.value: did not match anyOf schema/);
     const missingField = judgeItem(1, { fields: { price: (item.fields as Record<string, unknown>).price } });
     expect(validateJsonSchemaError(schema, { results: [missingField] })).toMatch(/missing required property 'area'|missing required property/);
     const longSummary = judgeItem(1, { summary: "s".repeat(141) });
@@ -428,12 +428,14 @@ describe("task schemas", () => {
 
 describe("semantic validation", () => {
   it("maps judge results and rejects missing, unknown and duplicate refs and unknown fields", () => {
-    const legacyItem = judgeItem(1);
-    delete legacyItem.is_spam;
-    const ok = validateJudgeExtractOutput({ results: [judgeItem(2), legacyItem] }, [1, 2], FIELDS);
+    const noSpamFlag = judgeItem(1);
+    delete noSpamFlag.is_spam; // serde default: a missing `is_spam` is false
+    const ok = validateJudgeExtractOutput({ results: [judgeItem(2), noSpamFlag] }, [1, 2], FIELDS);
     expect(ok.map((r) => r.ref)).toEqual([2, 1]);
     expect(ok[1].is_spam).toBe(false);
-    expect(() => validateJudgeExtractOutput({ results: [judgeItem(1, { is_spam: null })] }, [1], FIELDS)).toThrowError(/is_spam/);
+    expect(() => validateJudgeExtractOutput({ results: [judgeItem(1, { is_spam: null })] }, [1], FIELDS)).toThrowError(
+      /invalid type for `is_spam`/,
+    );
     expect(ok[0].fields.area).toEqual({ raw: null, value: null, confidence: 0 });
     expect(() => validateJudgeExtractOutput({ results: [judgeItem(1)] }, [1, 2], FIELDS)).toThrowError(
       "Đầu ra AI không hợp lệ theo schema: expected 2 results for batch refs [1, 2], got 1",
@@ -611,6 +613,7 @@ describe("judgeExtractAll", () => {
       state: "ai_failed",
       post_id: "post-id-secret-3",
       ref: 3,
+      // The singleton slice keeps its own (unique, un-renumbered) ref, as in the Rust oracle.
       error: "Đầu ra AI không hợp lệ theo schema: expected 1 results for batch refs [3], got 0",
     });
   });

@@ -60,6 +60,7 @@ class Reader {
     return v;
   }
   bool(o: JsonObject, k: string, dflt?: boolean): boolean {
+    // serde `#[serde(default)]` only covers a missing key; an explicit null is a type error.
     if (!has(o, k)) {
       if (dflt !== undefined) return dflt;
       throw this.error(`missing field \`${k}\``);
@@ -80,7 +81,7 @@ class Reader {
   }
   /** `Vec<String>` with `#[serde(default)]`. */
   strArrayDefault(o: JsonObject, k: string): string[] {
-    if (!has(o, k) || o[k] === null) return [];
+    if (!has(o, k)) return [];
     return this.strArray(o[k], k);
   }
   strArray(v: Json, what: string): string[] {
@@ -112,14 +113,14 @@ export function validateSuggestFieldsOutput(val: Json): SuggestFieldsBridgeOutpu
     return out;
   });
 
-  const hardFilters = (has(root, "hard_filters") && root.hard_filters !== null ? r.arr(root.hard_filters, "hard_filters") : []).map((item) => {
+  const hardFilters = (has(root, "hard_filters") ? r.arr(root.hard_filters, "hard_filters") : []).map((item) => {
     const h = r.obj(item, "hard_filter");
     if (!has(h, "value")) r.fail("missing field `value`");
     return {
       field: r.str(h, "field"),
       op: r.str(h, "op"),
       value: h.value,
-      when_missing: has(h, "when_missing") && h.when_missing !== null ? r.str(h, "when_missing") : "pass",
+      when_missing: has(h, "when_missing") ? r.str(h, "when_missing") : "pass",
     };
   });
 
