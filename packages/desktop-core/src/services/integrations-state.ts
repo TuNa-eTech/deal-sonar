@@ -10,6 +10,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { AiBridge, buildCliProvider } from "../ai/bridge";
+import { MockAiProvider } from "../ai/mock";
 import type { AiProvider, CliProviderId } from "../ai/types";
 import type { RuntimeContext } from "../backend/runtime";
 import { CoreError } from "../backend/wire";
@@ -254,7 +255,7 @@ export interface IntegrationHooks {
 
 export interface IntegrationDeps {
   hooks?: IntegrationHooks;
-  /** AI provider override (tests, or a future mock mode). Default: CLI adapter per settings. */
+  /** AI provider override for tests. The default follows runtime configuration and saved settings. */
   aiProvider?: AiProvider;
   aiHealth?: AiRuntimeHealth;
   licenseVerifier?: LicenseVerifier;
@@ -383,7 +384,9 @@ export function getIntegrations(ctx: RuntimeContext): IntegrationState {
   // Production default: Claude CLI, switched to the persisted selection (builder `start()`).
   const settings = loadSettings(ctx.store);
   const initial: AiProvider =
-    deps.aiProvider ?? cliProviderForSettings(settings.ai_provider ?? "claude_cli", settings, ctx);
+    deps.aiProvider ?? (ctx.config.mockAi
+      ? new MockAiProvider()
+      : cliProviderForSettings(settings.ai_provider ?? "claude_cli", settings, ctx));
   const state = new IntegrationState(deps, initial);
   REGISTRY.set(ctx, state);
   restoreOutboxTracker(ctx, state);

@@ -6,6 +6,7 @@ export * from "./cli-util";
 export * from "./codex";
 export * from "./codex-schema";
 export * from "./discovery";
+export * from "./mock";
 export * from "./schema";
 export * from "./subprocess";
 export * from "./types";

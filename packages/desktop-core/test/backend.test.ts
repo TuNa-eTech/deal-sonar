@@ -359,6 +359,27 @@ describe("startBackend / DesktopRuntime", () => {
     expect(fs.existsSync(path.join(dataDir, "agent-access"))).toBe(false);
   });
 
+  it("serves Radar suggestions through the offline provider when mock AI is enabled", async () => {
+    const port = new FakePort();
+    const env = { ...candidateEnv(path.join(tmp, "offline")), DEALSONAR_MOCK_AI: "1" };
+    const started = await startBackend({ port, env, loadHost: async () => fakeHost().host, platform: "linux", exit: () => undefined });
+    expect(started).not.toBeNull();
+    try {
+      port.send({
+        id: 1, command: "radar_suggest_fields",
+        args: { input: { description: "Tìm phòng trọ giá rẻ tại Hà Nội" } },
+      });
+      const reply = await port.reply(1);
+      expect(reply).toMatchObject({ id: 1, ok: true, value: { fields: expect.any(Array) } });
+      const usage = started!.runtime.context.store.aiCalls;
+      expect(usage.usage(1, Date.now()).total_items).toBe(1);
+      port.send({ id: 2, command: "ai_probe", args: { provider: "claude_cli" } });
+      expect(await port.reply(2)).toMatchObject({ id: 2, ok: true, value: { claude_cli: { version: "dealsonar-mock 0.1.0" } } });
+    } finally {
+      await started?.runtime.shutdown();
+    }
+  });
+
   it("delivers OS notifications through the shell push channel", async () => {
     const port = new FakePort();
     const started = await startBackend({ port, env: candidateEnv(path.join(tmp, "z")), loadHost: async () => fakeHost().host, platform: "linux", exit: () => undefined });
