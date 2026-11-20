@@ -9,6 +9,9 @@
 //    explicit isolated manifest path (`DEALSONAR_CHROME_MANIFEST_PATH`) it writes nothing; with
 //    one, it refuses the real default manifest location and the real Windows registry key.
 //  * The environment is passed in explicitly. Nothing here reads `process.env`.
+//  * Chrome starts the helper without backend env. The candidate therefore writes a per-install
+//    route file (data dir + IPC endpoint) beside its helper before installing it, and production
+//    removes any leftover one. A candidate whose provisioning cannot route is never provisioned.
 //
 // `@dealsonar/native-host` is reached through the structural `ChromeProvisioning` view (build it
 // with `chromeProvisioningFrom`), like `HostBindings`, so this module typechecks without it.
@@ -61,6 +64,15 @@ export interface ChromeProvisioning {
   installHelper(options: { sourcePath: string; destPath: string }): { path: string; changed: boolean };
   /** `NotPairedError` thrown by `refreshChromeIfPaired`. */
   NotPairedError: new () => Error;
+  /**
+   * `writeCandidateRoute({ dataDir, ipcEndpoint, env, platform })`: writes the per-install routing
+   * file beside the candidate helper (`<dataDir>/bin`) so a Chrome-launched helper, which gets no
+   * backend env, reaches this profile's endpoint. Throws when the target is the production data
+   * dir or endpoint. Required for the candidate channel; it never provisions without it.
+   */
+  writeCandidateRoute?(options: { dataDir: string; ipcEndpoint: string; env: Env; platform: HostPlatform }): { path: string; changed: boolean };
+  /** `clearHelperRoute(dataDir, platform)`: production removes any leftover route from its bin. */
+  clearHelperRoute?(dataDir: string, platform: HostPlatform): boolean;
 }
 
 /** Builds `ChromeProvisioning` from the real package export surface. */
@@ -71,6 +83,8 @@ export function chromeProvisioningFrom(mod: {
   stableHelperPath: ChromeProvisioning["stableHelperPath"];
   installHelper: ChromeProvisioning["installHelper"];
   NotPairedError: ChromeProvisioning["NotPairedError"];
+  writeCandidateRoute?: ChromeProvisioning["writeCandidateRoute"];
+  clearHelperRoute?: ChromeProvisioning["clearHelperRoute"];
 }): ChromeProvisioning {
   return {
     connectChrome: mod.connectChrome,
@@ -79,6 +93,8 @@ export function chromeProvisioningFrom(mod: {
     stableHelperPath: mod.stableHelperPath,
     installHelper: mod.installHelper,
     NotPairedError: mod.NotPairedError,
+    ...(mod.writeCandidateRoute ? { writeCandidateRoute: mod.writeCandidateRoute } : {}),
+    ...(mod.clearHelperRoute ? { clearHelperRoute: mod.clearHelperRoute } : {}),
   };
 }
 
@@ -251,7 +267,33 @@ function toCoreError(err: unknown): CoreError {
   const message = err instanceof Error ? err.message : String(err);
   // `NativeHostManifest::new_with_origins` failures (invalid extension id) are validation errors.
   if (err instanceof Error && err.name === "ManifestError") return CoreError.validation(message);
+  // A route that would point a helper at the production data dir or endpoint.
+  if (err instanceof Error && err.name === "HelperRouteError") return CoreError.validation(message);
   return CoreError.internal(message);
+}
+
+/**
+ * Per-install routing for the helper in `<dataDir>/bin`. Chrome launches the helper without backend
+ * env, so the candidate writes a route file (data dir + IPC endpoint) beside it; production removes
+ * any leftover route so a candidate file can never redirect a production helper. Run this BEFORE
+ * the helper is installed or a manifest is written: when it throws, nothing has been touched, and a
+ * candidate without routing is never provisioned (its helper would resolve production endpoints).
+ */
+function routeStableHelper(ctx: ChromeContext, deps: ChromeConnectDeps, platform: HostPlatform): void {
+  const { config } = ctx;
+  const provisioning = deps.provisioning;
+  try {
+    if (config.channel === "candidate") {
+      if (!provisioning.writeCandidateRoute) {
+        throw CoreError.internal("native-host provisioning cannot route the candidate helper to its profile");
+      }
+      provisioning.writeCandidateRoute({ dataDir: config.dataDir, ipcEndpoint: config.ipcEndpoint, env: deps.env, platform });
+    } else {
+      provisioning.clearHelperRoute?.(config.dataDir, platform);
+    }
+  } catch (err) {
+    throw toCoreError(err);
+  }
 }
 
 function persistExtensionId(ctx: ChromeContext, id: string | null): void {
@@ -294,6 +336,7 @@ export async function chromeConnect(
 
   const { target } = resolution;
   const explicit = opts.extension_id?.trim() ? opts.extension_id.trim() : null;
+  routeStableHelper(ctx, deps, platform);
   const helperPath = ensureStableHelper(ctx, deps, platform);
   if (helperPath === null) {
     persistExtensionId(ctx, explicit);
@@ -333,6 +376,7 @@ export async function refreshNativeHostManifestIfPaired(ctx: ChromeContext, deps
     return false;
   }
   if (resolution.kind === "isolated") return false;
+  routeStableHelper(ctx, deps, platform);
   const helperPath = ensureStableHelper(ctx, deps, platform);
   if (helperPath === null) return false;
 

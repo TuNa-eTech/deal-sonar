@@ -2,7 +2,7 @@
  * Process entry bundled into the standalone helper (Node SEA). Kept tiny: all logic lives in
  * `cli.ts` so it is unit-testable.
  */
-import { runCli, userArgs } from "./cli.js";
+import { isSea, runCli, userArgs } from "./cli.js";
 
 // Chrome closes the pipe on exit; EPIPE must end the process quietly, not with a stack trace.
 process.stdout.on("error", () => process.exit(1));
@@ -12,6 +12,8 @@ runCli(userArgs(process.argv, process.execPath), {
   stdout: process.stdout,
   stderr: process.stderr,
   env: process.env,
+  // SEA: the executable itself. Bundled script (development, synthetic tests): the script.
+  helperLocation: isSea() ? process.execPath : (process.argv[1] ?? null),
 }).then(
   (code) => {
     process.exitCode = code;

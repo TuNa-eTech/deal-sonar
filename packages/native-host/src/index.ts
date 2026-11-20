@@ -10,5 +10,6 @@ export * from "./mcp.js";
 export * from "./manifest.js";
 export * from "./registry.js";
 export * from "./install-helper.js";
+export * from "./route.js";
 export * from "./provision.js";
 export { runCli, userArgs, isSea, type CliIo } from "./cli.js";

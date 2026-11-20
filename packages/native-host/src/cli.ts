@@ -8,6 +8,8 @@
 import type { Readable, Writable } from "node:stream";
 import { relayConfigFromEnv, runRelay } from "./relay.js";
 import { runMcp } from "./mcp.js";
+import { createDesktopCaller } from "./agent-client.js";
+import { resolveHelperRoute } from "./route.js";
 import type { Env } from "./endpoint.js";
 
 export interface CliIo {
@@ -15,6 +17,12 @@ export interface CliIo {
   stdout: Writable;
   stderr: Writable;
   env: Env;
+  /**
+   * Path of the running helper (SEA executable, or the bundled script in development). When a
+   * candidate route file sits next to it and the caller set no DEALSONAR_DATA_DIR /
+   * DEALSONAR_IPC_PATH, that route decides the data dir and endpoint. Omit to disable routing.
+   */
+  helperLocation?: string | null;
 }
 
 /**
@@ -24,9 +32,18 @@ export interface CliIo {
 export async function runCli(args: readonly string[], io: CliIo): Promise<number> {
   const log = (message: string) => io.stderr.write(`dealsonar-native-host: ${message}\n`);
 
+  // Fail closed: a broken candidate route must never fall back to the production endpoint.
+  let env: Env;
+  try {
+    env = resolveHelperRoute({ helperLocation: io.helperLocation, env: io.env });
+  } catch (error) {
+    log(`invalid helper route: ${(error as Error).message}`);
+    return 1;
+  }
+
   if (args[0] === "--mcp") {
     try {
-      await runMcp(io.stdin, io.stdout);
+      await runMcp(io.stdin, io.stdout, env === io.env ? {} : { callDesktop: createDesktopCaller({ env }) });
       return 0;
     } catch (error) {
       log(`MCP terminated with error: ${(error as Error).message}`);
@@ -36,7 +53,7 @@ export async function runCli(args: readonly string[], io: CliIo): Promise<number
 
   let config;
   try {
-    config = relayConfigFromEnv(io.env);
+    config = relayConfigFromEnv(env);
   } catch (error) {
     log(`failed to resolve IPC endpoint: ${(error as Error).message}`);
     return 1;

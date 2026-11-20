@@ -29,6 +29,14 @@ export const CHROME_EXTENSION_ID_SETTING_KEY = "chrome.extension_id";
 export const DEALSONAR_IPC_PATH_ENV = "DEALSONAR_IPC_PATH";
 export const DEALSONAR_DATA_DIR_ENV = "DEALSONAR_DATA_DIR";
 
+/**
+ * Per-install routing file written next to an isolated (candidate) helper, in
+ * `<dataDir>/bin/`. Chrome launches the helper without backend env, so this is the only way an
+ * isolated install can reach its own data dir and IPC endpoint. Production installs have none.
+ */
+export const HELPER_ROUTE_FILENAME = "dealsonar-native-host.route.json";
+export const HELPER_ROUTE_VERSION = 1;
+
 /** Local agent (MCP) request format shared with the desktop backend. */
 export const AGENT_FRAME_PREFIX = Buffer.from("DealSonarAgent/1\n", "utf8");
 export const AGENT_MAX_FRAME_BYTES = 1024 * 1024;

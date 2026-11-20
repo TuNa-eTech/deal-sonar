@@ -41,8 +41,11 @@ function fakeProvisioning() {
     connect: [] as ChromeProvisionRequest[],
     refresh: [] as ChromeProvisionRequest[],
     install: [] as Array<{ sourcePath: string; destPath: string }>,
+    route: [] as Array<{ dataDir: string; ipcEndpoint: string; env: Record<string, string | undefined>; platform: string }>,
+    clear: [] as Array<{ dataDir: string; platform: string }>,
+    order: [] as string[],
   };
-  const state = { installFails: false, pairedOnRefresh: true, nativeHostInstalled: true, outcomeId: "hkmjpcenjjebhpjicnbpmogidfcbmbjn", defaultThrows: false };
+  const state = { installFails: false, pairedOnRefresh: true, nativeHostInstalled: true, outcomeId: "hkmjpcenjjebhpjicnbpmogidfcbmbjn", defaultThrows: false, routeError: null as Error | null };
   const outcome = (req: ChromeProvisionRequest): ChromeProvisionOutcome => ({
     nativeHostInstalled: state.nativeHostInstalled,
     manifestPath: req.manifestPath ?? REAL_MANIFEST,
@@ -53,10 +56,12 @@ function fakeProvisioning() {
   });
   const provisioning: ChromeProvisioning = {
     async connectChrome(req) {
+      calls.order.push("connect");
       calls.connect.push(req);
       return outcome(req);
     },
     async refreshChromeIfPaired(req) {
+      calls.order.push("refresh");
       calls.refresh.push(req);
       if (!state.pairedOnRefresh) throw new NotPaired();
       return outcome(req);
@@ -67,11 +72,23 @@ function fakeProvisioning() {
     },
     stableHelperPath: (dataDir) => `${dataDir}/bin/dealsonar-native-host`,
     installHelper(options) {
+      calls.order.push("install");
       calls.install.push(options);
       if (state.installFails) throw new Error("EACCES");
       return { path: options.destPath, changed: true };
     },
     NotPairedError: NotPaired,
+    writeCandidateRoute(options) {
+      calls.order.push("route");
+      calls.route.push(options);
+      if (state.routeError) throw state.routeError;
+      return { path: `${options.dataDir}/bin/dealsonar-native-host.route.json`, changed: true };
+    },
+    clearHelperRoute(dataDir, platform) {
+      calls.order.push("clear");
+      calls.clear.push({ dataDir, platform });
+      return false;
+    },
   };
   return { provisioning, calls, state };
 }
@@ -234,6 +251,73 @@ describe("chrome_connect (candidate channel never touches the live profile)", ()
   it("never refreshes without an isolated boundary", async () => {
     expect(await refreshNativeHostManifestIfPaired(chromeCtx({ channel: "candidate" }), deps())).toBe(false);
     expect(fake.calls.refresh).toHaveLength(0);
+    expect(fake.calls.route).toHaveLength(0);
+  });
+
+  it("writes nothing, not even a route, without an isolated boundary", async () => {
+    await chromeConnect(chromeCtx({ channel: "candidate" }), deps());
+    expect([fake.calls.route, fake.calls.clear, fake.calls.order]).toEqual([[], [], []]);
+  });
+});
+
+describe("candidate per-install helper routing", () => {
+  const isolated: ChromeBoundary = { manifestPath: "/iso/manifest.json", registryKeyPath: null, devExtensionIds: [] };
+
+  it("routes the helper to the profile's data dir and endpoint before installing it or writing a manifest", async () => {
+    await chromeConnect(chromeCtx({ channel: "candidate", dataDir: "/cand/data", ipcEndpoint: "/cand/data/ipc.sock" }), deps(isolated));
+    expect(fake.calls.route).toEqual([{ dataDir: "/cand/data", ipcEndpoint: "/cand/data/ipc.sock", env: { HOME: "/home/u" }, platform: "macos" }]);
+    expect(fake.calls.order).toEqual(["route", "install", "connect"]);
+    expect(fake.calls.clear).toEqual([]);
+  });
+
+  it("carries the Windows candidate pipe and an explicit endpoint override into the route", async () => {
+    const host = {
+      resolveDesktopDataDir: () => "C:\\cand",
+      resolveDesktopIpcEndpoint: (_dir: string, env: Readonly<Record<string, string | undefined>>) => env.DEALSONAR_IPC_PATH ?? "\\\\.\\pipe\\dealsonar-someone",
+    };
+    const candidate = loadBackendConfig({ DEALSONAR_CHANNEL: "candidate", USERNAME: "An Tu" }, host, "win32");
+    await chromeConnect(chromeCtx({ ...candidate }), deps({ ...isolated, manifestPath: "C:\\iso\\m.json" }));
+    expect(fake.calls.route.at(-1)).toMatchObject({ dataDir: "C:\\cand", ipcEndpoint: "\\\\.\\pipe\\dealsonar-candidate-An_Tu", platform: "windows" });
+
+    const explicit = loadBackendConfig({ DEALSONAR_CHANNEL: "candidate", DEALSONAR_IPC_PATH: "\\\\.\\pipe\\custom" }, host, "win32");
+    await chromeConnect(chromeCtx({ ...explicit }), deps({ ...isolated, manifestPath: "C:\\iso\\m.json" }));
+    expect(fake.calls.route.at(-1)).toMatchObject({ ipcEndpoint: "\\\\.\\pipe\\custom" });
+  });
+
+  it("touches nothing when the route would collide with production", async () => {
+    fake.state.routeError = Object.assign(new Error("refusing to route a helper to the production data dir"), { name: "HelperRouteError" });
+    await expect(chromeConnect(chromeCtx({ channel: "candidate" }), deps(isolated), { extension_id: "abc" })).rejects.toMatchObject({ kind: "validation" });
+    expect(fake.calls.order).toEqual(["route"]);
+    expect(ctx.store.settings.get(CHROME_EXTENSION_ID_SETTING_KEY)).toBeNull();
+
+    fake.calls.order.length = 0;
+    await expect(refreshNativeHostManifestIfPaired(chromeCtx({ channel: "candidate" }), deps(isolated))).rejects.toMatchObject({ kind: "validation" });
+    expect(fake.calls.order).toEqual(["route"]);
+  });
+
+  it("refuses to provision a candidate whose provisioning cannot route it", async () => {
+    delete fake.provisioning.writeCandidateRoute;
+    await expect(chromeConnect(chromeCtx({ channel: "candidate" }), deps(isolated))).rejects.toMatchObject({ kind: "internal" });
+    expect(fake.calls.order).toEqual([]);
+  });
+
+  it("refreshes the route with the manifest at startup", async () => {
+    ctx.store.settings.set(CHROME_EXTENSION_ID_SETTING_KEY, "abcdefghijklmnopabcdefghijklmnop");
+    expect(await refreshNativeHostManifestIfPaired(chromeCtx({ channel: "candidate", dataDir: "/cand/data", ipcEndpoint: "/cand/data/ipc.sock" }), deps(isolated))).toBe(true);
+    expect(fake.calls.order).toEqual(["route", "install", "refresh"]);
+  });
+
+  it("production never writes a route and clears a leftover one before installing", async () => {
+    await chromeConnect(chromeCtx(), deps());
+    expect(fake.calls.route).toEqual([]);
+    expect(fake.calls.clear).toEqual([{ dataDir: "/tmp/dealsonar-test", platform: "macos" }]);
+    expect(fake.calls.order).toEqual(["clear", "install", "connect"]);
+
+    // Provisioning without route support behaves exactly as before for production.
+    delete fake.provisioning.clearHelperRoute;
+    fake.calls.order.length = 0;
+    expect((await chromeConnect(chromeCtx(), deps())).native_host_installed).toBe(true);
+    expect(fake.calls.order).toEqual(["install", "connect"]);
   });
 });
 
@@ -334,6 +418,8 @@ type NativeHostModule = {
   stableHelperPath: ChromeProvisioning["stableHelperPath"];
   installHelper: ChromeProvisioning["installHelper"];
   NotPairedError: ChromeProvisioning["NotPairedError"];
+  writeCandidateRoute: NonNullable<ChromeProvisioning["writeCandidateRoute"]>;
+  clearHelperRoute: NonNullable<ChromeProvisioning["clearHelperRoute"]>;
 };
 
 let nativeHost: NativeHostModule | null = null;
@@ -413,5 +499,46 @@ describe.skipIf(nativeHost === null)("with the real native-host provisioning", (
     );
     expect(result.native_host_installed).toBe(false);
     expect(fs.existsSync(home)).toBe(false);
+  });
+
+  it("routes the candidate helper to its profile, and production provisioning removes the route", async () => {
+    const provisioning = chromeProvisioningFrom(nativeHost!);
+    const dataDir = path.join(tmp, "data");
+    const ipcEndpoint = path.join(dataDir, "ipc.sock");
+    const packaged = path.join(tmp, "Resources", "dealsonar-native-host");
+    fs.mkdirSync(path.dirname(packaged), { recursive: true });
+    fs.writeFileSync(packaged, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    const manifestPath = path.join(tmp, "iso", "com.dealsonar.host.json");
+    const d: ChromeConnectDeps = {
+      protocol: service,
+      provisioning,
+      env: { HOME: path.join(tmp, "home") },
+      boundary: { manifestPath, registryKeyPath: null, devExtensionIds: [] },
+    };
+    const base = { dataDir, ipcEndpoint, nativeHostBinaryPath: packaged, platform: "linux" as const };
+    const routeFile = path.join(dataDir, "bin", "dealsonar-native-host.route.json");
+
+    await chromeConnect({ config: makeConfig({ ...base, channel: "candidate" }), store: ctx.store, isShuttingDown: () => false }, d);
+    expect(JSON.parse(fs.readFileSync(routeFile, "utf8"))).toEqual({ version: 1, channel: "candidate", dataDir, ipcEndpoint });
+    expect(fs.existsSync(path.join(dataDir, "bin", "dealsonar-native-host"))).toBe(true);
+
+    await chromeConnect({ config: makeConfig({ ...base, channel: "production" }), store: ctx.store, isShuttingDown: () => false }, d);
+    expect(fs.existsSync(routeFile)).toBe(false);
+  });
+
+  it("refuses to install or route a candidate into the production data dir", async () => {
+    const home = path.join(tmp, "home");
+    const productionDir = path.join(home, ".local", "share", "dealsonar");
+    const manifestPath = path.join(tmp, "iso", "com.dealsonar.host.json");
+    const packaged = path.join(tmp, "dealsonar-native-host");
+    fs.writeFileSync(packaged, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    await expect(
+      chromeConnect(
+        { config: makeConfig({ channel: "candidate", dataDir: productionDir, nativeHostBinaryPath: packaged, platform: "linux" }), store: ctx.store, isShuttingDown: () => false },
+        { protocol: service, provisioning: chromeProvisioningFrom(nativeHost!), env: { HOME: home }, boundary: { manifestPath, registryKeyPath: null, devExtensionIds: [] } },
+      ),
+    ).rejects.toMatchObject({ kind: "validation" });
+    expect(fs.existsSync(productionDir)).toBe(false);
+    expect(fs.existsSync(manifestPath)).toBe(false);
   });
 });
