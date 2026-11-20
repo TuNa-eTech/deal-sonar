@@ -1,0 +1,32 @@
+{
+  "name": "@dealsonar/desktop-electron",
+  "private": true,
+  "version": "0.1.0",
+  "description": "DealSonar Electron desktop shell (candidate): window, tray, dialogs, notifications, autostart, backend utilityProcess supervision.",
+  "author": "DealSonar <support@dealsonar.invalid>",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "pnpm build && electron .",
+    "stage": "node scripts/stage.mjs",
+    "stage:stub": "node scripts/stage.mjs --allow-stub",
+    "pack:dir": "pnpm build && pnpm stage && electron-builder --dir --config electron-builder.config.cjs",
+    "dist:mac-arm64": "pnpm build && pnpm stage && electron-builder --mac dmg --arm64 --config electron-builder.config.cjs --publish never",
+    "dist:mac-x64": "pnpm build && pnpm stage && electron-builder --mac dmg --x64 --config electron-builder.config.cjs --publish never",
+    "dist:win-x64": "pnpm build && pnpm stage && electron-builder --win nsis --x64 --config electron-builder.config.cjs --publish never",
+    "dist:linux-x64": "pnpm build && pnpm stage && electron-builder --linux deb AppImage --x64 --config electron-builder.config.cjs --publish never",
+    "smoke:unpacked": "node scripts/smoke/run-smoke.mjs --mode unpacked",
+    "smoke:installed": "node scripts/smoke/run-smoke.mjs --mode installed"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0",
+    "electron-builder-squirrel-windows": "26.18.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}

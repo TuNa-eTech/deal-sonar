@@ -46,6 +46,7 @@ import type {
   UpdateRadarInput,
 } from "../types/ipc";
 import { invokeMockCommand, subscribeMockEvent } from "./mockBackend";
+import { invokeElectron, isElectronRuntime, listenElectron } from "./electronBridge";
 
 /**
  * Returns `true` only when running inside a real Tauri v2 WebView window.
@@ -55,9 +56,17 @@ export function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+/** True inside either real desktop shell (Tauri or Electron), false for browser dev mode and tests. */
+export function isDesktopRuntime(): boolean {
+  return isTauriRuntime() || isElectronRuntime();
+}
+
 async function callCommand<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
   if (isTauriRuntime()) {
     return invoke<T>(cmd, args);
+  }
+  if (isElectronRuntime()) {
+    return invokeElectron<T>(cmd, args);
   }
   return invokeMockCommand<T>(cmd, args);
 }
@@ -75,6 +84,9 @@ export async function onDesktopEvent<K extends keyof TauriEventMap>(
       handler(ev.payload);
     });
     return unlisten;
+  }
+  if (isElectronRuntime()) {
+    return listenElectron<TauriEventMap[K]>(event, handler);
   }
   return subscribeMockEvent(event, handler);
 }

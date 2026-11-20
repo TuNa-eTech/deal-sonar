@@ -1,0 +1,9 @@
+{
+  "channel": "candidate",
+  "appId": "com.dealsonar.desktop.electron-candidate",
+  "productName": "DealSonar Candidate",
+  "executableName": "dealsonar-candidate",
+  "dataDirName": "DealSonar Candidate",
+  "linuxDataDirName": "dealsonar-candidate",
+  "artifactPrefix": "DealSonar-Candidate"
+}

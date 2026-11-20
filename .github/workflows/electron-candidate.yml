@@ -1,0 +1,79 @@
+name: electron-candidate
+
+# Builds the Electron CANDIDATE installers and installs/launches each one on its own OS.
+# Manual only: it never publishes a release, signs with a real identity, or touches updater feeds.
+# Artifacts are uploaded to the workflow run for inspection, nothing else.
+on:
+  workflow_dispatch:
+    inputs:
+      allow_stub:
+        description: "Use the marked stub backend/native helper (shell + installer testing only, not a release candidate)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  package-and-smoke:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macos-arm64-dmg, runner: macos-15, builder: "--mac dmg --arm64", artifact: "*.dmg" }
+          - { name: macos-x64-dmg, runner: macos-15-intel, builder: "--mac dmg --x64", artifact: "*.dmg" }
+          - { name: windows-x64-nsis, runner: windows-2022, builder: "--win nsis --x64", artifact: "*.exe" }
+          - { name: linux-x64-deb, runner: ubuntu-24.04, builder: "--linux deb AppImage --x64", artifact: "*.deb", extra: "--system-install" }
+          - { name: linux-x64-appimage, runner: ubuntu-24.04, builder: "--linux deb AppImage --x64", artifact: "*.AppImage" }
+    env:
+      DEALSONAR_CANDIDATE_VERSION: 0.1.0-candidate.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb libfuse2t64 fakeroot dpkg
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm ui:build
+      - run: pnpm electron:test
+      - run: pnpm electron:typecheck
+      - name: Stage resources
+        shell: bash
+        run: |
+          if [ "${{ inputs.allow_stub }}" = "true" ]; then
+            pnpm --filter @dealsonar/desktop-electron stage:stub
+          else
+            pnpm --filter @dealsonar/desktop-electron stage
+          fi
+      - name: Package (${{ matrix.name }})
+        shell: bash
+        working-directory: apps/desktop-electron
+        run: |
+          pnpm build
+          pnpm exec electron-builder ${{ matrix.builder }} --config electron-builder.config.cjs --publish never
+      - name: Installed smoke
+        shell: bash
+        working-directory: apps/desktop-electron
+        run: |
+          set -e
+          f=$(ls release/${{ matrix.artifact }} | head -n1)
+          node scripts/smoke/run-smoke.mjs --mode installed --artifact "$f" ${{ matrix.extra }} --out release/smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            apps/desktop-electron/release/*.dmg
+            apps/desktop-electron/release/*.exe
+            apps/desktop-electron/release/*.deb
+            apps/desktop-electron/release/*.AppImage
+            apps/desktop-electron/release/smoke/*.json
+          if-no-files-found: warn
+          retention-days: 7
