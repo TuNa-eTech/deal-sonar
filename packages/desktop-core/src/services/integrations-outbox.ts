@@ -333,15 +333,19 @@ export interface RouteLeadNotificationsInput {
  *
  * Throws on invalid permalinks / callback data exactly where the Rust version returned `Err`.
  */
-export async function routeLeadNotifications(ctx: RuntimeContext, input: RouteLeadNotificationsInput): Promise<void> {
+export async function routeLeadNotifications(
+  ctx: RuntimeContext,
+  input: RouteLeadNotificationsInput,
+  { notifyDesktop = true }: { notifyDesktop?: boolean } = {},
+): Promise<void> {
   try {
-    await routeLeadNotificationsInner(ctx, input);
+    await routeLeadNotificationsInner(ctx, input, notifyDesktop);
   } catch (err) {
     throw asCoreError(err);
   }
 }
 
-async function routeLeadNotificationsInner(ctx: RuntimeContext, input: RouteLeadNotificationsInput): Promise<void> {
+async function routeLeadNotificationsInner(ctx: RuntimeContext, input: RouteLeadNotificationsInput, notifyDesktop: boolean): Promise<void> {
   const state = getIntegrations(ctx);
   const store = ctx.store;
   const { lead, post, now } = input;
@@ -351,12 +355,13 @@ async function routeLeadNotificationsInner(ctx: RuntimeContext, input: RouteLead
   const allChannels = store.channels.list();
   const targetChannels = allChannels.filter((c) => c.state === "ok" && notifySendsToChannel(input.radarNotify, c.id));
   const hasTelegramConfigured =
-    allChannels.some((c) => c.kind === "telegram") && (await tryGetSecret(ctx.secrets, TELEGRAM_BOT_TOKEN_KEY)) !== null;
+    notifyDesktop && allChannels.some((c) => c.kind === "telegram") && (await tryGetSecret(ctx.secrets, TELEGRAM_BOT_TOKEN_KEY)) !== null;
 
   // OS desktop notification fallback when Telegram is not configured (`07-notifications-export.md §4`).
   const sixHoursMs = 6 * 3_600_000;
   const localOnly = input.radarNotify.inherit_channels === false && input.radarNotify.channel_ids.length === 0;
   if (
+    notifyDesktop &&
     (localOnly || !hasTelegramConfigured) &&
     settings.os_notifications_enabled &&
     !input.isSilentOrPreview &&

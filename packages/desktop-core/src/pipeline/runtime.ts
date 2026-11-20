@@ -475,9 +475,7 @@ export class PipelineRuntime {
     this.tokenPresence = null;
   }
 
-  async computeHealthStatus(now: number): Promise<HealthStatus> {
-    const hasBotToken = await this.telegramTokenPresent(now);
-    const settings = this.loadSettings();
+  ipcSnapshot(now: number) {
     const conns = [...this.peers.values()];
     const extConnected = conns.length > 0;
     const extVersion = conns.length > 0 ? conns.reduce((a, b) => (b.connectedAt >= a.connectedAt ? b : a)).extVersion : null;
@@ -491,6 +489,22 @@ export class PipelineRuntime {
     const runtimeCheckedAt = reports.length > 0 ? Math.min(...reports.map(([at]) => at)) : null;
     const crawlPaused = this.crawlPaused || extensionPaused;
 
+    return {
+      extension_connected: extConnected,
+      extension_version: extVersion,
+      facebook_session: this.facebookSession,
+      crawl_paused: crawlPaused,
+      crawl_pause_reason: this.crawlPauseReason,
+      automatic_scanning: automaticScanning,
+      next_crawl_at: nextCrawlAt,
+      runtime_checked_at: runtimeCheckedAt,
+    };
+  }
+
+  async computeHealthStatus(now: number): Promise<HealthStatus> {
+    const hasBotToken = await this.telegramTokenPresent(now);
+    const settings = this.loadSettings();
+    const ipc = this.ipcSnapshot(now);
     const runs = this.store.sources.listCrawlRuns(null, 500);
     const oneHourAgo = now - 3_600_000;
     const dayStart = startOfLocalDayMs(now);
@@ -539,14 +553,14 @@ export class PipelineRuntime {
 
     const finished = runs.filter((r) => (r.status === "ok" || r.status === "empty") && r.ended_at !== null).map((r) => r.ended_at as number);
     return {
-      automatic_scanning: automaticScanning,
-      next_crawl_at: nextCrawlAt,
+      automatic_scanning: ipc.automatic_scanning,
+      next_crawl_at: ipc.next_crawl_at,
       last_crawl_at: finished.length > 0 ? Math.max(...finished) : null,
-      runtime_checked_at: runtimeCheckedAt,
-      extension_connected: extConnected,
-      extension_version: extVersion,
-      facebook_session: this.facebookSession,
-      crawl_paused: crawlPaused,
+      runtime_checked_at: ipc.runtime_checked_at,
+      extension_connected: ipc.extension_connected,
+      extension_version: ipc.extension_version,
+      facebook_session: ipc.facebook_session,
+      crawl_paused: ipc.crawl_paused,
       crawl_pause_reason: this.crawlPauseReason,
       page_loads_last_hour: pageLoadsLastHour,
       page_loads_today: pageLoadsToday,

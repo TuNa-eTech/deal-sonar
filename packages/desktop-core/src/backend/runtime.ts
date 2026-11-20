@@ -6,15 +6,10 @@
 // the local IPC endpoint through the Host package. Only after all that does the server push
 // `backend:ready`.
 //
-// Candidate-profile safety: Protocol v2 traffic and agent requests are NOT served until the
-// callbacks are provided by the corresponding ports. The defaults refuse every extension
-// connection and answer every agent call with a user-facing error, so a half-ported backend never
-// accepts data.
-
 import * as fs from "node:fs";
 
 import { Store } from "../store/store";
-import { type SecretStore, InMemorySecretStore } from "../secrets/types";
+import { type SecretStore, InMemorySecretStore, KEYRING_SERVICE } from "../secrets/types";
 import { createOsSecretStore } from "../secrets/os-store";
 import type { BackendConfig } from "./config";
 import type {
@@ -50,6 +45,8 @@ export interface DesktopRuntimeDeps {
   onExtensionConnection?: (ctx: RuntimeContext, connection: HostExtensionConnection) => void;
   /** Agent methods (list_radar_sources, prepare_radar, ...). Default: refuse. */
   agentBackend?: (ctx: RuntimeContext) => HostAgentBackend;
+  onStarted?: (ctx: RuntimeContext) => void | Promise<void>;
+  onStopping?: (ctx: RuntimeContext) => void | Promise<void>;
   logger?: (message: string) => void;
 }
 
@@ -84,8 +81,12 @@ export class DesktopRuntime implements BackendRuntime {
     const store = Store.open(config.dbPath, config.backupDir);
     this.store = store;
 
-    const secrets =
-      this.deps.secrets ?? (config.inMemorySecrets ? new InMemorySecretStore() : createOsSecretStore({ platform: config.platform }));
+    const secrets = this.deps.secrets ?? (config.inMemorySecrets
+      ? new InMemorySecretStore()
+      : createOsSecretStore({
+        platform: config.platform,
+        service: config.channel === "candidate" ? `${KEYRING_SERVICE} Candidate` : KEYRING_SERVICE,
+      }));
 
     const ctx: RuntimeContext = {
       config,
@@ -113,9 +114,9 @@ export class DesktopRuntime implements BackendRuntime {
         },
         logger: (m) => this.log(m),
       });
+      await this.deps.onStarted?.(ctx);
     } catch (err) {
-      store.close();
-      this.store = null;
+      await this.shutdown().catch((cleanupError: unknown) => this.log(String(cleanupError)));
       throw err;
     }
   }
@@ -143,6 +144,11 @@ export class DesktopRuntime implements BackendRuntime {
       errors.push(err);
     }
     this.ipc = null;
+    try {
+      if (this.ctx) await this.deps.onStopping?.(this.ctx);
+    } catch (err) {
+      errors.push(err);
+    }
     try {
       this.store?.close();
     } catch (err) {

@@ -23,6 +23,8 @@ import {
   type ParentPortLike,
 } from "../src";
 
+import { createDesktopServices } from "../src/backend/services";
+
 const RUST_DISPATCH = path.resolve(__dirname, "../../../apps/desktop/src/commands/dispatch.rs");
 
 let tmp: string;
@@ -85,8 +87,10 @@ describe("command surface", () => {
     expect(BACKEND_COMMANDS).toHaveLength(58);
   });
 
-  it("reports every command as unported until its handler lands", () => {
-    expect(unportedCommands()).toHaveLength(58);
+  it("registers exactly the supported backend commands and tray control", () => {
+    const handlers = createDesktopServices(fakeHost().host, {}).handlers!;
+    expect(unportedCommands(handlers)).toEqual([]);
+    expect(Object.keys(handlers).sort()).toEqual([...BACKEND_COMMANDS, BACKEND_CONTROL.toggleCrawlPaused].sort());
   });
 });
 
@@ -270,15 +274,28 @@ describe("startBackend / DesktopRuntime", () => {
     expect(raw.map((m) => m.version)).toEqual([1, 2, 3]);
     expect(started!.runtime.context.store.journalMode()).toBe("wal");
 
-    // extension connections and agent calls are refused until their ports exist
-    let closedConn = false;
-    fh.bound[0].onExtensionConnection({ close: () => { closedConn = true; } } as unknown as HostExtensionConnection);
-    expect(closedConn).toBe(true);
+    let receiveFrame!: (frame: Buffer) => void;
+    let disconnect!: () => void;
+    const sent: unknown[] = [];
+    fh.bound[0].onExtensionConnection({
+      onFrame: (listener) => { receiveFrame = listener; },
+      onClose: (listener) => { disconnect = listener; },
+      sendEnvelope: async (envelope) => { sent.push(envelope); },
+      close: () => disconnect(),
+    } as HostExtensionConnection);
+    receiveFrame(Buffer.from(JSON.stringify({
+      v: 2, id: "hello-from-chrome", ts: 1700000000000, reply_to: null, type: "hello",
+      payload: { profile_id: "fake-chrome", ext_version: "1.2.3", browser: "chrome", config_rev: 0 },
+    })));
+    expect(sent[0]).toMatchObject({ type: "hello.ok", reply_to: "hello-from-chrome" });
+    expect(sent[1]).toMatchObject({ type: "config.update" });
+    expect(await started!.runtime.invoke("health_get", {})).toMatchObject({ extension_connected: true });
+    await expect(fh.bound[0].agentBackend!.handle("list_radar_sources", {})).resolves.toMatchObject({ sources: [] });
     await expect(fh.bound[0].agentBackend!.handle("prepare_radar", {})).rejects.toBeInstanceOf(fh.AgentError);
+    disconnect();
 
-    // unported commands are explicit about it
-    port.send({ id: 1, command: "lead_list", args: {} });
-    expect((await port.reply(1)).error.code).toBe("not_implemented");
+    port.send({ id: 1, command: "source_list", args: {} });
+    expect(await port.reply(1)).toEqual({ id: 1, ok: true, value: [] });
 
     port.send({ id: 2, command: BACKEND_CONTROL.shutdown, args: { grace_ms: 100 } });
     expect(await port.reply(2)).toEqual({ id: 2, ok: true, value: null });

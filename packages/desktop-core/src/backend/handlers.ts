@@ -6,8 +6,6 @@
 import { BACKEND_COMMANDS } from "./wire";
 import type { HandlerTable } from "./runtime";
 
-export const DEFAULT_HANDLERS: HandlerTable = {};
-
-export function unportedCommands(handlers: HandlerTable = DEFAULT_HANDLERS): string[] {
+export function unportedCommands(handlers: HandlerTable): string[] {
   return BACKEND_COMMANDS.filter((c) => !handlers[c]);
 }

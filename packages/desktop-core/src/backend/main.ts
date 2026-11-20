@@ -3,6 +3,7 @@
 
 import { hostBindingsFrom } from "./host";
 import { startBackend } from "./entry";
+import { chromeProvisioningFrom } from "../services/protocol-chrome";
 import type { ParentPortLike } from "./server";
 
 const parentPort = (process as unknown as { parentPort?: ParentPortLike }).parentPort;
@@ -17,6 +18,10 @@ if (!parentPort) {
     loadHost: async () => {
       const mod = await import("@dealsonar/native-host");
       return hostBindingsFrom(mod as unknown as Parameters<typeof hostBindingsFrom>[0]);
+    },
+    loadProvisioning: async () => {
+      const mod = await import("@dealsonar/native-host");
+      return chromeProvisioningFrom(mod as unknown as Parameters<typeof chromeProvisioningFrom>[0]);
     },
     // stderr is piped to the shell's log; never log secrets or request bodies here.
     log: (message) => process.stderr.write(`[backend] ${message}\n`),

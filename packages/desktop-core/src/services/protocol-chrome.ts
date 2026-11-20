@@ -119,8 +119,15 @@ export function helperEnvFor(config: Pick<BackendConfig, "dataDir" | "ipcEndpoin
   return { DEALSONAR_DATA_DIR: config.dataDir, DEALSONAR_IPC_PATH: config.ipcEndpoint };
 }
 
+type ChromeProtocol = Pick<ProtocolService, "now" | "resumeCrawlAfterReconnect" | "setCrawlPaused"> & {
+  readonly hooks: Pick<ProtocolService["hooks"], "emitHealthIfChanged">;
+  readonly hub: Pick<ProtocolService["hub"], "crawlPaused"> & {
+    healthSnapshot(now: number): Pick<ReturnType<ProtocolService["hub"]["healthSnapshot"]>, "extension_connected" | "facebook_session">;
+  };
+};
+
 export interface ChromeConnectDeps {
-  protocol: ProtocolService;
+  protocol: ChromeProtocol;
   provisioning: ChromeProvisioning;
   /** Environment used for home/config directory resolution. Pass it explicitly. */
   env: Env;
@@ -349,14 +356,14 @@ export async function refreshNativeHostManifestIfPaired(ctx: ChromeContext, deps
 }
 
 /** `set_crawl_paused` (tray). Returns the refreshed health snapshot. */
-export function setCrawlPaused(ctx: Pick<RuntimeContext, "isShuttingDown">, protocol: ProtocolService, paused: boolean): unknown {
+export function setCrawlPaused(ctx: Pick<RuntimeContext, "isShuttingDown">, protocol: ChromeProtocol, paused: boolean): unknown {
   if (ctx.isShuttingDown()) throw CoreError.shuttingDown();
   protocol.setCrawlPaused(paused);
   return protocol.hooks.emitHealthIfChanged(protocol.now());
 }
 
 /** `toggle_crawl_paused`. */
-export function toggleCrawlPaused(ctx: Pick<RuntimeContext, "isShuttingDown">, protocol: ProtocolService): unknown {
+export function toggleCrawlPaused(ctx: Pick<RuntimeContext, "isShuttingDown">, protocol: ChromeProtocol): unknown {
   return setCrawlPaused(ctx, protocol, !protocol.hub.crawlPaused);
 }
 

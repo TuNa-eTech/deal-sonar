@@ -1,5 +1,6 @@
 import { loadBackendConfig, type Env } from "./config";
-import { DEFAULT_HANDLERS } from "./handlers";
+import { createDesktopServices } from "./services";
+import type { ChromeProvisioning } from "../services/protocol-chrome";
 import type { HostBindings } from "./host";
 import { DesktopRuntime, type DesktopRuntimeDeps } from "./runtime";
 import { BackendServer, type ParentPortLike } from "./server";
@@ -10,6 +11,7 @@ export interface StartBackendOptions {
   env: Env;
   /** Resolves the Host package bindings (dynamic import of `@dealsonar/native-host` in production). */
   loadHost: () => Promise<HostBindings>;
+  loadProvisioning?: () => Promise<ChromeProvisioning>;
   platform?: NodeJS.Platform;
   exit?: (code: number) => void;
   log?: (message: string) => void;
@@ -47,7 +49,7 @@ export async function startBackend(options: StartBackendOptions): Promise<Starte
     runtime = new DesktopRuntime({
       config,
       host,
-      handlers: DEFAULT_HANDLERS,
+      ...createDesktopServices(host, options.env, await options.loadProvisioning?.(), options.log),
       logger: options.log,
       ...options.runtimeDeps,
     });
