@@ -101,8 +101,7 @@ pnpm --filter @dealsonar/desktop-core test -- tauri-parity
 # (a second `rusqlite` connection). The v3 database and golden.json come entirely from the current Rust Store.
 # Generated outputs (test/fixtures/tauri/*, tools/gen-tauri-fixture/target + Cargo.lock) are gitignored.
 
-# backend bundle (rebuild better-sqlite3 for Electron's ABI first):
-pnpm exec electron-rebuild -f -w better-sqlite3 -v <electron version>
+# backend bundle with a same-target better-sqlite3 Node-API binding:
 pnpm --filter @dealsonar/desktop-core build:backend      # -> dist/backend (point DEALSONAR_BACKEND_BUNDLE_DIR at it)
 ```
 
