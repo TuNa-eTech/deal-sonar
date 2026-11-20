@@ -2,6 +2,44 @@
 
 use super::*;
 
+pub(super) fn heuristic_source_ids(prompt: &str) -> Vec<String> {
+    let Some((description, groups)) = prompt.split_once("\nNhóm Facebook có sẵn (JSON):\n")
+    else {
+        return Vec::new();
+    };
+    let description = fold_vi(
+        description
+            .split("Nghề của người dùng:")
+            .next()
+            .unwrap_or(description),
+    );
+    let sources: Vec<crate::types::RadarSourceCandidate> =
+        serde_json::from_str(groups).unwrap_or_default();
+    let topics = [
+        "can ho",
+        "chung cu",
+        "thue nha",
+        "bat dong san",
+        "tim tho",
+        "dien nuoc",
+        "sua",
+        "oto",
+        "xe cu",
+        "tuyen dung",
+    ];
+    sources
+        .into_iter()
+        .filter(|source| {
+            let name = fold_vi(&source.name);
+            topics
+                .iter()
+                .any(|topic| description.contains(topic) && name.contains(topic))
+        })
+        .take(3)
+        .map(|source| source.id)
+        .collect()
+}
+
 pub(super) fn heuristic_suggest_fields(prompt: &str) -> Value {
     let desc_section = prompt
         .split("Nghề của người dùng:")
@@ -82,9 +120,9 @@ pub(super) fn heuristic_suggest_fields(prompt: &str) -> Value {
                 if let Some(max_v) = money_val.get("max").and_then(Value::as_f64) {
                     hard_filters.push(json!({
                         "field": "price",
-                        "op": "lte",
+                        "op": if folded.contains("duoi ") { "lt" } else { "lte" },
                         "value": max_v,
-                        "when_missing": "pass"
+                        "when_missing": "fail"
                     }));
                 }
             }

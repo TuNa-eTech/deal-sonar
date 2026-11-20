@@ -4,6 +4,7 @@ import React from "react";
 import { api } from "../../lib/api";
 import type { AiProviderId } from "../../types/ipc";
 import type { SettingsScreenModel } from "./useSettingsScreen";
+import { Badge, Button, Input, Select } from "../../components/ui";
 
 export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
   const {
@@ -38,13 +39,13 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
         <h3 style={{ marginTop: 0, marginBottom: 4 }}>
           1. Nhà cung cấp CLI AI & Trần hạn mức ngày
         </h3>
-        <span className={`badge ${hasScannedLocalModels ? "badge-success" : "badge-neutral"}`}>
+        <Badge >
           {probingAi
             ? "Đang quét danh sách model…"
             : hasScannedLocalModels
               ? `✓ Đã tự quét ${availableModels.length} model từ CLI trên máy`
               : `Danh sách ${availableModels.length} model mặc định`}
-        </span>
+        </Badge>
       </div>
       <p className="field-hint" style={{ marginTop: 0 }}>
         Lưu ý riêng tư: Nội dung bài viết, tên group và tên hiển thị người đăng được gửi tới CLI
@@ -54,23 +55,20 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
       <div className="settings-fields settings-model-fields">
         <div className="field-group">
           <label className="field-label">CLI AI đang dùng</label>
-          <select
+          <Select
             aria-label="Chọn nhà cung cấp AI"
-            className="select"
             value={activeProvider}
-            onChange={async (e) => {
+            onChange={(e) => {
               const p = e.target.value as AiProviderId;
               setCustomFastMode(false);
               setCustomSmartMode(false);
-              const s = await api.aiSetProvider(p);
-              mergeSettings(s);
-              onSettingsUpdated(s);
+              setDraft(d => ({ ...d, ai_provider: p }));
             }}
           >
             <option value="claude_cli">Claude Code (`claude`)</option>
             <option value="codex_cli">OpenAI Codex (`codex`)</option>
             <option value="agy_cli">Antigravity (`agy`)</option>
-          </select>
+          </Select>
           {activeProbe && (
             <span className="field-hint">
               {activeProbe.installed
@@ -82,9 +80,8 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
 
         <div className="field-group">
           <label className="field-label">Mô hình tầng Fast (Chấm bài)</label>
-          <select
+          <Select
             aria-label="Chọn mô hình tầng Fast"
-            className="select"
             value={showCustomFastInput ? "__custom__" : tierMap.fast}
             onChange={(e) => {
               const val = e.target.value;
@@ -121,12 +118,11 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
               </optgroup>
             )}
             <option value="__custom__">Tự nhập tên model khác…</option>
-          </select>
+          </Select>
           {showCustomFastInput ? (
-            <input
+            <Input
               type="text"
               aria-label="Nhập tên mô hình tầng Fast tuỳ chỉnh"
-              className="input"
               style={{ marginTop: 6 }}
               placeholder="Nhập mã model (VD: claude-haiku-4-5)"
               value={tierMap.fast}
@@ -149,9 +145,8 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
 
         <div className="field-group">
           <label className="field-label">Mô hình tầng Smart (Đề xuất & Bộ luật)</label>
-          <select
+          <Select
             aria-label="Chọn mô hình tầng Smart"
-            className="select"
             value={showCustomSmartInput ? "__custom__" : tierMap.smart}
             onChange={(e) => {
               const val = e.target.value;
@@ -188,12 +183,11 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
               </optgroup>
             )}
             <option value="__custom__">Tự nhập tên model khác…</option>
-          </select>
+          </Select>
           {showCustomSmartInput ? (
-            <input
+            <Input
               type="text"
               aria-label="Nhập tên mô hình tầng Smart tuỳ chỉnh"
-              className="input"
               style={{ marginTop: 6 }}
               placeholder="Nhập mã model (VD: claude-sonnet-4-6)"
               value={tierMap.smart}
@@ -216,9 +210,8 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
 
         <div className="field-group">
           <label className="field-label">Số bài tối đa gửi AI / ngày</label>
-          <input
+          <Input
             type="number"
-            className="input"
             min={50}
             max={20000}
             value={draft.daily_ai_post_cap}
@@ -230,9 +223,8 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
+        <Button
+          variant="primary" size="sm"
           onClick={() =>
             void savePatch({
               ai_provider: activeProvider,
@@ -242,10 +234,9 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
           }
         >
           Lưu cấu hình AI
-        </button>
-        <button
-          type="button"
-          className="btn btn-sm"
+        </Button>
+        <Button
+          size="sm"
           disabled={probingAi}
           onClick={async () => {
             setProbingAi(true);
@@ -268,11 +259,10 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
           }}
         >
           {probingAi ? "Đang dò CLI & model…" : "Dò lại CLI & Quét model"}
-        </button>
+        </Button>
         {activeProbe?.recommended_fast_model && activeProbe?.recommended_smart_model && (
-          <button
-            type="button"
-            className="btn btn-sm"
+          <Button
+            size="sm"
             onClick={() => {
               const recFast = activeProbe.recommended_fast_model!;
               const recSmart = activeProbe.recommended_smart_model!;
@@ -289,7 +279,7 @@ export const AiSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
           >
             Chọn model khuyến nghị ({activeProbe.recommended_fast_model} /{" "}
             {activeProbe.recommended_smart_model})
-          </button>
+          </Button>
         )}
       </div>
     </div>

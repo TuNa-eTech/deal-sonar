@@ -6,6 +6,7 @@
 //! - Envelope:
 //!   `{"v": 2, "id": "<ULID>", "ts": <i64 unix ms>, "reply_to": null | "<id>", "type": "<dot.name>", "payload": { ... }}`
 
+pub mod agent;
 pub mod framing;
 pub mod ipc;
 pub mod native_manifest;

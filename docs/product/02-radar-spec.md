@@ -27,10 +27,13 @@ Radar là đối tượng trung tâm của sản phẩm. Tài liệu này địn
     "channel_ids": ["01JCF9..."],
     "mode": "instant",                  // instant | digest (P1)
     "min_score": 0.6,
-    "quiet_hours": null                 // P1: {"from": "22:30", "to": "06:30"}
+    "quiet_hours": null,                // P1: {"from": "22:30", "to": "06:30"}
+    "lead_ttl_hours": 72                // tin còn giá trị bao lâu kể từ lúc đăng; bỏ trống = không hạn
   }
 }
 ```
+
+**Hạn sống của tin (`lead_ttl_hours`).** Mỗi ngành có nhịp riêng: tin bán xe giá tốt mất giá trị sau vài giờ, tin tìm việc thì vài tuần. Hạn tính từ lúc bài được đăng (`post.created_at`); nếu không biết lúc đăng thì tính từ lúc thấy bài. Tin quá hạn vẫn được lưu và vẫn hiện trong app (hàng "Quá hạn"), nhưng **không gửi thông báo**. Lý do: nếu extension quét muộn, một tin đã quá hạn mà vẫn báo thì người dùng chỉ mất công liên hệ. Hàng "Mới" chỉ gồm tin còn hạn. Đổi hạn không tạo phiên bản mới. Giá trị nằm trong JSON `notify` của radar nên không cần migration.
 
 Phần quyết định cách chấm bài nằm trong **phiên bản radar**, bất biến sau khi tạo:
 
@@ -54,7 +57,7 @@ Phần quyết định cách chấm bài nằm trong **phiên bản radar**, b�
 
 **Vì sao tách phiên bản.** Sửa mô tả hoặc trường làm thay đổi ý nghĩa của kết quả. Mỗi đánh giá và mỗi bộ luật gắn với một phiên bản cụ thể, nên tin cũ không bị diễn giải lại theo định nghĩa mới, và bộ luật cũ tự động hết hiệu lực khi radar đổi.
 
-Thay đổi tạo phiên bản mới: mô tả, danh sách trường (thêm, xoá, đổi kiểu, đổi mô tả trường), `match_policy`, `user_profession`. Thay đổi không tạo phiên bản mới: tên radar, nguồn, kênh báo, ngưỡng điểm.
+Thay đổi tạo phiên bản mới: mô tả, danh sách trường (thêm, xoá, đổi kiểu, đổi mô tả trường), `match_policy`, `user_profession`. Thay đổi không tạo phiên bản mới: tên radar, nguồn, kênh báo, ngưỡng điểm, hạn sống của tin.
 
 ## 3. Trường
 
@@ -189,21 +192,27 @@ Mẫu là file JSON đi kèm app (`apps/desktop/templates/*.json`), không nằm
   "user_profession": "môi giới bất động sản",
   "fields": [ /* định nghĩa trường như §3.1 */ ],
   "match_policy": {"want_intent": "demand", "exclude_roles": ["peer"]},
+  "lead_ttl_hours": 72,                 // tuỳ chọn: hạn sống mặc định của tin (xem §2)
+  "notify_mode": "instant",             // tuỳ chọn: instant | digest
   "seed_ruleset": "bds-vi-v1"           // tuỳ chọn: bộ luật có sẵn làm tầng lọc rẻ
 }
 ```
 
 ### Danh mục khởi đầu
 
-| Ngành | Mẫu | Trường chính | Ý định |
-|---|---|---|---|
-| Bất động sản | Khách cần thuê/mua theo khu vực và tầm giá | loại giao dịch, loại nhà, khu vực, giá, diện tích, số phòng ngủ, SĐT | demand |
-| Bất động sản | Tin chính chủ | loại giao dịch, khu vực, giá, diện tích, chính chủ, SĐT | supply |
-| Dịch vụ nhà cửa | Bài hỏi "ai biết thợ…" | loại việc, khu vực, mức gấp, SĐT | demand |
-| Xe và đồ cũ | Tin bán dưới giá thị trường | hãng, dòng, đời, giá, số km, khu vực, SĐT | supply |
-| Tuyển dụng | Người tìm việc | vị trí, kinh nghiệm, khu vực, mức lương mong muốn | supply |
-| Vận tải, ghép hàng | Cần xe / có xe trống | loại tin, điểm đi, điểm đến, ngày, tải trọng, loại hàng, SĐT | any |
-| Order, bán hàng | Bài hỏi mua một loại sản phẩm | sản phẩm, số lượng, ngân sách, khu vực | demand |
+| Ngành | Mẫu | Trường chính | Ý định | Tin còn giá trị · cách báo |
+|---|---|---|---|---|
+| Bất động sản | Khách cần thuê/mua theo khu vực và tầm giá | loại giao dịch, loại nhà, khu vực, giá, diện tích, số phòng ngủ, SĐT | demand | 3 ngày · ngay |
+| Bất động sản | Tin chính chủ | loại giao dịch, khu vực, giá, diện tích, chính chủ, SĐT | supply | 3 ngày · ngay |
+| Dịch vụ nhà cửa | Bài hỏi "ai biết thợ…" | loại việc, khu vực, mức gấp, SĐT | demand | 24 giờ · ngay |
+| Xe và đồ cũ | Tin bán trong tầm giá bạn đặt | hãng, dòng, đời, giá, số km, khu vực, SĐT | supply | 6 giờ · ngay |
+| Tuyển dụng | Người tìm việc | vị trí, kinh nghiệm, khu vực, mức lương mong muốn | supply | 30 ngày · gom |
+| Vận tải, ghép hàng | Chủ hàng cần xe (lấp xe trống) | điểm đi, điểm đến, ngày, tải trọng, loại hàng, SĐT | demand | 12 giờ · ngay |
+| Order, bán hàng | Bài hỏi mua một loại sản phẩm | sản phẩm, số lượng, ngân sách, khu vực | demand | 48 giờ · ngay |
+
+Ghi chú về hai mẫu:
+- **Xe và đồ cũ** không gọi là "dưới giá thị trường", vì app chưa có mốc giá thị trường để so. Người dùng tự đặt trần giá bằng điều kiện cứng trên trường `giá`.
+- **Vận tải** chỉ tìm phía chủ hàng (`demand`). Trước đây mẫu dùng `any`, nên bài của nhà xe khác chào xe trống cũng lọt vào. Với người có xe trống, những bài đó là đối thủ, không phải khách.
 
 Mẫu BĐS là mẫu duy nhất có `seed_ruleset` trong MVP, lấy từ bộ luật bất động sản tiếng Việt đã có.
 

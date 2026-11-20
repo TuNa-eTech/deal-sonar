@@ -4,6 +4,7 @@ import React from "react";
 import { BackupRestore } from "../../components/BackupRestore";
 import { api } from "../../lib/api";
 import type { SettingsScreenModel } from "./useSettingsScreen";
+import { Button, Input } from "../../components/ui";
 
 export const DataSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
   const {
@@ -23,9 +24,8 @@ export const DataSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
         <label className="field-label">
           Giữ nội dung bài không khớp (7–90 ngày, mặc định 30):
         </label>
-        <input
+        <Input
           type="number"
-          className="input"
           style={{ width: 100 }}
           min={7}
           max={90}
@@ -37,32 +37,27 @@ export const DataSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
             }))
           }
         />
-        <button
-          type="button"
-          className="btn btn-sm btn-primary"
+        <Button
+          variant="primary" size="sm"
           onClick={() =>
             void savePatch({ unmatched_retention_days: draft.unmatched_retention_days })
           }
         >
           Lưu thời hạn giữ
-        </button>
+        </Button>
       </div>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          className="btn"
+        <Button
           onClick={async () => {
             const res = await api.dataBackup();
             setBanner({ kind: "ok", text: `Đã sao lưu cơ sở dữ liệu tới: ${res.path}` });
           }}
         >
           Sao lưu cơ sở dữ liệu ngay
-        </button>
+        </Button>
 
-        <button
-          type="button"
-          className="btn"
+        <Button
           onClick={async () => {
             const res = await api.dataPurge(draft.unmatched_retention_days);
             setBanner({
@@ -72,18 +67,17 @@ export const DataSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
           }}
         >
           Dọn bài hết hạn ngay
-        </button>
+        </Button>
 
-        <button
-          type="button"
-          className="btn btn-danger"
+        <Button
+          variant="danger"
           onClick={() => {
             setDeletePhrase("");
             setDeleteStep(1);
           }}
         >
           Xoá toàn bộ dữ liệu…
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -7,15 +7,9 @@ use std::process::ExitCode;
 
 use dealsonar_native_host::{run_relay, RelayConfig};
 
-fn main() -> ExitCode {
-    let config = match RelayConfig::from_env() {
-        Ok(cfg) => cfg,
-        Err(err) => {
-            eprintln!("dealsonar-native-host: failed to resolve IPC endpoint: {err}");
-            return ExitCode::FAILURE;
-        }
-    };
+mod mcp;
 
+fn main() -> ExitCode {
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -27,6 +21,26 @@ fn main() -> ExitCode {
         }
     };
 
+    if std::env::args_os()
+        .nth(1)
+        .is_some_and(|mode| mode == "--mcp")
+    {
+        return match runtime.block_on(mcp::run_mcp(tokio::io::stdin(), tokio::io::stdout())) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(err) => {
+                eprintln!("dealsonar-native-host: MCP terminated with error: {err}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+
+    let config = match RelayConfig::from_env() {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            eprintln!("dealsonar-native-host: failed to resolve IPC endpoint: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
     match runtime.block_on(run_relay(tokio::io::stdin(), tokio::io::stdout(), config)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {

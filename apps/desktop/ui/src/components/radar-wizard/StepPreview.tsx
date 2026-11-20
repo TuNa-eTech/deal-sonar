@@ -1,10 +1,12 @@
-// Step 4: preview on real posts, notification setup, and feedback.
+// Preview on real posts, notification setup, and feedback.
 
 import React from "react";
 import { OperationStatus } from "../OperationStatus";
+import { lifetimeOptions } from "../../lib/format";
 import { formatExtractedFieldValue } from "../../lib/format";
 import { renderHighlightedPostText } from "../../lib/security";
 import type { RadarWizardModel } from "./useRadarWizard";
+import { Badge, Button, Card, Input, Select } from "../ui";
 
 export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
   const {
@@ -23,6 +25,7 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     mode,
     fields,
     setFields,
+    sources,
     selectedSourceIds,
     requiresVersionConfirm,
     confirmedUpgrade,
@@ -41,6 +44,10 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     unmatchedPreviewItems,
   } = w;
 
+  const channelScope = (notify.inherit_channels ?? (notify.channel_ids.length === 0))
+    ? "default" : notify.channel_ids.length ? "selected" : "local";
+  const activeChannels = channels.filter(c => c.state === "ok");
+  const selectedSourceNames = sources.filter(source => selectedSourceIds.includes(source.id)).map(source => source.name);
   return (
     <div>
       <div className="toolbar-row" style={{ justifyContent: "space-between" }}>
@@ -50,20 +57,24 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
             {previewState &&
               `(${previewState.evaluated_posts} / ${previewState.total_posts} bài)`}
           </strong>
+          {previewState && (!editRadar || editRadar.radar.status === "draft") &&
+            <span className="radar-preview-draft"><Badge>Bản nháp</Badge></span>}
+          {selectedSourceNames.length > 0 && <div className="field-hint">{selectedSourceNames.join(" · ")}</div>}
           <div className="field-hint">
             Không tạo cơ hội thật hoặc gửi thông báo. Phản hồi được lưu làm ví dụ; chạy lại để kiểm tra kết quả mới.
           </div>
         </div>
-        <button
-          type="button"
-          className="btn"
+        <Button
           disabled={previewBusy || saving}
           onClick={() => void startPreviewRun()}
         >
           {previewLoading ? "Đang chấm thử…" : "↻ Chạy lại xem thử"}
-        </button>
+        </Button>
       </div>
 
+      {previewState?.status === "done" && previewState.total_posts > 0 && previewState.total_posts < 5 && (
+        <p className="field-hint" role="status">Mẫu xem thử còn ít. Đã chấm {previewState.total_posts} bài.</p>
+      )}
       {previewRunning && (
         <div className="health-banner info" style={{ borderRadius: 6, marginBottom: 12 }}>
           <span>
@@ -76,9 +87,9 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
       )}
 
       {previewRunning && (
-        <button type="button" className="btn btn-sm" disabled={previewLoading} onClick={() => void stopPreview()}>
+        <Button size="sm" disabled={previewLoading} onClick={() => void stopPreview()}>
           Dừng xem thử
-        </button>
+        </Button>
       )}
       {previewSyncError && <div role="status" className="health-banner warning">{previewSyncError}</div>}
       {previewState?.status === "error" && (
@@ -97,9 +108,8 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
         >
           <span>{w.message}</span>
           {w.code === "missing_required_field" && w.field_key && (
-            <button
-              type="button"
-              className="btn btn-sm"
+            <Button
+              size="sm"
               onClick={() => {
                 const updated = fields.map((f) =>
                   f.key === w.field_key ? { ...f, required: false } : f
@@ -109,7 +119,7 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
               }}
             >
               Bỏ bắt buộc «{w.field_label}» & Chạy lại
-            </button>
+            </Button>
           )}
         </div>
       ))}
@@ -142,15 +152,49 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
         </label>
       )}
 
+      <details className="radar-preview-settings">
+        <summary>Cài đặt khi bật Radar</summary>
       <OperationStatus health={health}/>
-      <div className="card notification-setup"><h3>Khi bật radar này</h3><p>{selectedSourceIds.length} nhóm, {fields.length} thông tin, {hardFilters.length} điều kiện bắt buộc. {editRadar?`Đang chỉnh radar “${editRadar.radar.name}”; chỉ áp dụng khi bấm nút cuối.`:"Bản nháp chưa tự thu thập bài."}</p>
-        <label>Chế độ thông báo<select className="select" value={notify.mode} onChange={e=>setNotify(n=>({...n,mode:e.target.value as "instant"|"digest"}))}><option value="instant">Báo ngay</option><option value="digest">Gửi gộp</option></select></label>
-        <label>Điểm tối thiểu để báo<input className="input" type="number" min={0.4} max={1} step={0.05} value={notify.min_score} onChange={e=>setNotify(n=>({...n,min_score:Number(e.target.value)}))}/></label>
+      <Card className="notification-setup"><h3>Khi bật radar này</h3><p>{selectedSourceIds.length} nhóm, {fields.length} thông tin, {hardFilters.length} điều kiện bắt buộc. {editRadar?`Đang chỉnh radar “${editRadar.radar.name}”; chỉ áp dụng khi bấm nút cuối.`:"Bản nháp chưa tự thu thập bài."}</p>
+        <label>Chế độ thông báo<Select value={notify.mode} onChange={e=>setNotify(n=>({...n,mode:e.target.value as "instant"|"digest"}))}><option value="instant">Báo ngay</option><option value="digest">Gửi gộp</option></Select></label>
+        <label>Tin còn giá trị trong<Select aria-label="Tin còn giá trị trong" value={notify.lead_ttl_hours ?? ""} onChange={e=>setNotify(n=>({...n,lead_ttl_hours:e.target.value?Number(e.target.value):null}))}>{lifetimeOptions(notify.lead_ttl_hours).map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</Select></label>
+        <p className="field-hint">Tin hết hạn rời hàng chờ «Chưa xử lý» và dừng gửi thông báo. Xem lại tại «Tin hết hạn».</p>
+        <label>Điểm tối thiểu để báo<Input type="number" min={0.4} max={1} step={0.05} value={notify.min_score} onChange={e=>setNotify(n=>({...n,min_score:Number(e.target.value)}))}/></label>
         <p className="field-hint">Điểm phù hợp dùng để ưu tiên, không phải xác suất đúng. Cơ hội dưới ngưỡng vẫn có thể xem trong ứng dụng.</p>
-        <fieldset><legend>Kênh nhận của radar này</legend>{channels.map(c=><label key={c.id}><input type="checkbox" checked={notify.channel_ids.includes(c.id)} onChange={e=>setNotify(n=>({...n,channel_ids:e.target.checked?[...n.channel_ids,c.id]:n.channel_ids.filter(id=>id!==c.id)}))}/>{c.name} {c.state!=="ok"?"(cần kết nối lại)":""}</label>)}{channels.length===0&&<p>Chưa có kênh ngoài. Xem cơ hội trong ứng dụng và dùng thông báo màn hình theo Cài đặt.</p>}</fieldset>
-        {(health?.automatic_scanning!==true||!health?.extension_connected||health?.crawl_paused)&&<label><input type="checkbox" checked={readyAck} onChange={e=>setReadyAck(e.target.checked)}/> Tôi hiểu radar đã bật chưa đồng nghĩa đang quét. Tôi sẽ mở tiện ích và bật quét tự động hoặc quét thủ công.</label>}
-      </div>
-      <div className="section-tabs"><button className={`btn ${previewTab==="match"?"btn-primary":""}`} onClick={()=>setPreviewTab("match")}>Khớp ({matchedPreviewItems.length})</button><button className={`btn ${previewTab==="no_match"?"btn-primary":""}`} onClick={()=>setPreviewTab("no_match")}>Bị loại ({unmatchedPreviewItems.length})</button></div>
+        <fieldset>
+          <legend>Kênh nhận của radar này</legend>
+          <Select aria-label="Phạm vi nhận thông báo" value={channelScope} onChange={e => {
+            const scope = e.target.value;
+            setNotify(n => ({
+              ...n, inherit_channels: scope === "default",
+              channel_ids: scope === "selected" ? activeChannels.map(c => c.id) : [],
+            }));
+          }}>
+            <option value="local">Chỉ nhận trên máy này</option>
+            <option value="default">Dùng tất cả kênh mặc định</option>
+            <option value="selected" disabled={!activeChannels.length}>Chọn kênh cho radar này</option>
+          </Select>
+          {channelScope === "selected" && channels.map(c => <label key={c.id}>
+            <input type="checkbox" checked={notify.channel_ids.includes(c.id)} onChange={e =>
+              setNotify(n => ({...n, inherit_channels:false, channel_ids:e.target.checked
+                ? [...n.channel_ids,c.id] : n.channel_ids.filter(id=>id!==c.id)}))}/>
+            {c.name} {c.state!=="ok"?"(cần kết nối lại)":""}
+          </label>)}
+          <p className="field-hint">Kênh ngoài nhận tin: {activeChannels.filter(c =>
+            channelScope === "default" || (channelScope === "selected" && notify.channel_ids.includes(c.id))
+          ).map(c => c.name).join(", ") || "Không có"}.</p>
+        </fieldset>
+
+      </Card>
+      </details>
+      {health && (health.automatic_scanning !== true || !health.extension_connected ||
+        health.facebook_session !== "ok" || health.crawl_paused) && (
+        <label className="radar-preview-limited">
+          <input type="checkbox" checked={readyAck} onChange={event => setReadyAck(event.target.checked)} />
+          Tôi hiểu Radar sẽ hoạt động ở chế độ giới hạn cho đến khi Chrome sẵn sàng quét.
+        </label>
+      )}
+      <div className="section-tabs"><Button variant={previewTab==="match" ? "primary" : "default"} onClick={()=>setPreviewTab("match")}>Khớp ({matchedPreviewItems.length})</Button><Button variant={previewTab==="no_match" ? "primary" : "default"} onClick={()=>setPreviewTab("no_match")}>Bị loại ({unmatchedPreviewItems.length})</Button></div>
       <div className="preview-columns">
         {/* Column 1: KHỚP */}
         <div hidden={previewTab!=="match"}>
@@ -170,12 +214,12 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
                 .filter((x): x is { raw: string; fieldLabel: string } => Boolean(x));
 
               return (
-                <div key={it.evaluation_id} className="card">
+                <Card key={it.evaluation_id} >
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                    <span className="badge badge-success">
+                    <Badge tone="success">
                       Điểm {(it.score * 100).toFixed(0)}% ·{" "}
                       {it.decided_by === "rule" ? "Bộ luật" : "AI"}
-                    </span>
+                    </Badge>
                     <span className="field-hint">
                       {it.author_name} · {it.source_name}
                     </span>
@@ -197,9 +241,9 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
                       const ef = it.fields[fd.key];
                       if (!ef) return null;
                       return (
-                        <span key={fd.key} className="badge badge-primary">
+                        <Badge key={fd.key} tone="primary">
                           {fd.label}: {formatExtractedFieldValue(fd, ef)}
-                        </span>
+                        </Badge>
                       );
                     })}
                   </div>
@@ -209,30 +253,24 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
                   </div>
 
                   <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${
-                        it.feedback_label === "correct" ? "btn-success" : ""
-                      }`}
+                    <Button
+                      variant={it.feedback_label === "correct" ? "success" : "default"} size="sm"
                       onClick={() => void handlePreviewFeedback(it, "correct")}
                     >
                       Đúng
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${
-                        it.feedback_label === "irrelevant" ? "btn-danger" : ""
-                      }`}
+                    </Button>
+                    <Button
+                      variant={it.feedback_label === "irrelevant" ? "danger" : "default"} size="sm"
                       onClick={() => void handlePreviewFeedback(it, "irrelevant")}
                     >
                       Chấm sai
-                    </button>
+                    </Button>
                   </div>
-                </div>
+                </Card>
               );
             })}
             {matchedPreviewItems.length === 0 && (
-              <div className="card text-muted">Chưa có bài khớp nào trong tập xem thử.</div>
+              <Card className="text-muted">Chưa có bài khớp nào trong tập xem thử.</Card>
             )}
           </div>
         </div>
@@ -247,12 +285,12 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {unmatchedPreviewItems.map((it) => (
-              <div key={it.evaluation_id} className="card">
+              <Card key={it.evaluation_id} >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <span className="badge">
+                  <Badge >
                     Điểm {(it.score * 100).toFixed(0)}% ·{" "}
                     {it.decided_by === "rule" ? "Bộ luật" : "AI"}
-                  </span>
+                  </Badge>
                   <span className="field-hint">
                     {it.author_name} · {it.source_name}
                   </span>
@@ -265,24 +303,20 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
                   {renderHighlightedPostText(it.post_text, [])}
                 </div>
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className={`btn btn-sm ${
-                      it.feedback_label === "correct" ? "btn-success" : ""
-                    }`}
+                  <Button
+                    variant={it.feedback_label === "correct" ? "success" : "default"} size="sm"
                     onClick={() => void handlePreviewFeedback(it, "correct")}
                   >
                     Loại đúng
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
+                  </Button>
+                  <Button
+                    size="sm"
                     onClick={() => void handlePreviewFeedback(it, "missed")}
                   >
                     Đáng lẽ phải khớp
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>

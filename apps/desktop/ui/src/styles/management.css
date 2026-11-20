@@ -42,6 +42,13 @@
 .radar-rules .field-group { margin-block: var(--space-md); }
 .source-directory .crm-table td:first-child { min-width: 220px; }
 .source-directory .crm-table .field-hint { margin-top: var(--space-2xs); }
+.source-posts {
+  display: grid;
+  gap: var(--space-sm);
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-md);
+}
 .priority-selected { background: var(--primary-soft); border-color: var(--primary); color: var(--text-main); }
 .connection-ledger {
   display: grid;

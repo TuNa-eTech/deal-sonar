@@ -300,6 +300,7 @@ pub fn hard_filters_store_to_rules(
 pub fn notify_to_store(n: &RadarNotifyConfig) -> dealsonar_store::models::NotifyConfig {
     dealsonar_store::models::NotifyConfig {
         channel_ids: n.channel_ids.clone(),
+        inherit_channels: n.inherit_channels,
         mode: n.mode.as_str().to_string(),
         min_score: n.min_score,
         quiet_hours: n
@@ -309,18 +310,21 @@ pub fn notify_to_store(n: &RadarNotifyConfig) -> dealsonar_store::models::Notify
                 from: q.from.clone(),
                 to: q.to.clone(),
             }),
+        lead_ttl_hours: n.lead_ttl_hours,
     }
 }
 
 pub fn notify_from_store(n: &dealsonar_store::models::NotifyConfig) -> RadarNotifyConfig {
     RadarNotifyConfig {
         channel_ids: n.channel_ids.clone(),
+        inherit_channels: n.inherit_channels,
         mode: NotifyMode::from_db(&n.mode),
         min_score: n.min_score,
         quiet_hours: n.quiet_hours.as_ref().map(|q| QuietHours {
             from: q.from.clone(),
             to: q.to.clone(),
         }),
+        lead_ttl_hours: n.lead_ttl_hours,
     }
 }
 

@@ -39,10 +39,10 @@
               <option value="current_tab">Đọc tab hiện tại</option>
               <option value="background">Quét bằng tab nền</option>
             </select>
-            <p id="scan-mode-help" class="option-help">Đọc bài đã tải, không tự cuộn trang.</p>
+            <p id="scan-mode-help" class="option-help">Đọc bài ở tab hiện tại, tự cuộn theo số lần đã chọn.</p>
             <div class="scan-limits">
               <div><label for="scan-max-posts">Số bài tối đa</label><input id="scan-max-posts" type="number" min="1" max="100" step="1" value="30" required inputmode="numeric" aria-describedby="scan-posts-help" /><p id="scan-posts-help" class="option-help">Từ 1 đến 100 bài mỗi lượt</p></div>
-              <div><label for="scan-max-scrolls">Số lần cuộn</label><input id="scan-max-scrolls" type="number" min="0" max="5" step="1" value="3" required inputmode="numeric" aria-describedby="scan-scrolls-help" /><p id="scan-scrolls-help" class="option-help">Chỉ dùng cho tab nền</p></div>
+              <div><label for="scan-max-scrolls">Số lần cuộn</label><input id="scan-max-scrolls" type="number" min="0" max="50" step="1" value="10" required inputmode="numeric" aria-describedby="scan-scrolls-help" /><p id="scan-scrolls-help" class="option-help">Từ 0 đến 50 lần mỗi lượt</p></div>
             </div>
             <p id="scan-options-feedback" class="option-help" role="status" aria-live="polite">Tự lưu cho những lần quét sau.</p>
           </div>

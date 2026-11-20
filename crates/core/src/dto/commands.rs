@@ -9,10 +9,13 @@ use super::*;
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RadarNotifyPatch {
     pub channel_ids: Option<Vec<String>>,
+    pub inherit_channels: Option<bool>,
     pub mode: Option<NotifyMode>,
     pub min_score: Option<f64>,
     #[serde(default, with = "double_option")]
     pub quiet_hours: Option<Option<QuietHours>>,
+    #[serde(default, with = "double_option")]
+    pub lead_ttl_hours: Option<Option<u32>>,
 }
 
 impl RadarNotifyPatch {
@@ -22,11 +25,16 @@ impl RadarNotifyPatch {
                 .channel_ids
                 .clone()
                 .unwrap_or_else(|| base.channel_ids.clone()),
+            inherit_channels: self.inherit_channels.or(base.inherit_channels),
             mode: self.mode.unwrap_or(base.mode),
             min_score: self.min_score.unwrap_or(base.min_score),
             quiet_hours: match &self.quiet_hours {
                 Some(qh) => qh.clone(),
                 None => base.quiet_hours.clone(),
+            },
+            lead_ttl_hours: match self.lead_ttl_hours {
+                Some(ttl) => ttl.filter(|h| *h > 0),
+                None => base.lead_ttl_hours,
             },
         }
     }
@@ -83,6 +91,8 @@ pub struct SuggestFieldsInput {
     pub template_id: Option<String>,
     #[serde(default)]
     pub language_hint: Option<String>,
+    #[serde(default)]
+    pub suggest_sources: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -99,6 +109,8 @@ pub struct SuggestFieldsResult {
     pub hard_filters: Vec<HardFilter>,
     pub clarifying_questions: Vec<String>,
     pub prefilter_hint: Option<PrefilterHintDto>,
+    #[serde(default)]
+    pub suggested_source_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -153,6 +165,9 @@ pub struct PreviewRunState {
     pub preview_id: String,
     pub radar_id: String,
     pub radar_version: i32,
+    /// Sources used by this run, when known. Legacy rows do not track this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_ids: Option<Vec<String>>,
     pub status: PreviewStatus,
     pub total_posts: usize,
     pub evaluated_posts: usize,
@@ -238,6 +253,8 @@ impl ExportFormat {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LeadExportInput {
+    #[serde(default)]
+    pub lead_ids: Option<Vec<String>>,
     pub query: LeadFilterQuery,
     pub format: ExportFormat,
     pub include_post_text: bool,

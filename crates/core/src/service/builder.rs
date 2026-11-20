@@ -28,6 +28,7 @@ pub struct CoreServiceBuilder {
     pub(super) webhook: Option<WebhookClient>,
     pub(super) license_verifier: Option<LicenseVerifier>,
     pub(super) os_notify_hook: Option<OsNotificationHook>,
+    agent_tools: bool,
 }
 
 impl CoreServiceBuilder {
@@ -41,6 +42,7 @@ impl CoreServiceBuilder {
             webhook: None,
             license_verifier: None,
             os_notify_hook: None,
+            agent_tools: false,
         }
     }
 
@@ -74,7 +76,8 @@ impl CoreServiceBuilder {
         Ok(Self::new(store)
             .with_config(config)
             .with_secrets(secrets)
-            .with_ai_provider(ai_provider))
+            .with_ai_provider(ai_provider)
+            .with_agent_tools())
     }
 
     /// Open a file-backed [`CoreServiceBuilder`] at `config.data_dir` using deterministic
@@ -94,6 +97,11 @@ impl CoreServiceBuilder {
 
     pub fn with_config(mut self, config: CoreConfig) -> Self {
         self.config = config;
+        self
+    }
+
+    pub fn with_agent_tools(mut self) -> Self {
+        self.agent_tools = true;
         self
     }
 
@@ -225,10 +233,22 @@ impl CoreServiceBuilder {
         let bound_endpoint = if let Some(ep) = &self.config.ipc_endpoint {
             let listener = IpcListener::bind(ep)?;
             let actual_ep = ep.clone();
+            let agent_token = if self.agent_tools {
+                match issue_agent_token(&rt.config.data_dir) {
+                    Ok(token) => Some(token),
+                    Err(error) => {
+                        tracing::warn!(%error, "Could not enable local Radar agent tools");
+                        None
+                    }
+                }
+            } else {
+                None
+            };
             tasks.push(spawn_ipc_server(
                 listener,
                 Arc::clone(&rt),
                 shutdown_rx.clone(),
+                agent_token,
             ));
             Some(actual_ep)
         } else {

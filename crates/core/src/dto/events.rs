@@ -29,7 +29,7 @@ pub struct JobFailedEvent {
     pub failed_at: i64,
 }
 
-/// Exact 6 push events emitted to the Tauri UI (`03-desktop.md §4`, `TauriEventMap`).
+/// Push events emitted to the Tauri UI.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "event", content = "payload")]
 pub enum CoreEvent {
@@ -41,6 +41,8 @@ pub enum CoreEvent {
     LeadUpdated(Lead),
     #[serde(rename = "preview:progress")]
     PreviewProgress(PreviewProgressEvent),
+    #[serde(rename = "radar:draft-created")]
+    RadarDraftCreated(String),
     #[serde(rename = "health:changed")]
     HealthChanged(HealthStatus),
     #[serde(rename = "crawl:finished")]
@@ -58,6 +60,7 @@ impl CoreEvent {
             Self::LeadNew(_) => "lead:new",
             Self::LeadUpdated(_) => "lead:updated",
             Self::PreviewProgress(_) => "preview:progress",
+            Self::RadarDraftCreated(_) => "radar:draft-created",
             Self::HealthChanged(_) => "health:changed",
             Self::CrawlFinished(_) => "crawl:finished",
             Self::JobFailed(_) => "job:failed",
@@ -71,6 +74,7 @@ impl CoreEvent {
                 serde_json::to_value(v).unwrap_or(Value::Null)
             }
             Self::PreviewProgress(v) => serde_json::to_value(v).unwrap_or(Value::Null),
+            Self::RadarDraftCreated(id) => Value::String(id.clone()),
             Self::HealthChanged(v) => serde_json::to_value(v).unwrap_or(Value::Null),
             Self::CrawlFinished(v) => serde_json::to_value(v).unwrap_or(Value::Null),
             Self::JobFailed(v) => serde_json::to_value(v).unwrap_or(Value::Null),

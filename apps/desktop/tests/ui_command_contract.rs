@@ -477,14 +477,18 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
     .expect("radar_preview_get");
     assert_eq!(preview_got["radar_id"], json!(radar_id));
 
-    let active_radar = invoke_command_json(
+    let activation_without_preview = invoke_command_json(
         &state,
         "radar_set_status",
         json!({ "id": radar_id, "status": "active" }),
     )
     .await
-    .expect("radar_set_status active");
-    assert_eq!(active_radar["status"], json!("active"));
+    .expect_err("a draft must be reviewed before desktop activation");
+    assert!(activation_without_preview.to_string().contains("xem thử"));
+    // The rest of this test exercises IPC ingestion with a radar fixture.
+    state.core().radar_set_status(&radar_id, dealsonar_core::dto::RadarStatus::Active)
+        .await.expect("activate fixture for pipeline");
+
     let _cfg_after_active = recv_ipc_env(&mut ipc_client).await;
 
     // ------------------------------------------------------------------------
@@ -706,6 +710,20 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
         .await
         .expect("post_get");
     assert_eq!(got_post["external_id"], json!("fb_post_demand_101"));
+
+    let scanned_posts = invoke_command_json(
+        &state,
+        "post_list_by_source",
+        json!({ "source_id": source_id, "before": null }),
+    )
+    .await
+    .expect("post_list_by_source");
+    let items = scanned_posts["items"].as_array().unwrap();
+    assert!(items.iter().any(|item| item["id"] == json!(post_id)));
+    assert!(items
+        .iter()
+        .all(|item| item["source_id"] == json!(source_id)));
+    assert!(scanned_posts["next_cursor"].is_null());
 
     let searched_posts = invoke_command_json(
         &state,

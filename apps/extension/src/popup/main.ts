@@ -6,6 +6,7 @@ import { extractGroupSlugOrIdFromUrl } from "../content/extract";
 import { isQuickScanOptions } from "../scan-options";
 import { detectActiveTabGroup, renderGroupContext } from "./group-context";
 import { readScanOptions, renderScanControls } from "./scan-controls";
+import { dsLog } from "../log";
 import { byId, popupState, showError } from "./state";
 import { renderStatus } from "./status";
 
@@ -54,7 +55,7 @@ export async function initPopup(): Promise<void> {
     } finally { refreshing = false; }
   };
   try {
-    byId("ext-version").textContent = `v${chrome.runtime.getManifest().version}`;
+    byId("ext-version").textContent = `v${chrome.runtime.getManifest().version}${typeof __BUILD_ID__ === "string" ? ` · ${__BUILD_ID__}` : ""}`;
     await refresh();
   } catch (error) { showError(error); }
 
@@ -140,9 +141,11 @@ export async function initPopup(): Promise<void> {
     const source = popupState.selectedSources.find((s) => s.external_id === byId<HTMLSelectElement>("scan-source").value);
     if (!source || popupState.scanPending || popupState.optionsSaving || popupState.optionsUnsaved || !isQuickScanOptions(readScanOptions())) return;
     popupState.scanPending = true;
+    dsLog("panel: Quét ngay", source.external_id, readScanOptions());
     if (popupState.latestStatus) renderScanControls(popupState.latestStatus);
     try {
       const response = await chrome.runtime.sendMessage({ kind: "popup:scan-now", source, options: readScanOptions() }) as PopupScanResponse;
+      dsLog("panel: kết quả quét", { ok: response.ok, error: response.error, lastScan: response.status?.lastScan });
       if (response.status) renderResponse(response.status);
       if (!response.ok) throw new Error(response.error || "Chưa thể quét. Vui lòng thử lại.");
     } finally {

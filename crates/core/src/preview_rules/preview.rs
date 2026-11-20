@@ -2,6 +2,14 @@
 
 use super::*;
 
+#[derive(Serialize, Deserialize)]
+struct SavedDraftPreview {
+    id: String,
+    version_id: String,
+    source_ids: Vec<String>,
+    total_posts: usize,
+}
+
 /// Start an interactive streaming preview run (`02-radar-spec.md §5`, `05-pipeline-rules.md §10`).
 ///
 /// - Selects up to `config.preview_max_posts` (`50`) recent stored posts across `source_ids`.
@@ -64,6 +72,14 @@ pub async fn start_radar_preview(
         .source_ids
         .clone()
         .unwrap_or_else(|| rw.source_ids.clone());
+    let mut sorted_sources = source_ids.clone();
+    sorted_sources.sort();
+    let mut saved_sources = rw.source_ids.clone();
+    saved_sources.sort();
+    let saved_draft = rw.radar.status == "draft"
+        && effective_ver.id == rw.current_version.id
+        && sorted_sources == saved_sources;
+    let saved_preview_key = format!("radar.saved_preview.{}", rw.radar.id);
 
     if source_ids.is_empty() {
         return Err(CoreError::Validation(
@@ -93,6 +109,7 @@ pub async fn start_radar_preview(
         preview_id: preview_id.clone(),
         radar_id: rw.radar.id.clone(),
         radar_version: effective_ver.version,
+        source_ids: Some(source_ids.clone()),
         status: initial_status,
         total_posts: posts.len(),
         evaluated_posts: 0,
@@ -124,6 +141,7 @@ pub async fn start_radar_preview(
                 "Radar đang xem thử. Hãy dừng phiên hiện tại trước khi chạy lại.".into(),
             ));
         }
+        rt.store.delete_setting(&saved_preview_key)?;
         latest.insert(state.radar_id.clone(), state.preview_id.clone());
         previews.insert(state.preview_id.clone(), state.clone());
     }
@@ -195,6 +213,17 @@ pub async fn start_radar_preview(
         if let Err(err) = result {
             state.status = PreviewStatus::Error;
             state.error = Some(err.to_string());
+        }
+        if saved_draft && state.status == PreviewStatus::Done && state.total_posts > 0 {
+            let saved = SavedDraftPreview {
+                id: state.preview_id.clone(),
+                version_id: effective_ver.id.clone(),
+                source_ids: sorted_sources,
+                total_posts: state.total_posts,
+            };
+            if let Err(error) = rt.store.set_setting(&saved_preview_key, &saved) {
+                tracing::warn!(%error, "Could not retain preview for a saved draft");
+            }
         }
         save_preview_state(&rt, &state);
         emit_preview_progress(&rt, &state, Vec::new());
@@ -581,11 +610,27 @@ pub fn get_radar_preview(
         .map(preview_eval_item_to_dto)
         .collect();
     let warnings = compute_preview_warnings(&items, ver);
+    let mut source_ids = rw.source_ids.clone();
+    source_ids.sort();
+    let saved = rt
+        .store
+        .get_setting::<SavedDraftPreview>(&format!("radar.saved_preview.{radar_id}"))?
+        .filter(|saved| {
+            !incomplete
+                && saved.total_posts == rows.len()
+                && saved.version_id == ver.id
+                && saved.source_ids == source_ids
+                && preview_id.is_none_or(|id| id == saved.id)
+        });
 
     Ok(PreviewRunState {
-        preview_id: preview_id.unwrap_or("restored").to_string(),
+        preview_id: saved
+            .as_ref()
+            .map(|run| run.id.clone())
+            .unwrap_or_else(|| preview_id.unwrap_or("restored").to_string()),
         radar_id: radar_id.to_string(),
         radar_version: ver.version,
+        source_ids: saved.map(|run| run.source_ids),
         status: if incomplete {
             PreviewStatus::Error
         } else {

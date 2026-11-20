@@ -39,6 +39,7 @@ export type CrawlPageResult = {
   strategy: ExtractionStrategy;
   inaccessible?: boolean;
   error?: string;
+  diagnostic?: string;
 };
 
 // Content -> Background
@@ -88,6 +89,8 @@ export type BgCrawlExecuteMessage = {
   maxPosts: number;
   maxScrollSteps: number;
   seenPostIds: string[];
+  /** Scheduled runs stop at the first known post; manual scans scroll the full chosen count. */
+  stopOnKnownPost?: boolean;
   extractor: ExtractorProfile;
   stepDelayMinMs?: number;
   stepDelayMaxMs?: number;
@@ -144,6 +147,7 @@ export type ScanSummary = {
   postsNew: number;
   endedAt: number;
   error?: string;
+  diagnostic?: string;
 };
 
 export type PopupScanMessage = { kind: "popup:scan-now"; source: SourceRef; options?: QuickScanOptions };

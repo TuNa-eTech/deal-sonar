@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {offerUndo} from "../components/UndoCenter";
 import { api } from "../lib/api";
 import { formatRelativeTime } from "../lib/format";
 import { openSafeSetupUrl, renderHighlightedPostText } from "../lib/security";
-import type { LicenseStatus, Post, Source } from "../types/ipc";
+import type { LicenseStatus, Post, Source, SourcePostCursor, SourcePostPage } from "../types/ipc";
+import { Badge, Button, Card, Input, Modal, ModalBody, ModalHeader } from "../components/ui";
 
 interface SourcesScreenProps {
   sources: Source[];
@@ -17,11 +18,43 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
   onChanged,
 }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [infoMsg, setInfoMsg] = useState<string | null>(null);
+  const [scans, setScans] = useState<Record<string, {runId?: string; started?: number; text: string; busy: boolean}>>({});
+
+  useEffect(() => {
+    const pending = Object.entries(scans).filter(([, scan]) => scan.busy && scan.runId);
+    if (!pending.length) return;
+    let cancelled = false;
+    const refresh = async () => {
+      for (const [id, scan] of pending) {
+        try {
+          const runs = await api.crawlRunList(id, 10);
+          if (cancelled) return;
+          const result = runs.find(run => run.id === scan.runId);
+          if (!result && Date.now() - (scan.started ?? 0) < 90_000) continue;
+          const text = result
+            ? result.status === "ok" || result.status === "empty"
+              ? `Quét hoàn tất · ${result.posts_new} bài mới`
+              : `Quét chưa hoàn tất · ${result.error ?? "kiểm tra kết nối và quyền truy cập nhóm"}`
+            : "Chưa nhận kết quả. Kiểm tra tiện ích DealSonar trong Chrome.";
+          setScans(current => current[id]?.runId === scan.runId
+            ? { ...current, [id]: { text, busy: false } }
+            : current);
+        } catch (error) {
+          if (!cancelled) setScans(current => current[id]?.runId === scan.runId
+            ? { ...current, [id]: {text: `Chưa đọc được lượt quét. ${String(error)}`, busy: false} }
+            : current);
+        }
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 2500);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [scans]);
 
   const [ftsOpen, setFtsOpen] = useState(false);
   const [ftsQuery, setFtsQuery] = useState("");
   const [ftsPosts, setFtsPosts] = useState<Post[]>([]);
+  const [viewingSource, setViewingSource] = useState<Source | null>(null);
 
   const followedCount = sources.filter((s) => s.followed).length;
   const priorityCount = sources.filter((s) => s.priority).length;
@@ -56,10 +89,15 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
 
   const handleCrawlNow = async (s: Source) => {
     setErrorMsg(null);
-    const result=await api.sourceCrawlNow(s.id, "manual");
-    if(!result.queued){setErrorMsg("Chưa có tiện ích kết nối để nhận lệnh. Mở Chrome rồi thử lại.");return;}
-    setInfoMsg(`Đã gửi lệnh quét ngay cho group «${s.name}». Hãy xem lần quét cuối và số bài lưu để xác nhận kết quả.`);
-    onChanged();
+    setScans(current => ({...current, [s.id]: {text: "Đang gửi lệnh…", busy: true}}));
+    try {
+      const result = await api.sourceCrawlNow(s.id, "manual");
+      setScans(current => ({...current, [s.id]: result.queued
+        ? {runId: result.run_id, started: Date.now(), text: "Đã gửi lệnh · đang chờ tiện ích báo kết quả", busy: true}
+        : {text: "Chưa gửi được. Mở Chrome có tiện ích DealSonar rồi thử lại.", busy: false}}));
+    } catch (error) {
+      setScans(current => ({...current, [s.id]: {text: String(error), busy: false}}));
+    }
   };
 
   const runPostSearch = async () => {
@@ -71,7 +109,7 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
     <div className="sources-workspace">
       <div className="screen-header">
         <div>
-          <h1 className="screen-title">Nguồn Group Facebook</h1>
+          <h1 className="screen-title">Group Facebook</h1>
           <p className="screen-subtitle">
             Đang theo dõi {followedCount} / {license.limits.max_followed_groups} group. Group ưu
             tiên: {priorityCount} / 3 (chu kỳ 5 phút).
@@ -79,23 +117,20 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
         </div>
 
         <div className="management-header-actions">
-          <button
-            type="button"
-            className="btn"
+          <Button
             onClick={() => {
               setFtsOpen(true);
               void runPostSearch();
             }}
           >
             Tìm bài viết thô trong kho (FTS)
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
+          </Button>
+          <Button
+            variant="primary"
             onClick={() => openSafeSetupUrl("https://www.facebook.com/groups/joins/")}
           >
             + Mở trang group của tôi trên Facebook
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -104,11 +139,12 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
           <span>{errorMsg}</span>
         </div>
       )}
-      {infoMsg && (
-        <div className="health-banner info" style={{ borderRadius: 6, marginBottom: 12 }}>
-          <span>{infoMsg}</span>
-        </div>
-      )}
+      {sources.length === 0 && <Card>
+        <h2>Chưa có nhóm Facebook</h2>
+        <p>Mở danh sách nhóm Facebook trong Chrome có tiện ích DealSonar, rồi chờ đồng bộ. Nếu chưa thấy nhóm, kiểm tra kết nối Chrome và làm mới danh sách.</p>
+        <Button onClick={onChanged}>Làm mới danh sách</Button>
+        <Button onClick={() => { location.hash = "health"; }}>Kiểm tra kết nối Chrome</Button>
+      </Card>}
 
       <div className="table-wrap source-directory">
         <table className="crm-table">
@@ -134,53 +170,52 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
                   </div>
                 </td>
                 <td>
-                  <span className="badge">
+                  <Badge >
                     {s.privacy === "private" ? "Group kín" : "Công khai"}
-                  </span>
+                  </Badge>
                 </td>
                 <td>{s.member_count ? s.member_count.toLocaleString("vi-VN") : "—"}</td>
                 <td>{s.last_crawl_at ? formatRelativeTime(s.last_crawl_at) : "Chưa quét"}</td>
                 <td>~{s.posts_per_day} bài/ngày</td>
                 <td>
-                  <span
-                    className={`badge ${
-                      s.state === "ok" ? "badge-success" : "badge-danger"
-                    }`}
+                  <Badge
                   >
                     {s.state === "ok"
                       ? "Ổn định"
                       : s.state === "inaccessible"
                         ? "Không truy cập được"
                         : "Lỗi"}
-                  </span>
+                  </Badge>
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    className={`btn btn-sm ${s.priority ? "priority-selected" : ""}`}
+                  <Button
+                    size="sm"
+                    className={s.priority ? "priority-selected" : undefined}
                     disabled={!s.followed}
                     onClick={() => void handleTogglePriority(s)}
                   >
                     {s.priority ? "Ưu tiên" : "Thường"}
-                  </button>
+                  </Button>
                 </td>
                 <td>
                   <div className="management-row-actions">
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${s.followed ? "" : "btn-primary"}`}
+                    <Button
+                      variant={s.followed ? "default" : "primary"} size="sm"
                       onClick={() => void handleToggleFollow(s)}
                     >
                       {s.followed ? "Bỏ theo dõi" : "Theo dõi"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      disabled={!s.followed}
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={!s.followed || scans[s.id]?.busy}
                       onClick={() => void handleCrawlNow(s).catch(e=>setErrorMsg(String(e)))}
                     >
                       Quét ngay
-                    </button>
+                    </Button>
+                    <Button size="sm" onClick={() => setViewingSource(s)}>
+                      Xem bài đã quét
+                    </Button>
+                    {scans[s.id] && <small role="status">{scans[s.id]?.text}</small>}
                   </div>
                 </td>
               </tr>
@@ -189,21 +224,27 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
         </table>
       </div>
 
+      {viewingSource && (
+        <SourcePostsDialog
+          key={viewingSource.id}
+          source={viewingSource}
+          onClose={() => setViewingSource(null)}
+        />
+      )}
+
       {/* Raw Post FTS Search Drawer (`post_search`) */}
       {ftsOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Tìm kiếm bài thô trong kho">
-          <div className="modal-panel" style={{ maxWidth: 820 }}>
-            <div className="modal-header">
+        <Modal label="Tìm kiếm bài thô trong kho" size="lg">
+            <ModalHeader>
               <h3 style={{ margin: 0 }}>Tìm kiếm toàn văn trên kho bài thô (FTS5 không phân biệt dấu)</h3>
-              <button type="button" className="btn btn-sm" onClick={() => setFtsOpen(false)}>
+              <Button size="sm" onClick={() => setFtsOpen(false)}>
                 Đóng
-              </button>
-            </div>
-            <div className="modal-body">
+              </Button>
+            </ModalHeader>
+            <ModalBody>
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                <input
+                <Input
                   type="search"
-                  className="input"
                   placeholder="Gõ từ khoá (ví dụ: cau giay, 2pn, vios)…"
                   value={ftsQuery}
                   onChange={(e) => setFtsQuery(e.target.value)}
@@ -211,14 +252,14 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
                     if (e.key === "Enter") void runPostSearch();
                   }}
                 />
-                <button type="button" className="btn btn-primary" onClick={() => void runPostSearch()}>
+                <Button variant="primary" onClick={() => void runPostSearch()}>
                   Tìm bài
-                </button>
+                </Button>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {ftsPosts.map((p) => (
-                  <div key={p.id} className="card">
+                  <Card key={p.id} >
                     <div className="management-row-heading">
                       <strong>{p.author_name}</strong>
                       <span className="field-hint">
@@ -228,16 +269,83 @@ export const SourcesScreen: React.FC<SourcesScreenProps> = ({
                     <div className="post-plain-text" style={{ fontSize: 12.5, padding: 9 }}>
                       {renderHighlightedPostText(p.text, ftsQuery ? [ftsQuery] : [])}
                     </div>
-                  </div>
+                  </Card>
                 ))}
                 {ftsPosts.length === 0 && (
                   <div className="text-muted">Không có bài viết nào khớp từ khoá.</div>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
+            </ModalBody>
+          </Modal>
       )}
     </div>
   );
 };
+
+function SourcePostsDialog({ source, onClose }: { source: Source; onClose: () => void }) {
+  const [page, setPage] = useState<SourcePostPage | null>(null);
+  const [request, setRequest] = useState<{ before: SourcePostCursor | null }>({ before: null });
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.postListBySource(source.id, request.before)
+      .then((result) => {
+        if (cancelled) return;
+        setPage((current) => ({
+          items: request.before && current ? [...current.items, ...result.items] : result.items,
+          next_cursor: result.next_cursor,
+        }));
+      })
+      .catch(() => { if (!cancelled) setFailed(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [source.id, request]);
+
+  const load = (before: SourcePostCursor | null) => {
+    setLoading(true);
+    setFailed(false);
+    setRequest({ before });
+  };
+
+  const nextCursor = page?.next_cursor;
+  return (
+    <Modal label={`Bài đã quét · ${source.name}`} size="lg">
+      <ModalHeader>
+        <h3>Bài đã quét · {source.name}</h3>
+        <Button size="sm" autoFocus onClick={onClose}>Đóng</Button>
+      </ModalHeader>
+      <ModalBody>
+        {page?.items.length === 0 && <p className="text-muted">Group này chưa có bài đã lưu.</p>}
+        {!!page?.items.length && (
+          <ul className="source-posts">
+            {page.items.map((post) => (
+              <li key={post.id}>
+                <Card>
+                  <div className="management-row-heading">
+                    <strong>{post.author_name}</strong>
+                    <span className="field-hint">
+                      {post.created_at === null ? "Đã quét" : "Đăng"} {formatRelativeTime(post.created_at ?? post.captured_at)}
+                    </span>
+                  </div>
+                  <div className="post-plain-text">{renderHighlightedPostText(post.text)}</div>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+        {loading && <p role="status" className="text-muted">Đang tải bài đã quét…</p>}
+        {failed && (
+          <>
+            <p role="alert">Không tải được bài đã quét.</p>
+            <Button onClick={() => load(request.before)}>Thử lại</Button>
+          </>
+        )}
+        {!failed && nextCursor && (
+          <Button disabled={loading} onClick={() => load(nextCursor)}>Xem thêm bài</Button>
+        )}
+      </ModalBody>
+    </Modal>
+  );
+}

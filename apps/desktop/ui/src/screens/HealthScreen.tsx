@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { formatExactTime, formatRelativeTime } from "../lib/format";
 import type { AiUsageStats, CrawlRun, FunnelStats, HealthStatus } from "../types/ipc";
 import { FunnelChart } from "../components/FunnelChart";
+import { Badge, Button, Card, Input } from "../components/ui";
 
 interface HealthScreenProps {
   health: HealthStatus | null;
@@ -18,6 +19,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
   const [crawlRuns, setCrawlRuns] = useState<CrawlRun[]>([]);
   const [aiUsage, setAiUsage] = useState<AiUsageStats | null>(null);
   const [funnel, setFunnel] = useState<FunnelStats | null>(null);
+  const [checkResult, setCheckResult] = useState<{ok: boolean; text: string} | null>(null);
   const [checking, setChecking] = useState(false);
   const [diagMsg, setDiagMsg] = useState<string | null>(null);
   const [customExtId, setCustomExtId] = useState("");
@@ -35,18 +37,24 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
   }, []);
 
   useEffect(() => {
-    void loadAll();
+    void loadAll().catch(error => setCheckResult({ok: false, text: String(error)}));
   }, [loadAll]);
 
   const handleRecheck = async () => {
     setChecking(true);
+    setCheckResult(null);
     try {
-      await api.chromeConnect(
+      const chrome = await api.chromeConnect(
         customExtId.trim() ? { extension_id: customExtId.trim() } : undefined
       );
-      await api.aiProbe();
+      const probes = await api.aiProbe();
       await onRefreshHealth();
       await loadAll();
+      const ready = Object.values(probes).some(p => p.installed && p.authenticated);
+      setCheckResult({ok: true, text: `Chrome: ${chrome.extension_connected ? "đã kết nối" : "chưa kết nối"} · Facebook: ${chrome.facebook_session === "ok" ? "sẵn sàng" : "cần kiểm tra"} · AI: ${ready ? "có CLI sẵn sàng" : "chưa có CLI sẵn sàng"}.`});
+    } catch (error) {
+      const message = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+      setCheckResult({ok: false, text: `Kiểm tra chưa hoàn tất. ${message}`});
     } finally {
       setChecking(false);
     }
@@ -93,20 +101,19 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
         </div>
 
         <div className="management-header-actions">
-          <button
-            type="button"
-            className="btn"
+          <Button
             disabled={checking}
             onClick={() => void handleRecheck()}
           >
             {checking ? "Đang kiểm tra…" : "Chạy lại kiểm tra"}
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => void handleCreateBundle()}>
+          </Button>
+          <Button variant="primary" onClick={() => void handleCreateBundle()}>
             Tạo gói chẩn đoán
-          </button>
+          </Button>
         </div>
       </div>
 
+      {checkResult && <div role={checkResult.ok ? "status" : "alert"} className={`health-banner ${checkResult.ok ? "info" : "danger"}`}>{checkResult.text}</div>}
       {diagMsg && (
         <div className="health-banner info" style={{ borderRadius: 6, marginBottom: 14 }}>
           <span>{diagMsg}</span>
@@ -128,22 +135,20 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
           </div>
           {!health?.extension_connected && (
             <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
-              <input
+              <Input
                 type="text"
-                className="input"
                 style={{ fontSize: 12, padding: "4px 8px" }}
                 placeholder="Extension ID tuỳ chỉnh (tuỳ chọn)"
                 value={customExtId}
                 onChange={(e) => setCustomExtId(e.target.value)}
               />
-              <button
-                type="button"
-                className="btn btn-sm"
+              <Button
+                size="sm"
                 disabled={checking}
                 onClick={() => void handlePairExtensionId()}
               >
                 Ghép nối
-              </button>
+              </Button>
             </div>
           )}
           {pairingMsg && (
@@ -199,14 +204,14 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
 
       {/* AI Daily Usage & Funnel */}
       <div className="health-analytics">
-        <div className="card">
+        <Card >
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
             <strong style={{ fontSize: 14 }}>Mức dùng AI theo ngày (7 ngày qua)</strong>
             {aiUsage && (
-              <span className="badge badge-primary">
+              <Badge tone="primary">
                 Hôm nay: {aiUsage.today_items.toLocaleString("vi-VN")} /{" "}
                 {aiUsage.daily_cap.toLocaleString("vi-VN")} bài
-              </span>
+              </Badge>
             )}
           </div>
 
@@ -279,7 +284,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               </table>
             </>
           )}
-        </div>
+        </Card>
 
         <FunnelChart stats={funnel} title="Phễu xử lý toàn hệ thống (7 ngày)" />
       </div>
@@ -310,19 +315,16 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
                   <td>{run.source_name}</td>
                   <td>{run.reason}</td>
                   <td>
-                    <span className="badge">{run.strategy ?? "—"}</span>
+                    <Badge >{run.strategy ?? "—"}</Badge>
                   </td>
                   <td>
                     {run.posts_seen} thấy · <strong>{run.posts_new} mới</strong>
                   </td>
                   <td>
-                    <span
-                      className={`badge ${
-                        run.status === "ok" ? "badge-success" : "badge-warning"
-                      }`}
+                    <Badge
                     >
                       {run.status}
-                    </span>
+                    </Badge>
                     {run.error && <div className="field-hint">{run.error}</div>}
                   </td>
                 </tr>

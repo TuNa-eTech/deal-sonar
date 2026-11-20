@@ -4,6 +4,7 @@
 // - Strictly read-only "Xem thêm" / "See more" text expansion inside post articles
 // - Controlled scroll step driver with early-stop on `seen_post_ids` or `max_posts`
 
+import { dsLog } from "../log";
 import type { CrawlPageResult, SessionDetection } from "../messages";
 import type {
   ExtractionStrategy,
@@ -331,6 +332,8 @@ export type DriveCrawlOptions = {
   maxPosts: number;
   maxScrollSteps: number;
   seenPostIds: readonly string[];
+  /** Default true: stop once a previously seen post appears. Manual scans pass false. */
+  stopOnKnownPost?: boolean;
   extractor?: ExtractorProfile;
   getNetworkPayloads: () => readonly string[];
   stepDelayMinMs?: number;
@@ -352,6 +355,23 @@ function defaultScroll(win: Window): void {
   } catch {
     win.scrollBy(0, delta);
   }
+}
+
+function describeEmptyScan(options: DriveCrawlOptions, extractor: ExtractorProfile, steps: number): string {
+  const dom = resolveDomConfig(extractor.dom);
+  let articles = 0;
+  let permalinks = 0;
+  let withText = 0;
+  try {
+    const nodes = options.doc.querySelectorAll(dom.article_selector);
+    articles = nodes.length;
+    nodes.forEach((el) => {
+      if (dom.permalink_selectors.some((sel) => el.querySelector(sel))) permalinks++;
+      if (dom.text_selectors.some((sel) => el.querySelector(sel)) || el.querySelector('div[dir="auto"]')) withText++;
+    });
+  } catch { /* invalid selector: report zero */ }
+  const payloads = options.getNetworkPayloads().length;
+  return `đã cuộn ${steps} lần; ${articles} khung bài, ${permalinks} có liên kết bài, ${withText} có chữ; ${payloads} gói mạng bắt được`;
 }
 
 export async function driveCrawlInPage(
@@ -395,13 +415,15 @@ export async function driveCrawlInPage(
 
   const seenSet = new Set(options.seenPostIds);
   const maxPosts = Math.max(1, options.maxPosts);
-  const maxSteps = Math.max(0, Math.min(options.maxScrollSteps, 10));
+  const maxSteps = Math.max(0, Math.min(options.maxScrollSteps, 50));
 
   const collected = new Map<string, RawPost>();
   let usedStrategy: ExtractionStrategy = primaryDefault;
   let hitKnownPost = false;
 
+  let stepsDone = 0;
   for (let step = 0; step <= maxSteps; step++) {
+    stepsDone = step;
     // Re-check session in case a rate-limit modal appeared after scrolling
     const stepSession = detectSessionStatus(
       options.doc,
@@ -444,8 +466,10 @@ export async function driveCrawlInPage(
       }
     }
 
+    dsLog(`bước ${step}/${maxSteps}: ${posts.length} bài trong trang, đã gom ${collected.size}, ${options.getNetworkPayloads().length} gói mạng`);
     // Stop early when encountering a previously seen post_id or reaching max_posts
-    if (hitKnownPost || collected.size >= maxPosts || step === maxSteps) {
+    if ((hitKnownPost && options.stopOnKnownPost !== false) || collected.size >= maxPosts || step === maxSteps) {
+      dsLog("dừng:", hitKnownPost && options.stopOnKnownPost !== false ? "gặp bài đã thấy" : collected.size >= maxPosts ? "đủ số bài" : "hết số lần cuộn");
       break;
     }
 
@@ -455,10 +479,14 @@ export async function driveCrawlInPage(
   }
 
   const finalPosts = Array.from(collected.values()).slice(0, maxPosts);
-  return {
+  const result: CrawlPageResult = {
     status: finalPosts.length > 0 ? "ok" : "empty",
     session: { state: "ok" },
     posts: finalPosts,
     strategy: usedStrategy,
   };
+  if (finalPosts.length === 0) {
+    result.diagnostic = describeEmptyScan(options, extractor, stepsDone);
+  }
+  return result;
 }

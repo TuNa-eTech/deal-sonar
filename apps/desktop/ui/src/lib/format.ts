@@ -229,3 +229,66 @@ export function removeVietnameseDiacritics(str: string): string {
     .replace(/đ/g, "d")
     .replace(/Đ/g, "D");
 }
+
+export type FreshnessTone = "fresh" | "warm" | "normal" | "stale";
+
+/** Short age label for the triage queue: "3 phút", "2 giờ", "4 ngày". */
+export function formatAge(tsMs: number | null | undefined, nowMs: number = Date.now()): string {
+  if (!tsMs) return "—";
+  const min = Math.max(0, Math.floor((nowMs - tsMs) / 60000));
+  if (min < 1) return "vừa xong";
+  if (min < 60) return `${min} phút`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} giờ`;
+  return `${Math.floor(hr / 24)} ngày`;
+}
+
+/** Freshness bucket: the first broker to call usually wins, so age is the primary signal. */
+export function freshnessTone(tsMs: number | null | undefined, nowMs: number = Date.now()): FreshnessTone {
+  if (!tsMs) return "normal";
+  const min = (nowMs - tsMs) / 60000;
+  if (min < 15) return "fresh";
+  if (min < 60) return "warm";
+  if (min < 6 * 60) return "normal";
+  return "stale";
+}
+
+/** Domestic digits for clipboard use: "+84912345678" → "0912345678". */
+export function domesticPhoneDigits(phone: string): string {
+  return formatDomesticPhone(phone).replace(/\D/g, "");
+}
+
+const LIFETIME_PRESETS = [1, 3, 6, 12, 24, 48, 72, 168, 720];
+
+/** "6 giờ", "3 ngày", "Không giới hạn". */
+export function formatLifetime(hours: number | null | undefined): string {
+  if (!hours) return "Không giới hạn";
+  if (hours < 24 || hours % 24 !== 0) return `${hours} giờ`;
+  return `${hours / 24} ngày`;
+}
+
+/** Lifetime choices for a radar, keeping a custom stored value selectable. */
+export function lifetimeOptions(current: number | null | undefined): Array<{ value: number | ""; label: string }> {
+  const hours = current && !LIFETIME_PRESETS.includes(current) ? [...LIFETIME_PRESETS, current].sort((a, b) => a - b) : LIFETIME_PRESETS;
+  return [...hours.map((h) => ({ value: h, label: formatLifetime(h) })), { value: "" as const, label: "Không giới hạn" }];
+}
+
+/**
+ * Freshness relative to the radar's own clock: 15 minutes is stale for a bargain but brand new
+ * for a job seeker. Falls back to fixed thresholds when the radar has no lifetime.
+ */
+export function leadFreshness(
+  postedAt: number | null | undefined,
+  expiresAt: number | null | undefined,
+  nowMs: number = Date.now()
+): FreshnessTone | "expired" {
+  if (expiresAt != null && postedAt) {
+    if (nowMs >= expiresAt) return "expired";
+    const used = (nowMs - postedAt) / Math.max(1, expiresAt - postedAt);
+    if (used < 0.1) return "fresh";
+    if (used < 0.35) return "warm";
+    if (used < 0.75) return "normal";
+    return "stale";
+  }
+  return freshnessTone(postedAt, nowMs);
+}

@@ -296,8 +296,17 @@ pub fn finalize_candidate_evaluation(
         return Ok(eval_done);
     }
 
+    // A lead that is already past its lifetime when found (late crawl, backlog) still lands in
+    // the app, but pinging the user about a sold car or a departed truck is pure noise.
+    let already_expired = lead_expires_at(
+        post.created_at,
+        post.captured_at,
+        radar_notify.lead_ttl_hours,
+    )
+    .is_some_and(|exp| exp <= now);
+
     // Notification routing (`CreateAndNotify` only; `CreateWeakOnly` stays silent in Inbox!)
-    if disposition == LeadDisposition::CreateAndNotify {
+    if disposition == LeadDisposition::CreateAndNotify && !already_expired {
         route_lead_notifications(
             rt,
             &lead_rec,
@@ -326,11 +335,12 @@ pub fn load_lead_dto(rt: &CoreRuntime, lead_id: &str) -> CoreResult<Option<Lead>
     let Some(detail) = rt.store.lead_get(lead_id)? else {
         return Ok(None);
     };
-    let min_score = rt
+    let notify = rt
         .store
         .radar_get(&detail.lead.radar_id)?
-        .map(|rw| rw.radar.notify.min_score)
-        .unwrap_or(0.6);
+        .map(|rw| rw.radar.notify);
+    let min_score = notify.as_ref().map(|n| n.min_score).unwrap_or(0.6);
+    let lead_ttl_hours = notify.as_ref().and_then(|n| n.lead_ttl_hours);
 
     let feedback_label = detail
         .events
@@ -352,13 +362,25 @@ pub fn load_lead_dto(rt: &CoreRuntime, lead_id: &str) -> CoreResult<Option<Lead>
     Ok(Some(lead_detail_to_lead_dto(
         &detail,
         min_score,
+        lead_ttl_hours,
         feedback_label,
     )))
+}
+
+/// Instant after which a lead is no longer worth acting on: post time (or capture time when
+/// Facebook hides it) plus the radar's lifetime.
+pub fn lead_expires_at(
+    post_created_at: Option<i64>,
+    captured_at: i64,
+    ttl_hours: Option<u32>,
+) -> Option<i64> {
+    ttl_hours.map(|h| post_created_at.unwrap_or(captured_at) + i64::from(h) * 3_600_000)
 }
 
 pub fn lead_detail_to_lead_dto(
     detail: &dealsonar_store::models::LeadDetail,
     min_score: f64,
+    lead_ttl_hours: Option<u32>,
     feedback_label: Option<FeedbackLabel>,
 ) -> Lead {
     let fields = detail
@@ -405,6 +427,11 @@ pub fn lead_detail_to_lead_dto(
             .unwrap_or_else(|| "Ẩn danh".to_string()),
         permalink: detail.permalink.clone(),
         post_created_at: detail.post_created_at,
+        expires_at: lead_expires_at(
+            detail.post_created_at,
+            detail.post_captured_at,
+            lead_ttl_hours,
+        ),
         also_seen_in,
         notified_at: detail.lead.notified_at,
         follow_up_at: detail.lead.follow_up_at,
@@ -413,5 +440,55 @@ pub fn lead_detail_to_lead_dto(
         feedback_label,
         created_at: detail.lead.created_at,
         updated_at: detail.lead.updated_at,
+    }
+}
+
+#[cfg(test)]
+mod lifetime_tests {
+    use super::lead_expires_at;
+    use crate::dto::{RadarNotifyConfig, RadarNotifyPatch};
+
+    #[test]
+    fn expiry_counts_from_post_time_and_falls_back_to_capture_time() {
+        assert_eq!(
+            lead_expires_at(Some(1_000), 9_000, Some(2)),
+            Some(1_000 + 7_200_000)
+        );
+        assert_eq!(
+            lead_expires_at(None, 9_000, Some(1)),
+            Some(9_000 + 3_600_000)
+        );
+        assert_eq!(lead_expires_at(Some(1_000), 9_000, None), None);
+    }
+
+    #[test]
+    fn notify_patch_sets_keeps_and_clears_lifetime() {
+        let base = RadarNotifyConfig {
+            lead_ttl_hours: Some(24),
+            ..RadarNotifyConfig::default()
+        };
+        let keep = RadarNotifyPatch::default().apply_onto(&base);
+        assert_eq!(keep.lead_ttl_hours, Some(24));
+        let set = RadarNotifyPatch {
+            lead_ttl_hours: Some(Some(2)),
+            ..Default::default()
+        }
+        .apply_onto(&base);
+        assert_eq!(set.lead_ttl_hours, Some(2));
+        let clear = RadarNotifyPatch {
+            lead_ttl_hours: Some(None),
+            ..Default::default()
+        }
+        .apply_onto(&base);
+        assert_eq!(clear.lead_ttl_hours, None);
+        let zero = RadarNotifyPatch {
+            lead_ttl_hours: Some(Some(0)),
+            ..Default::default()
+        }
+        .apply_onto(&base);
+        assert_eq!(
+            zero.lead_ttl_hours, None,
+            "0 hours means no lifetime, not instantly expired"
+        );
     }
 }

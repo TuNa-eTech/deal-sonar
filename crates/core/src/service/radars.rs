@@ -51,91 +51,7 @@ impl CoreService {
 
     pub fn radar_create_draft(&self, input: CreateRadarDraftInput) -> CoreResult<RadarDetail> {
         self.ensure_not_shutting_down()?;
-        if input.name.trim().is_empty() {
-            return Err(CoreError::Validation(
-                "Radar name cannot be empty".to_string(),
-            ));
-        }
-        if input.description.trim().is_empty() {
-            return Err(CoreError::Validation(
-                "Radar description cannot be empty".to_string(),
-            ));
-        }
-
-        let now = monotonic_radar_now_ms();
-        let license = self.rt.current_license_status(now)?;
-        if input.fields.len() > license.limits.max_fields_per_radar {
-            return Err(CoreError::LicenseLimitExceeded(format!(
-                "Current {:?} plan allows at most {} fields per radar (got {})",
-                license.plan,
-                license.limits.max_fields_per_radar,
-                input.fields.len()
-            )));
-        }
-
-        let settings = self.rt.load_settings()?;
-        let mut base_notify = RadarNotifyConfig {
-            channel_ids: Vec::new(),
-            mode: settings.default_notify_mode,
-            min_score: 0.6,
-            quiet_hours: None,
-        };
-        if let Some(patch) = &input.notify {
-            base_notify = patch.apply_onto(&base_notify);
-        }
-
-        // If `channel_ids` wasn't explicitly specified, default to all healthy channels so out-of-the-box alerts work seamlessly
-        if input
-            .notify
-            .as_ref()
-            .and_then(|n| n.channel_ids.as_ref())
-            .is_none()
-        {
-            let channels = self.rt.store.channel_list()?;
-            base_notify.channel_ids = channels
-                .into_iter()
-                .filter(|c| c.state == "ok")
-                .map(|c| c.id)
-                .collect();
-        }
-
-        let store_fields: Vec<_> = input.fields.iter().map(field_def_to_store).collect();
-        let rw = self
-            .rt
-            .store
-            .radar_create_draft(&StoreCreateRadarDraftInput {
-                id: None,
-                name: input.name.trim().to_string(),
-                template_id: input.template_id.clone(),
-                description: input.description,
-                language_hint: input.language_hint.or_else(|| Some("vi".to_string())),
-                user_profession: input.user_profession,
-                fields: store_fields,
-                match_policy: match_policy_to_store(&input.match_policy),
-                source_ids: input.source_ids,
-                notify: notify_to_store(&base_notify),
-                now_ms: now,
-            })?;
-
-        // Auto-attach seed ruleset (`bds-vi-v1`) when creating from a template specifying it (`05-pipeline-rules.md §6.3`)
-        if let Some(tid) = &input.template_id {
-            if let Ok(tpl) = get_template(tid, self.rt.config.templates_dir.as_deref()) {
-                if let Some(seed_name) = &tpl.seed_ruleset {
-                    if let Some(seed_body) = dealsonar_rules::seed_ruleset(seed_name) {
-                        let _ = self.rt.store.insert_ruleset(&NewRulesetInput {
-                            id: None,
-                            radar_version_id: rw.current_version.id.clone(),
-                            state: "active".to_string(),
-                            origin: "seed".to_string(),
-                            body: serde_json::to_value(&seed_body)?,
-                            metrics: None,
-                            now_ms: now,
-                        })?;
-                    }
-                }
-            }
-        }
-
+        let (rw, now) = persist_radar_draft(&self.rt, input, None)?;
         self.build_radar_detail_dto(&rw, now)
     }
 
@@ -271,12 +187,42 @@ impl CoreService {
         let now = monotonic_radar_now_ms();
         let license = self.rt.current_license_status(now)?;
         let _inflight = InflightAiGuard::acquire(&self.rt);
+        let sources = if input.suggest_sources {
+            self.rt.store.source_list(now)?
+        } else {
+            Vec::new()
+        };
+        let mut followed: HashSet<&str> = sources
+            .iter()
+            .filter(|row| row.source.followed)
+            .map(|row| row.source.id.as_str())
+            .collect();
+        let max_groups = license.limits.max_followed_groups;
+        let source_candidates = sources
+            .iter()
+            .filter(|row| {
+                row.source.platform == dealsonar_protocol::PLATFORM_FACEBOOK
+                    && row.source.kind == dealsonar_protocol::SOURCE_KIND_GROUP
+                    && row.source.state == "ok"
+                    && (row.source.followed || followed.len() < max_groups)
+            })
+            .map(|row| dealsonar_ai_bridge::RadarSourceCandidate {
+                id: row.source.id.clone(),
+                name: row.source.name.clone(),
+                stored_posts: row.stored_post_count,
+            })
+            .collect();
 
         let bridge_input = BridgeSuggestFieldsInput {
             description: input.description,
             user_profession: input.user_profession,
             language_hint: input.language_hint.or_else(|| Some("vi".to_string())),
-            closest_template: None,
+            closest_template: input
+                .template_id
+                .as_deref()
+                .and_then(|id| self.template_get(id).ok())
+                .and_then(|template| serde_json::to_value(template).ok()),
+            source_candidates,
         };
 
         let task_res = self.rt.ai_bridge.suggest_fields(&bridge_input).await?;
@@ -299,6 +245,22 @@ impl CoreService {
         }
 
         let out = task_res.output;
+        let mut suggested_source_ids = Vec::new();
+        for id in &out.suggested_source_ids {
+            if suggested_source_ids.len() == 3 {
+                break;
+            }
+            if bridge_input
+                .source_candidates
+                .iter()
+                .any(|candidate| candidate.id == *id)
+                && !suggested_source_ids.contains(id)
+                && (followed.contains(id.as_str()) || followed.len() < max_groups)
+            {
+                followed.insert(id);
+                suggested_source_ids.push(id.clone());
+            }
+        }
         let max_fields = license.limits.max_fields_per_radar;
         let fields: Vec<_> = out
             .fields
@@ -315,6 +277,7 @@ impl CoreService {
         let hard_filters = out
             .hard_filters
             .iter()
+            .filter(|filter| fields.iter().any(|field| field.key == filter.field))
             .map(|hf| HardFilter {
                 field: hf.field.clone(),
                 op: crate::dto::FilterOperator::from_str_lossy(&hf.op),
@@ -345,7 +308,35 @@ impl CoreService {
             hard_filters,
             clarifying_questions: out.clarifying_questions,
             prefilter_hint,
+            suggested_source_ids,
         })
+    }
+
+    pub async fn radar_set_status_from_desktop(
+        &self,
+        id: &str,
+        status: RadarStatus,
+        preview_id: Option<&str>,
+    ) -> CoreResult<Radar> {
+        if status == RadarStatus::Active {
+            let radar = self.radar_get(id)?.radar;
+            if radar.source_ids.is_empty() {
+                return Err(CoreError::Validation("Hãy chọn ít nhất một nhóm cho radar.".into()));
+            }
+            if radar.status == RadarStatus::Draft {
+                let preview_id = preview_id.ok_or_else(|| CoreError::Validation(
+                    "Hãy xem thử bản nháp trước khi bật radar.".into()
+                ))?;
+                let preview = self.radar_preview_get(id, None)?;
+                if preview.preview_id != preview_id
+                    || preview.status != crate::dto::PreviewStatus::Done
+                    || preview.total_posts == 0
+                {
+                    return Err(CoreError::Validation("Cần hoàn tất xem thử trên bài thật.".into()));
+                }
+            }
+        }
+        self.radar_set_status(id, status).await
     }
 
     pub async fn radar_set_status(&self, id: &str, status: RadarStatus) -> CoreResult<Radar> {
@@ -492,4 +483,97 @@ impl CoreService {
     pub fn template_get(&self, id: &str) -> CoreResult<RadarTemplate> {
         get_template(id, self.rt.config.templates_dir.as_deref())
     }
+}
+
+pub(super) fn persist_radar_draft(
+    rt: &CoreRuntime,
+    input: CreateRadarDraftInput,
+    id: Option<String>,
+) -> CoreResult<(dealsonar_store::models::RadarWithVersion, i64)> {
+    if input.name.trim().is_empty() {
+        return Err(CoreError::Validation(
+            "Radar name cannot be empty".to_string(),
+        ));
+    }
+    if input.description.trim().is_empty() {
+        return Err(CoreError::Validation(
+            "Radar description cannot be empty".to_string(),
+        ));
+    }
+
+    let now = monotonic_radar_now_ms();
+    let license = rt.current_license_status(now)?;
+    if input.fields.len() > license.limits.max_fields_per_radar {
+        return Err(CoreError::LicenseLimitExceeded(format!(
+            "Current {:?} plan allows at most {} fields per radar (got {})",
+            license.plan,
+            license.limits.max_fields_per_radar,
+            input.fields.len()
+        )));
+    }
+
+    let settings = rt.load_settings()?;
+    let mut base_notify = RadarNotifyConfig {
+        channel_ids: Vec::new(),
+        inherit_channels: None,
+        mode: settings.default_notify_mode,
+        min_score: 0.6,
+        quiet_hours: None,
+        lead_ttl_hours: None,
+    };
+    if let Some(patch) = &input.notify {
+        base_notify = patch.apply_onto(&base_notify);
+    }
+
+    // If `channel_ids` wasn't explicitly specified, default to all healthy channels so out-of-the-box alerts work seamlessly
+    if input
+        .notify
+        .as_ref()
+        .and_then(|n| n.channel_ids.as_ref())
+        .is_none()
+        && base_notify.inherit_channels.is_none()
+    {
+        let channels = rt.store.channel_list()?;
+        base_notify.channel_ids = channels
+            .into_iter()
+            .filter(|c| c.state == "ok")
+            .map(|c| c.id)
+            .collect();
+    }
+
+    let store_fields: Vec<_> = input.fields.iter().map(field_def_to_store).collect();
+    let rw = rt.store.radar_create_draft(&StoreCreateRadarDraftInput {
+        id,
+        name: input.name.trim().to_string(),
+        template_id: input.template_id.clone(),
+        description: input.description,
+        language_hint: input.language_hint.or_else(|| Some("vi".to_string())),
+        user_profession: input.user_profession,
+        fields: store_fields,
+        match_policy: match_policy_to_store(&input.match_policy),
+        source_ids: input.source_ids,
+        notify: notify_to_store(&base_notify),
+        now_ms: now,
+    })?;
+
+    // Auto-attach seed ruleset (`bds-vi-v1`) when creating from a template specifying it (`05-pipeline-rules.md §6.3`)
+    if let Some(tid) = &input.template_id {
+        if let Ok(tpl) = get_template(tid, rt.config.templates_dir.as_deref()) {
+            if let Some(seed_name) = &tpl.seed_ruleset {
+                if let Some(seed_body) = dealsonar_rules::seed_ruleset(seed_name) {
+                    let _ = rt.store.insert_ruleset(&NewRulesetInput {
+                        id: None,
+                        radar_version_id: rw.current_version.id.clone(),
+                        state: "active".to_string(),
+                        origin: "seed".to_string(),
+                        body: serde_json::to_value(&seed_body)?,
+                        metrics: None,
+                        now_ms: now,
+                    })?;
+                }
+            }
+        }
+    }
+
+    Ok((rw, now))
 }

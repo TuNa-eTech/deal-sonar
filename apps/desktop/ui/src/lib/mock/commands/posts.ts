@@ -1,6 +1,7 @@
 // Mock handlers: posts and rejected evaluations.
 
 import { removeVietnameseDiacritics } from "../../format";
+import type { Post, SourcePostCursor, SourcePostPage } from "../../../types/ipc";
 import type { MockCommandTable } from "./types";
 import { state } from "../store";
 
@@ -10,6 +11,25 @@ export const postCommands: MockCommandTable = {
     const post = state.posts.find((p) => p.id === id);
     if (!post) throw new Error(`Không tìm thấy bài viết: ${id}`);
     return structuredClone(post);
+  },
+
+  post_list_by_source: async (args): Promise<SourcePostPage> => {
+    const pageSize = 30;
+    const before = args.before as SourcePostCursor | null;
+    const timestamp = (post: Post) => post.created_at ?? post.captured_at;
+    const items = state.posts
+      .filter((post) => post.source_id === args.source_id && post.text !== null)
+      .filter((post) => !before || timestamp(post) < before.at ||
+        (timestamp(post) === before.at && post.id < before.id))
+      .sort((a, b) => timestamp(b) - timestamp(a) || (a.id < b.id ? 1 : -1))
+      .slice(0, pageSize + 1);
+    const hasMore = items.length > pageSize;
+    if (hasMore) items.pop();
+    const last = items[items.length - 1];
+    return structuredClone({
+      items,
+      next_cursor: hasMore && last ? { at: timestamp(last), id: last.id } : null,
+    });
   },
 
   post_search: async (args) => {

@@ -9,6 +9,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use dealsonar_notify::SystemIncidentKind;
+use dealsonar_protocol::agent::{FRAME_PREFIX, MAX_FRAME_BYTES, TOKEN_BYTES};
 use dealsonar_protocol::ipc::{IpcListener, IpcStream};
 use dealsonar_protocol::{
     parse_envelope, Body, CrawlReason, CrawlStatus, Envelope, ErrorCode, FrameError, SessionState,
@@ -21,13 +22,15 @@ use tokio::task::JoinHandle;
 use crate::dto::{CoreEvent, CrawlPauseReason, FacebookSessionState};
 use crate::error::{CoreError, CoreResult};
 use crate::pipeline;
+use crate::service::handle_agent_request;
 use crate::state::{ConnectedProfile, CoreRuntime};
 
 /// Spawn the local IPC accept loop on `listener`, terminating cleanly when `shutdown_rx` fires.
-pub fn spawn_ipc_server(
+pub(crate) fn spawn_ipc_server(
     mut listener: IpcListener,
     rt: Arc<CoreRuntime>,
     mut shutdown_rx: watch::Receiver<bool>,
+    agent_token: Option<[u8; TOKEN_BYTES]>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         loop {
@@ -46,7 +49,7 @@ pub fn spawn_ipc_server(
                             let conn_rt = Arc::clone(&rt);
                             let conn_shutdown = shutdown_rx.clone();
                             tokio::spawn(async move {
-                                handle_ipc_connection(stream, conn_rt, conn_shutdown).await;
+                                handle_ipc_connection(stream, conn_rt, conn_shutdown, agent_token).await;
                             });
                         }
                         Err(err) => {
@@ -64,10 +67,37 @@ pub fn spawn_ipc_server(
 }
 
 async fn handle_ipc_connection(
+    mut stream: IpcStream,
+    rt: Arc<CoreRuntime>,
+    mut shutdown_rx: watch::Receiver<bool>,
+    agent_token: Option<[u8; TOKEN_BYTES]>,
+) {
+    let first_frame = tokio::select! {
+        _ = shutdown_rx.changed() => return,
+        result = stream.read_ext_frame() => result,
+    };
+    if let Ok(Some(frame)) = &first_frame {
+        if let Some(request) = frame.strip_prefix(FRAME_PREFIX) {
+            let response = tokio::select! {
+                _ = shutdown_rx.changed() => return,
+                result = handle_agent_request(&rt, agent_token.as_ref(), request) => result,
+            };
+            if let Ok(json) = serde_json::to_vec(&response) {
+                let _ = stream.write_frame(&json, MAX_FRAME_BYTES).await;
+            }
+            return;
+        }
+    }
+    handle_extension_connection(stream, rt, shutdown_rx, first_frame).await;
+}
+
+async fn handle_extension_connection(
     stream: IpcStream,
     rt: Arc<CoreRuntime>,
     mut shutdown_rx: watch::Receiver<bool>,
+    first_frame: Result<Option<Vec<u8>>, FrameError>,
 ) {
+    let mut first_frame = Some(first_frame);
     let conn_id = rt.ipc_hub.alloc_conn_id();
     let (mut read_half, mut write_half) = stream.into_split();
     let (tx, mut rx) = mpsc::unbounded_channel::<Envelope>();
@@ -84,14 +114,17 @@ async fn handle_ipc_connection(
     let mut bound_profile_id: Option<String> = None;
 
     loop {
-        let frame_res = tokio::select! {
-            changed = shutdown_rx.changed() => {
-                if changed.is_err() || *shutdown_rx.borrow() {
-                    break;
+        let frame_res = match first_frame.take() {
+            Some(frame) => frame,
+            None => tokio::select! {
+                changed = shutdown_rx.changed() => {
+                    if changed.is_err() || *shutdown_rx.borrow() {
+                        break;
+                    }
+                    continue;
                 }
-                continue;
-            }
-            res = read_half.read_ext_frame() => res,
+                res = read_half.read_ext_frame() => res,
+            },
         };
 
         let bytes = match frame_res {
@@ -767,9 +800,10 @@ pub fn push_crawl_request(
     source: &SourceRecord,
     reason: CrawlReason,
     max_posts: u32,
+    request_id: String,
 ) -> usize {
     let env = Envelope::new(Body::CrawlRequest {
-        request_id: dealsonar_protocol::new_ulid(),
+        request_id,
         source_ref: SourceRef {
             platform: source.platform.clone(),
             kind: source.kind.clone(),

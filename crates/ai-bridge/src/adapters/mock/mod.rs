@@ -141,7 +141,17 @@ impl MockAiProvider {
         }
 
         let output = match req.task {
-            TaskKind::SuggestFields => heuristic_suggest_fields(&req.prompt),
+            TaskKind::SuggestFields => {
+                let mut output = heuristic_suggest_fields(&req.prompt);
+                if req.schema["properties"]
+                    .get("suggested_source_ids")
+                    .is_some()
+                {
+                    output["suggested_source_ids"] =
+                        json!(suggest::heuristic_source_ids(&req.prompt));
+                }
+                output
+            }
             TaskKind::JudgeExtract => heuristic_judge_extract(&req.prompt, &req.schema),
             TaskKind::CompileRules => heuristic_compile_rules(&req.prompt),
         };

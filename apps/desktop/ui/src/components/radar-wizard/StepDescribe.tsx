@@ -3,7 +3,9 @@
 import React from "react";
 import type { RadarTemplate, WantIntent } from "../../types/ipc";
 import { BLANK_EXAMPLES } from "./constants";
+import { formatLifetime } from "../../lib/format";
 import type { RadarWizardModel } from "./useRadarWizard";
+import { Badge, Button, Input, Textarea } from "../ui";
 
 export const StepDescribe: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
   const {
@@ -13,7 +15,6 @@ export const StepDescribe: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     mode,
     setMode,
     selectedTemplate,
-    setSelectedTemplate,
     placeholderValues,
     radarName,
     setRadarName,
@@ -21,13 +22,15 @@ export const StepDescribe: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     setDescription,
     userProfession,
     setUserProfession,
-    wantIntent,
     setWantIntent,
-    excludePeers,
-    setExcludePeers,
     setFields,
     selectTemplate,
+    goalTemplate,
+    startBlank,
     handlePlaceholderChange,
+    runSuggestFields,
+    suggesting,
+    notify,
   } = w;
 
   const renderInlineTemplateEditor = (tpl: RadarTemplate) => {
@@ -58,33 +61,40 @@ export const StepDescribe: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
 
   return (
     <div>
+      <div className="field-group">
+        <label className="field-label" htmlFor="radar-desc-textarea">
+          Mô tả nhu cầu
+        </label>
+        <Textarea
+          id="radar-desc-textarea"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Ví dụ: Tìm người cần thuê căn hộ ở Tân Phú, dưới 8 triệu/tháng…"
+        />
+      </div>
+      {mode === "blank" && goalTemplate && <p>
+        <Button onClick={() => selectTemplate(goalTemplate)}>Dùng mẫu gợi ý · {goalTemplate.name}</Button>
+      </p>}
       <div className="toolbar-row">
-        <button
-          type="button"
-          className={`btn ${mode === "template" ? "btn-primary" : ""}`}
+        <Button disabled={!description.trim() || suggesting} onClick={() => void runSuggestFields(true)}>
+          Cập nhật tiêu chí
+        </Button>
+        <Button
+          variant={mode === "template" ? "primary" : "default"}
           onClick={() => {
             setMode("template");
             setTemplatesOpen(true);
-            if (!selectedTemplate && templates[0]) selectTemplate(templates[0]);
+
           }}
         >
           Chọn mẫu theo ngành ({templates.length})
-        </button>
-        <button
-          type="button"
-          className={`btn ${mode === "blank" ? "btn-primary" : ""}`}
-          onClick={() => {
-            setMode("blank");
-            setSelectedTemplate(null);
-          }}
-        >
-          Bắt đầu từ trang trắng
-        </button>
+        </Button>
+        {mode !== "blank" && <Button onClick={startBlank}>Bắt đầu từ trang trắng</Button>}
       </div>
 
       {mode === "template" && (
         <div style={{ marginBottom: 14 }}>
-          {selectedTemplate&&!templatesOpen&&<div className="radar-selected-template"><div><span className="field-hint">Mẫu đang dùng · {selectedTemplate.industry}</span><strong>{selectedTemplate.name}</strong></div><button type="button" className="btn btn-sm" onClick={()=>setTemplatesOpen(true)}>Đổi mẫu</button></div>}
+          {selectedTemplate&&!templatesOpen&&<div className="radar-selected-template"><div><span className="field-hint">Mẫu đang dùng · {selectedTemplate.industry}</span><strong>{selectedTemplate.name}</strong></div><Button size="sm" onClick={()=>setTemplatesOpen(true)}>Đổi mẫu</Button></div>}
           <div className="template-grid radar-template-grid" hidden={!templatesOpen} style={{ marginBottom: 14 }}>
             {templates.map((tpl) => (
               <button
@@ -95,9 +105,9 @@ export const StepDescribe: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
                 onClick={() => selectTemplate(tpl)}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                  <span className="badge badge-primary">{tpl.industry}</span>
+                  <Badge tone="primary">{tpl.industry}</Badge>
                   {tpl.seed_ruleset && (
-                    <span className="badge badge-success">Có sẵn bộ luật</span>
+                    <Badge tone="success">Có sẵn bộ luật</Badge>
                   )}
                 </div>
                 <strong style={{ fontSize: 13.5 }}>{tpl.name}</strong>
@@ -112,17 +122,18 @@ export const StepDescribe: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
                 Điền nhanh vào câu mẫu «{selectedTemplate.name}»:
               </span>
               {renderInlineTemplateEditor(selectedTemplate)}
+              <dl className="radar-template-lifetime">
+                <dt>Tin còn giá trị</dt><dd>{formatLifetime(notify.lead_ttl_hours)}</dd>
+              </dl>
             </div>
           )}
         </div>
       )}
 
       {mode === "blank" && (
-        <div style={{ marginBottom: 14 }}>
-          <div className="field-label" style={{ marginBottom: 6 }}>
-            Ba ví dụ mô tả tốt để tham khảo (bấm để chép mẫu):
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+        <details className="radar-advanced">
+          <summary>Xem ví dụ mô tả</summary>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
             {BLANK_EXAMPLES.map((ex) => (
               <button
                 key={ex.title}
@@ -141,30 +152,17 @@ export const StepDescribe: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
               </button>
             ))}
           </div>
-        </div>
+        </details>
       )}
 
-      <div className="field-group">
-        <label className="field-label" htmlFor="radar-desc-textarea">
-          Câu mô tả chi tiết thứ cần tìm
-        </label>
-        <textarea
-          id="radar-desc-textarea"
-          className="textarea"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Mô tả rõ đối tượng, khu vực, tầm giá hoặc đặc điểm tin bạn muốn bắt…"
-        />
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <details className="radar-advanced"><summary>Tên Radar và công việc của bạn</summary><div className="radar-identity-fields">
         <div className="field-group">
           <label className="field-label" htmlFor="radar-name-input">
             Tên gọi Radar
           </label>
-          <input
+          <Input
             id="radar-name-input"
             type="text"
-            className="input"
             value={radarName}
             onChange={(e) => setRadarName(e.target.value)}
             placeholder="Ví dụ: Khách thuê căn hộ Cầu Giấy"
@@ -175,10 +173,9 @@ export const StepDescribe: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
           <label className="field-label" htmlFor="user-profession-input">
             Bạn làm nghề gì?
           </label>
-          <input
+          <Input
             id="user-profession-input"
             type="text"
-            className="input"
             value={userProfession}
             onChange={(e) => setUserProfession(e.target.value)}
             placeholder="Ví dụ: môi giới bất động sản, thợ điện nước…"
@@ -187,34 +184,8 @@ export const StepDescribe: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
             Để hệ thống nhận ra và loại bài của người cùng nghề đăng tìm khách.
           </span>
         </div>
-      </div>
-
-
-      <details className="radar-advanced"><summary>Đối tượng bài viết & Loại trừ người cùng nghề</summary><div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="field-label">Ý định bài viết cần bắt:</span>
-          <select
-            aria-label="Ý định bài viết cần bắt"
-            className="select"
-            style={{ width: 240 }}
-            value={wantIntent}
-            onChange={(e) => setWantIntent(e.target.value as WantIntent)}
-          >
-            <option value="demand">Khách cần mua / thuê / tìm</option>
-            <option value="supply">Người bán / cho thuê / tìm việc</option>
-            <option value="any">Cả hai chiều / ghép chuyến</option>
-          </select>
-        </div>
-
-        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-          <input
-            type="checkbox"
-            checked={excludePeers}
-            onChange={(e) => setExcludePeers(e.target.checked)}
-          />
-          <span>Loại bài chào bán của người cùng nghề</span>
-        </label>
       </div></details>
+
     </div>
   );
 };

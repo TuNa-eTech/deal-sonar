@@ -2,6 +2,14 @@
 
 use super::*;
 
+fn map_post_detail(row: &Row<'_>) -> rusqlite::Result<PostDetail> {
+    Ok(PostDetail {
+        post: map_post_row(row)?,
+        source_name: row.get("source_name")?,
+        author_name: row.get("author_name")?,
+    })
+}
+
 impl Store {
     /// Fetch a post joined with `source_name` and `author_name`.
     pub fn post_get(&self, post_id: &str) -> Result<Option<PostDetail>, StoreError> {
@@ -14,16 +22,39 @@ impl Store {
                  LEFT JOIN authors a ON a.id = p.author_id
                  WHERE p.id = ?1",
                 params![post_id],
-                |row| {
-                    Ok(PostDetail {
-                        post: map_post_row(row)?,
-                        source_name: row.get("source_name")?,
-                        author_name: row.get("author_name")?,
-                    })
-                },
+                map_post_detail,
             )
             .optional()?;
         Ok(rec)
+    }
+
+    /// Browse retained posts for one source, most recently published first.
+    pub fn post_list_by_source(
+        &self,
+        source_id: &str,
+        before: Option<(i64, &str)>,
+        limit: usize,
+    ) -> Result<Vec<PostDetail>, StoreError> {
+        let (before_at, before_id) = before.unzip();
+        let limit = limit.min(500) as i64;
+        let conn = self.lock_conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT p.*, s.name AS source_name, a.name AS author_name
+             FROM posts p
+             JOIN sources s ON s.id = p.source_id
+             LEFT JOIN authors a ON a.id = p.author_id
+             WHERE p.source_id = ?1 AND p.text IS NOT NULL
+               AND (?2 IS NULL OR (COALESCE(p.created_at, p.captured_at), p.id) < (?2, ?3))
+             ORDER BY COALESCE(p.created_at, p.captured_at) DESC, p.id DESC
+             LIMIT ?4",
+        )?;
+        let rows = stmt
+            .query_map(
+                params![source_id, before_at, before_id, limit],
+                map_post_detail,
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 
     /// Full-text diacritic-insensitive search across stored posts via `posts_fts`
@@ -40,14 +71,6 @@ impl Store {
         let limit = limit.clamp(1, 500) as i64;
         let conn = self.lock_conn()?;
 
-        let map_detail = |row: &Row<'_>| -> rusqlite::Result<PostDetail> {
-            Ok(PostDetail {
-                post: map_post_row(row)?,
-                source_name: row.get("source_name")?,
-                author_name: row.get("author_name")?,
-            })
-        };
-
         if let Some(sid) = source_id {
             let mut stmt = conn.prepare(
                 "SELECT p.*, s.name AS source_name, a.name AS author_name
@@ -62,7 +85,7 @@ impl Store {
                  LIMIT ?3",
             )?;
             let rows = stmt
-                .query_map(params![fts_query, sid, limit], map_detail)?
+                .query_map(params![fts_query, sid, limit], map_post_detail)?
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(rows)
         } else {
@@ -78,7 +101,7 @@ impl Store {
                  LIMIT ?2",
             )?;
             let rows = stmt
-                .query_map(params![fts_query, limit], map_detail)?
+                .query_map(params![fts_query, limit], map_post_detail)?
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(rows)
         }

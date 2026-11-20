@@ -2,6 +2,7 @@ import React from "react";
 import type { HealthStatus } from "../types/ipc";
 import { formatExactTime } from "../lib/format";
 import { openSafeSetupUrl } from "../lib/security";
+import { Button } from "./ui";
 
 interface GlobalHealthBannerProps {
   health: HealthStatus | null;
@@ -9,6 +10,7 @@ interface GlobalHealthBannerProps {
   onRetryAi: () => void;
   onResumeCrawl: () => void;
   onOpenRadars: () => void;
+  onOpenHealth?: () => void;
 }
 
 export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
@@ -17,6 +19,7 @@ export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
   onRetryAi,
   onResumeCrawl,
   onOpenRadars,
+  onOpenHealth,
 }) => {
   if (!health) return null;
 
@@ -30,9 +33,9 @@ export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
           <strong>Mất kết nối Chrome Extension:</strong> Radar đang tạm ngừng đọc bài mới. Hãy mở
           Google Chrome có cài DealSonar Extension.
         </div>
-        <button type="button" className="btn btn-sm" onClick={onRetryConnect}>
+        <Button size="sm" onClick={onRetryConnect}>
           Kiểm tra lại kết nối
-        </button>
+        </Button>
       </div>
     );
   }
@@ -60,16 +63,14 @@ export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
           <strong>Tạm dừng quét Facebook:</strong> {detailText}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            className="btn btn-sm"
+          <Button
+            size="sm"
             onClick={() => openSafeSetupUrl("https://www.facebook.com")}
           >
             Mở facebook.com
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm btn-primary"
+          </Button>
+          <Button
+            variant="primary" size="sm"
             disabled={!canResume}
             title={
               canResume
@@ -79,7 +80,7 @@ export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
             onClick={onResumeCrawl}
           >
             Tiếp tục
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -108,9 +109,9 @@ export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
           <strong>{health.pending_ai_posts.toLocaleString("vi-VN")} bài</strong> đang xếp hàng chờ
           và sẽ tự động xử lý khi AI sẵn sàng trở lại{etaText}.
         </div>
-        <button type="button" className="btn btn-sm" onClick={onRetryAi}>
+        <Button size="sm" onClick={onRetryAi}>
           Kiểm tra AI
-        </button>
+        </Button>
       </div>
     );
   }
@@ -126,9 +127,9 @@ export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
           <strong>Tự chuyển sang gửi gộp (Digest):</strong> Radar {names} vượt 30 tin/giờ. Hãy xem
           lại mô tả để tránh quá rộng.
         </div>
-        <button type="button" className="btn btn-sm" onClick={onOpenRadars}>
+        <Button size="sm" onClick={onOpenRadars}>
           Xem radar
-        </button>
+        </Button>
       </div>
     );
   }
@@ -136,5 +137,16 @@ export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
   if (health.extension_connected && health.facebook_session==="ok" && (health.automatic_scanning!==true || health.crawl_paused) && !hasFbIssue) banners.push(<div key="operation" className="health-banner info" role="status"><span>{health.crawl_paused?"Thu thập đang tạm dừng.":health.automatic_scanning===false?"Chỉ quét thủ công. Bật Quét tự động trong tiện ích Chrome để nhận bài theo lịch.":"Chưa xác nhận chế độ quét. Mở tiện ích Chrome để đồng bộ trạng thái."}</span></div>);
   if (banners.length === 0) return null;
 
-  return <div className="health-banner-stack">{banners}</div>;
+  // One problem at a time, most severe first: a stack of alerts teaches people to ignore all of them.
+  const others = banners.length - 1;
+  return (
+    <div className="health-banner-stack">
+      {banners[0]}
+      {others > 0 && onOpenHealth && (
+        <button type="button" className="health-banner-more" onClick={onOpenHealth}>
+          Còn {others} vấn đề khác · Xem Kết nối
+        </button>
+      )}
+    </div>
+  );
 };

@@ -687,10 +687,12 @@ async fn diagnostic_zip_redaction_os_notify_data_lifecycle_and_graceful_shutdown
             },
             source_ids: vec![src_rec.id.clone()],
             notify: Some(dealsonar_core::dto::RadarNotifyPatch {
+                inherit_channels: None,
                 channel_ids: Some(Vec::new()), // No Telegram channel configured -> OS Notification fallback!
                 mode: None,
                 min_score: None,
                 quiet_hours: None,
+                lead_ttl_hours: None,
             }),
         })
         .expect("draft");
@@ -821,6 +823,7 @@ async fn diagnostic_zip_redaction_os_notify_data_lifecycle_and_graceful_shutdown
                 user_profession: None,
                 template_id: None,
                 language_hint: Some("vi".to_string()),
+                suggest_sources: false,
             })
             .await
     });
@@ -929,10 +932,12 @@ async fn outbox_health_counters_persist_across_restart_and_clear_on_channel_remo
             match_policy: tpl.match_policy,
             source_ids: vec![src_rec.id.clone()],
             notify: Some(dealsonar_core::dto::RadarNotifyPatch {
+                inherit_channels: None,
                 channel_ids: Some(vec![wh_pending.id.clone(), wh_failed.id.clone()]),
                 mode: None,
                 min_score: None,
                 quiet_hours: None,
+                lead_ttl_hours: None,
             }),
         })
         .expect("create radar");

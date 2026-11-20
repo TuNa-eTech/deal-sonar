@@ -4,8 +4,42 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { App } from "../App";
 import { getMockCommandCalls } from "../lib/mockBackend";
+import { state } from "../lib/mock/store";
 
 describe("All 7 Main Screens Coverage (Radar, Nguồn, Danh bạ, Sức khoẻ, Cài đặt, Rejected Modal)", () => {
+  it("shows the selected group's newest scanned posts first and loads older results", async () => {
+    const user = userEvent.setup();
+    const post = state.posts[0]!;
+    const source = state.sources.find(({ id }) => id === post.source_id)!;
+    for (let i = 0; i < 31; i++) {
+      state.posts.push({
+        ...post,
+        id: `older-${i}`,
+        text: `Bài cũ số ${i}`,
+        created_at: post.captured_at - (i + 10) * 3_600_000,
+      });
+    }
+    render(<App />);
+    await screen.findByRole("heading", { name: "Cơ hội" });
+    await user.click(screen.getByRole("button", { name: /^Radar/i }));
+    await user.click(screen.getByRole("tab", { name: "Group" }));
+
+    const row = await screen.findByRole("row", { name: new RegExp(source.name) });
+    await user.click(within(row).getByRole("button", { name: "Xem bài đã quét" }));
+    const dialog = screen.getByRole("dialog", { name: `Bài đã quét · ${source.name}` });
+    const posts = await within(dialog).findAllByRole("listitem");
+    expect(posts).toHaveLength(30);
+    expect(posts[0]).toHaveTextContent("Nguyễn Minh Tuấn");
+    expect(posts[1]).toHaveTextContent("Sàn BĐS Thành Đạt");
+    expect(within(dialog).queryByText("Trần Thu Hà")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Bài cũ số 30")).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Xem thêm bài" }));
+    expect(await within(dialog).findByText("Bài cũ số 30")).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("listitem")).toHaveLength(34);
+    expect(within(dialog).queryByRole("button", { name: "Xem thêm bài" })).not.toBeInTheDocument();
+  });
+
   it("inspects 7d Funnel & edits Ruleset keywords (`origin: user`), searches raw posts, manages Contacts/Blocklist, creates Diagnostic Bundle, and double-confirms Delete All", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -37,10 +71,10 @@ describe("All 7 Main Screens Coverage (Radar, Nguồn, Danh bạ, Sức khoẻ, 
     });
 
     // 3. Nguồn Screen: Crawl Now & Raw Post FTS Search
-    await user.click(screen.getByRole("button", { name: /^Nguồn/i }));
-    await screen.findByRole("heading", { name: "Nguồn Group Facebook" });
+    await user.click(screen.getByRole("tab", { name: "Group" }));
+    await screen.findByRole("heading", { name: "Group Facebook" });
     await user.click(screen.getAllByRole("button", { name: "Quét ngay" })[0]!);
-    expect(await screen.findByText(/Đã gửi lệnh quét ngay/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Quét hoàn tất · 4 bài mới/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Tìm bài viết thô trong kho/i }));
     const ftsDialog = await screen.findByRole("dialog", { name: /Tìm kiếm bài thô trong kho/i });
@@ -48,14 +82,16 @@ describe("All 7 Main Screens Coverage (Radar, Nguồn, Danh bạ, Sức khoẻ, 
     await user.click(within(ftsDialog).getByRole("button", { name: /Đóng/i }));
 
     // 4. Danh bạ & Blocklist Screen
-    await user.click(screen.getByRole("button", { name: "Liên hệ" }));
+    await user.click(screen.getByRole("button", { name: /^Cơ hội/ }));
+    await user.click(screen.getByRole("tab", { name: "Liên hệ" }));
     await screen.findByRole("heading", { name: /Danh bạ & Danh sách chặn/i });
     expect(await screen.findByText("0912 345 678")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Danh sách chặn/i }));
     expect(await screen.findByText(/Kho Tổng Chung Cư Mini HN/i)).toBeInTheDocument();
 
     // 5. Sức khoẻ Screen: 4 lamps + Diagnostic Bundle
-    await user.click(screen.getByRole("button", { name: /Kết nối/i }));
+    await user.click(screen.getByRole("button", { name: /^Cài đặt/ }));
+    await user.click(screen.getByRole("tab", { name: "Kết nối" }));
     await screen.findByRole("heading", { name: /Kết nối & Chẩn đoán/i });
     expect(screen.getByText("1. Chrome Extension")).toBeInTheDocument();
     expect(screen.getByText("2. Phiên Facebook")).toBeInTheDocument();
@@ -63,7 +99,7 @@ describe("All 7 Main Screens Coverage (Radar, Nguồn, Danh bạ, Sức khoẻ, 
     expect(await screen.findByText(/Đã tạo gói chẩn đoán/i)).toBeInTheDocument();
 
     // 6. Cài đặt Screen: Auto-scanned model dropdowns & Double-confirm Delete All Data
-    await user.click(screen.getByRole("button", { name: "Cài đặt" }));
+    await user.click(screen.getByRole("tab", { name: "Cài đặt" }));
     await screen.findByRole("heading", { name: "Cài đặt hệ thống" });
 
     const fastModelSelect = await screen.findByLabelText("Chọn mô hình tầng Fast");

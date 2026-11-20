@@ -1,7 +1,8 @@
+import { offerUndo } from "../components/UndoCenter";
 import React, { useEffect, useState } from "react";
 import {VersionHistory} from "../components/VersionHistory";
 import { api } from "../lib/api";
-import { RADAR_STATUS_LABELS } from "../lib/format";
+import { formatLifetime, RADAR_STATUS_LABELS } from "../lib/format";
 import type {
   FunnelStats,
   LicenseStatus,
@@ -10,12 +11,13 @@ import type {
   Ruleset,
 } from "../types/ipc";
 import { FunnelChart } from "../components/FunnelChart";
+import { Badge, Button, Card, Input } from "../components/ui";
 
 interface RadarsScreenProps {
   radars: Radar[];
   license: LicenseStatus;
   onCreateNew: () => void;
-  onEditRadar: (detail: RadarDetail, step?: 1 | 4) => void;
+  onEditRadar: (detail: RadarDetail, step?: 1 | 3 | 4) => void;
   onChanged: () => void;
 }
 
@@ -37,8 +39,10 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedId && radars[0]) {
-      setSelectedId(radars[0].id);
+    if (!radars.some(r => r.id === selectedId)) {
+      setSelectedId(radars[0]?.id ?? "");
+      setDetail(null);
+      setFunnel(null);
     }
   }, [radars, selectedId]);
 
@@ -71,6 +75,11 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
   const handleToggleStatus = async (r: Radar) => {
     setErrorMsg(null);
     try {
+      if (r.status === "draft" || (r.status === "paused" && !r.source_ids.length)) {
+        const step = r.status === "draft" && r.source_ids.length ? 4 : 3;
+        onEditRadar(await api.radarGet(r.id), step);
+        return;
+      }
       const next = r.status === "active" ? "paused" : "active";
       await api.radarSetStatus(r.id, next);
       onChanged();
@@ -80,8 +89,16 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
   };
 
   const handleArchive = async (r: Radar) => {
-    await api.radarSetStatus(r.id, "archived");
-    onChanged();
+    try {
+      await api.radarSetStatus(r.id, "archived");
+      offerUndo(`Đã lưu trữ và ngừng radar ${r.name}`, async () => {
+        await api.radarSetStatus(r.id, r.status);
+        onChanged();
+      });
+      onChanged();
+    } catch (error) {
+      setErrorMsg(String(error));
+    }
   };
 
   const handleSaveUserKeywords = async () => {
@@ -138,9 +155,9 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
             {license.plan === "pro" ? "Chuyên nghiệp" : "Cá nhân"})
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={onCreateNew}>
+        <Button variant="primary" onClick={onCreateNew}>
           + Tạo radar mới
-        </button>
+        </Button>
       </div>
 
       {errorMsg && (
@@ -161,7 +178,7 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
             <tr>
               <th>Tên Radar</th>
               <th>Trạng thái</th>
-              <th>Phiên bản</th>
+              <th>Tin còn giá trị</th>
               <th>Nguồn</th>
               <th>Tin 24 giờ</th>
               <th>Tỉ lệ báo sai</th>
@@ -195,46 +212,43 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
                     {RADAR_STATUS_LABELS[r.status]}
                   </span>
                 </td>
-                <td>v{r.current_version}</td>
+                <td title={`Phiên bản định nghĩa v${r.current_version}`}>{formatLifetime(r.notify.lead_ttl_hours)}</td>
                 <td>{r.source_ids.length} group</td>
                 <td>{(r.leads_24h ?? 0).toLocaleString("vi-VN")} tin</td>
                 <td>{Math.round((r.false_positive_rate ?? 0) * 100)}%</td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <div className="management-row-actions">
-                    <button
-                      type="button"
-                      className="btn btn-sm"
+                    <Button
+                      size="sm"
                       onClick={async () => {
                         const d = await api.radarGet(r.id);
                         onEditRadar(d, 1);
                       }}
                     >
                       Sửa
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
+                    </Button>
+                    {r.status !== "draft" && <Button
+                      size="sm"
                       onClick={async () => {
                         const d = await api.radarGet(r.id);
                         onEditRadar(d, 4);
                       }}
                     >
                       Xem thử lại
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
+                    </Button>}
+                    <Button
+                      size="sm"
                       onClick={() => void handleToggleStatus(r)}
                     >
-                      {r.status === "active" ? "Tạm dừng" : "Bật"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
+                      {r.status === "active" ? "Tạm dừng" : r.status === "draft"
+                        ? (r.source_ids.length ? "Xem kết quả" : "Chọn nguồn") : "Chạy lại"}
+                    </Button>
+                    <Button
+                      size="sm"
                       onClick={() => void handleArchive(r)}
                     >
                       Lưu trữ
-                    </button>
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -243,24 +257,24 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
         </table>
       </div>
 
-      {detail&&<VersionHistory key={detail.radar.id+detail.radar.current_version} detail={detail} onChanged={()=>{onChanged();void loadInspector(detail.radar.id);}}/>}
+      {detail?.radar.id === selectedId && <VersionHistory key={detail.radar.id+detail.radar.current_version} detail={detail} onChanged={()=>{onChanged();void loadInspector(detail.radar.id);}}/>}
       {/* Selected Radar Funnel & Ruleset Inspector (`05-pipeline-rules.md §6.5, §11`) */}
-      {detail && (
+      {detail?.radar.id === selectedId && (
         <div className="radar-inspector">
           <FunnelChart
             stats={funnel}
             title={`Phễu 7 ngày: ${detail.radar.name}`}
           />
 
-          <div className="card radar-rules">
+          <Card className="radar-rules">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <strong style={{ fontSize: 14 }}>Bộ luật tự động (Ruleset)</strong>
               {activeRuleset ? (
-                <span className="badge badge-success">
+                <Badge tone="success">
                   r{activeRuleset.revision}, {activeRuleset.state}, nguồn: {activeRuleset.origin}
-                </span>
+                </Badge>
               ) : (
-                <span className="badge">Chưa có bộ luật (100% qua AI)</span>
+                <Badge >Chưa có bộ luật (100% qua AI)</Badge>
               )}
             </div>
 
@@ -273,9 +287,9 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
                 <div style={{ marginBottom: 6 }}>
                   <strong>Bộ trích trường tự động đang bật:</strong>{" "}
                   {activeRuleset.body.extract.map((ex) => (
-                    <span key={ex.field} className="badge" style={{ marginRight: 4 }}>
+                    <Badge key={ex.field}  style={{ marginRight: 4 }}>
                       {ex.field} ({ex.extractor})
-                    </span>
+                    </Badge>
                   ))}
                 </div>
                 {activeRuleset.body.classify.length > 0 && (
@@ -299,10 +313,9 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
               <label className="field-label" htmlFor="rs-accept-kw">
                 Từ khoá nhận sơ bộ (không dấu, cách nhau dấu phẩy)
               </label>
-              <input
+              <Input
                 id="rs-accept-kw"
                 type="text"
-                className="input"
                 value={acceptKws}
                 onChange={(e) => setAcceptKws(e.target.value)}
                 placeholder="can thue, tim thue, muon thue"
@@ -313,10 +326,9 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
               <label className="field-label" htmlFor="rs-reject-kw">
                 Từ khoá loại ngay (không dấu, cách nhau dấu phẩy)
               </label>
-              <input
+              <Input
                 id="rs-reject-kw"
                 type="text"
-                className="input"
                 value={rejectKws}
                 onChange={(e) => setRejectKws(e.target.value)}
                 placeholder="quy can, hoa hong, tuyen sale"
@@ -324,16 +336,14 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
             </div>
 
             <div className="management-row-actions">
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
+              <Button
+                variant="primary" size="sm"
                 onClick={() => void handleSaveUserKeywords()}
               >
                 Lưu chỉnh sửa từ khoá (`origin: user`)
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm"
+              </Button>
+              <Button
+                size="sm"
                 onClick={async () => {
                   await api.rulesetCompileNow(detail.radar.id);
                   setStatusMsg("Đã xếp lịch sinh bộ luật mới bằng AI từ dữ liệu phản hồi.");
@@ -341,9 +351,9 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
                 }}
               >
                 Sinh lại bộ luật bằng AI
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>

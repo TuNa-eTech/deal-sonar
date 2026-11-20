@@ -23,21 +23,12 @@ pub(super) fn route_lead_notifications(
         .get_setting::<bool>("telegram.notifications_paused")?
         .unwrap_or(false);
 
-    // Resolve channels attached to radar (or all healthy channels if `channel_ids` is empty and channels exist)
     let all_channels = rt.store.channel_list()?;
-    let target_channels: Vec<_> = if !radar_notify.channel_ids.is_empty() {
-        all_channels
-            .iter()
-            .filter(|c| c.state == "ok" && radar_notify.channel_ids.iter().any(|id| id == &c.id))
-            .cloned()
-            .collect()
-    } else {
-        all_channels
-            .iter()
-            .filter(|c| c.state == "ok")
-            .cloned()
-            .collect()
-    };
+    let target_channels: Vec<_> = all_channels
+        .iter()
+        .filter(|channel| channel.state == "ok" && radar_notify.sends_to_channel(&channel.id))
+        .cloned()
+        .collect();
 
     let has_telegram_configured = all_channels.iter().any(|c| c.kind == "telegram")
         && rt
@@ -49,7 +40,8 @@ pub(super) fn route_lead_notifications(
 
     // OS desktop notification fallback when Telegram is not configured (`07-notifications-export.md §4`)
     let six_hours_ms = 6 * 3_600_000i64;
-    if !has_telegram_configured
+    let local_only = radar_notify.inherit_channels == Some(false) && radar_notify.channel_ids.is_empty();
+    if (local_only || !has_telegram_configured)
         && settings.os_notifications_enabled
         && !mode.is_silent_or_preview()
         && radar_status == "active"

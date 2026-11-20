@@ -436,6 +436,47 @@ fn test_sources_and_crawl_runs_repository() {
 }
 
 #[test]
+fn source_post_list_filters_and_pages_in_publication_order() {
+    let store = Store::open_in_memory().unwrap();
+    let source = seed_source(&store, "g1", "Group Cầu Giấy", true);
+    let other = seed_source(&store, "g2", "Group Mỹ Đình", true);
+
+    let insert = |source_id: &str, id: &str, created_at, captured_at| {
+        let mut post = make_post(source_id, id, "author", "Nguyễn Văn A", id, id, 0, captured_at);
+        post.id = Some(id.to_string());
+        post.created_at = created_at;
+        store.insert_post(&post).unwrap();
+    };
+    insert(&source, "first", Some(BASE_TS + 300), BASE_TS + 350);
+    insert(&source, "tie-a", Some(BASE_TS + 200), BASE_TS + 500);
+    insert(&source, "tie-b", None, BASE_TS + 200);
+    insert(&other, "other", Some(BASE_TS + 400), BASE_TS + 450);
+    insert(&source, "expired", Some(BASE_TS - DAY_MS), BASE_TS - DAY_MS);
+    store.purge_expired(BASE_TS + DAY_MS, 1).unwrap();
+
+    let page = store.post_list_by_source(&source, None, 2).unwrap();
+    assert_eq!(
+        page.iter()
+            .map(|row| row.post.id.as_str())
+            .collect::<Vec<_>>(),
+        ["first", "tie-b"],
+    );
+    assert_eq!(page[0].source_name, "Group Cầu Giấy");
+    assert_eq!(page[0].author_name.as_deref(), Some("Nguyễn Văn A"));
+    let last = &page[1].post;
+    let older = store
+        .post_list_by_source(&source, Some((last.captured_at, &last.id)), 2)
+        .unwrap();
+    assert_eq!(
+        older
+            .iter()
+            .map(|row| row.post.id.as_str())
+            .collect::<Vec<_>>(),
+        ["tie-a"],
+    );
+}
+
+#[test]
 fn test_vietnamese_diacritic_insensitive_fts5_and_simhash_dedup() {
     let store = Store::open_in_memory().expect("open_in_memory");
     let s1 = seed_source(&store, "g1", "Group Cầu Giấy", true);
@@ -948,6 +989,7 @@ fn test_dynamic_lead_list_filters_fts_pagination_and_sql_injection_guard() {
             radar_id: Some(radar.radar.id.clone()),
             unread_only: None,
             follow_up_before: None,
+            follow_up_after: None,
             exclude_weak: None,
             status: Some(vec!["new".into(), "viewed".into()]),
             since: Some(BASE_TS),
@@ -971,6 +1013,7 @@ fn test_dynamic_lead_list_filters_fts_pagination_and_sql_injection_guard() {
             }),
             limit: 50,
             cursor: None,
+            expiry: None,
         })
         .unwrap();
 
@@ -2158,4 +2201,169 @@ fn durable_feedback_migrates_rejection_labels_and_survives_preview_cleanup() {
         fs::read_dir(&backups).unwrap().count() > 0,
         "existing databases are backed up before migrating"
     );
+}
+
+#[test]
+fn lead_list_filters_by_radar_lead_lifetime() {
+    use dealsonar_store::LeadExpiryFilter;
+    let store = Store::open_in_memory().expect("open_in_memory");
+    let src = seed_source(&store, "g_xe", "Chợ xe cũ", true);
+    let radar = store
+        .radar_create_draft(&CreateRadarDraftInput {
+            id: None,
+            name: "Xe dưới giá".to_string(),
+            template_id: None,
+            description: "Tin bán xe dưới giá".to_string(),
+            language_hint: Some("vi".to_string()),
+            user_profession: None,
+            fields: sample_bds_fields(),
+            match_policy: MatchPolicy::default(),
+            notify: NotifyConfig {
+                lead_ttl_hours: Some(2),
+                ..NotifyConfig::default()
+            },
+            source_ids: vec![src.clone()],
+            now_ms: BASE_TS,
+        })
+        .unwrap();
+
+    let now = BASE_TS + DAY_MS;
+    let mut ids = Vec::new();
+    // `make_post` stamps created_at one minute before captured_at.
+    for (idx, captured_at) in [now - 3 * HOUR_MS, now - 30 * 60_000]
+        .into_iter()
+        .enumerate()
+    {
+        let (post, _) = store
+            .insert_post(&make_post(
+                &src,
+                &format!("xe_{idx}"),
+                &format!("seller_{idx}"),
+                "Người bán",
+                [
+                    "Bán Vios 2019 giá mềm",
+                    "Cần bán Wave Alpha chính chủ đi ít",
+                ][idx],
+                &format!("xe_hash_{idx}"),
+                [0x0F0F_0F0F_i64, 0x7070_7070_7070_i64][idx],
+                captured_at,
+            ))
+            .unwrap();
+        let eval = store
+            .upsert_evaluation(&EvaluationUpsertInput {
+                id: None,
+                post_id: post.id.clone(),
+                radar_version_id: radar.current_version.id.clone(),
+                state: "done".to_string(),
+                decided_by: Some("ai".to_string()),
+                verdict: Some("match".to_string()),
+                reject_reason: None,
+                score: Some(0.9),
+                intent: Some("supply".to_string()),
+                author_role: Some("end_user".to_string()),
+                summary: Some(format!("Xe {idx}")),
+                reason: None,
+                fields: Some(BTreeMap::new()),
+                ruleset_id: None,
+                ai_call_id: None,
+                is_preview: false,
+                created_at: captured_at,
+                decided_at: Some(captured_at),
+            })
+            .unwrap();
+        let (lead, _) = store
+            .create_lead(&CreateLeadInput {
+                id: None,
+                radar_id: radar.radar.id.clone(),
+                radar_version_id: radar.current_version.id.clone(),
+                post_id: post.id,
+                evaluation_id: eval.id,
+                contact_id: None,
+                status: "new".to_string(),
+                score: 0.9,
+                summary: format!("Xe {idx}"),
+                fields: BTreeMap::new(),
+                also_seen_in: None,
+                notified_at: None,
+                follow_up_at: None,
+                note: None,
+                tags: None,
+                now_ms: captured_at,
+            })
+            .unwrap();
+        ids.push(lead.id);
+    }
+    let (stale_id, fresh_id) = (ids[0].clone(), ids[1].clone());
+
+    let list = |expiry: Option<LeadExpiryFilter>| -> Vec<String> {
+        store
+            .lead_list(&LeadListQuery {
+                radar_id: Some(radar.radar.id.clone()),
+                expiry,
+                limit: 50,
+                ..Default::default()
+            })
+            .unwrap()
+            .items
+            .into_iter()
+            .map(|i| i.lead.id)
+            .collect()
+    };
+
+    assert_eq!(
+        list(Some(LeadExpiryFilter {
+            expired: false,
+            now_ms: now
+        })),
+        vec![fresh_id.clone()]
+    );
+    assert_eq!(
+        list(Some(LeadExpiryFilter {
+            expired: true,
+            now_ms: now
+        })),
+        vec![stale_id.clone()]
+    );
+    assert_eq!(list(None).len(), 2);
+
+    // Removing the lifetime makes every lead current again.
+    store
+        .radar_update(
+            &radar.radar.id,
+            &UpdateRadarInput {
+                notify: Some(NotifyConfig::default()),
+                now_ms: now,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert!(list(Some(LeadExpiryFilter {
+        expired: true,
+        now_ms: now
+    }))
+    .is_empty());
+    assert_eq!(
+        list(Some(LeadExpiryFilter {
+            expired: false,
+            now_ms: now
+        }))
+        .len(),
+        2
+    );
+}
+
+#[test]
+fn radar_channel_scope_preserves_legacy_and_honors_explicit_local_selection() {
+    use dealsonar_store::models::NotifyConfig;
+
+    let legacy = NotifyConfig::default();
+    assert!(legacy.sends_to_channel("telegram"));
+
+    let local = NotifyConfig { inherit_channels: Some(false), ..legacy.clone() };
+    assert!(!local.sends_to_channel("telegram"));
+    assert!(!local.sends_to_channel("webhook"));
+
+    let selected = NotifyConfig { channel_ids: vec!["telegram".into()], ..local };
+    assert!(selected.sends_to_channel("telegram"));
+    assert!(!selected.sends_to_channel("webhook"));
 }

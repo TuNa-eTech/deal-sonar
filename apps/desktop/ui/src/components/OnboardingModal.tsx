@@ -9,6 +9,7 @@ import type {
   Settings,
   TelegramSetupStatus,
 } from "../types/ipc";
+import { Badge, Button, Card, Input, Modal, ModalBody, ModalFooter, ModalHeader, Select } from "./ui";
 
 interface OnboardingModalProps {
   settings: Settings;
@@ -150,43 +151,42 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   // Step 0: Privacy & Facebook Safety Consent Gate (`03-risks-compliance.md §3.3`)
   if (!consentSaved) {
     return (
-      <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Đồng ý quyền riêng tư và an toàn">
-        <div className="modal-panel" style={{ maxWidth: 680 }}>
-          <div className="modal-header">
+      <Modal label="Đồng ý quyền riêng tư và an toàn" size="md">
+          <ModalHeader>
             <h2 style={{ margin: 0, fontSize: 17 }}>
               Chào mừng tới DealSonar: Nguyên tắc riêng tư & an toàn
             </h2>
-          </div>
-          <div className="modal-body">
+          </ModalHeader>
+          <ModalBody>
             <p style={{ marginTop: 0 }}>
               Trước khi bắt đầu, vui lòng đọc kỹ cách DealSonar vận hành bằng lời thường để bạn hoàn
               toàn chủ động về dữ liệu và tài khoản của mình:
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
-              <div className="card" style={{ background: "var(--bg-subtle)" }}>
+              <Card style={{ background: "var(--bg-subtle)" }}>
                 <strong>1. Chỉ đọc tần suất thấp trong group bạn đã tham gia</strong>
                 <div className="field-hint" style={{ marginTop: 3 }}>
                   Extension chỉ đọc bài viết mới trong các group bạn chọn theo dõi. Không bao giờ tự
                   đăng bài, bình luận, nhắn tin, thả cảm xúc hay quét danh sách thành viên/trang cá
                   nhân.
                 </div>
-              </div>
-              <div className="card" style={{ background: "var(--bg-subtle)" }}>
+              </Card>
+              <Card style={{ background: "var(--bg-subtle)" }}>
                 <strong>2. Dữ liệu nằm trên máy tính của bạn (Không máy chủ trung gian)</strong>
                 <div className="field-hint" style={{ marginTop: 3 }}>
                   Cơ sở dữ liệu SQLite nằm hoàn toàn trên máy bạn. Bài không khớp tự động xoá nội
                   dung sau 30 ngày, và bạn có nút «Xoá toàn bộ dữ liệu» bất cứ lúc nào trong Cài đặt.
                 </div>
-              </div>
-              <div className="card" style={{ background: "var(--bg-subtle)" }}>
+              </Card>
+              <Card style={{ background: "var(--bg-subtle)" }}>
                 <strong>3. Dữ liệu chỉ đi tới công cụ của chính bạn</strong>
                 <div className="field-hint" style={{ marginTop: 3 }}>
                   Nội dung bài và tên hiển thị người đăng được gửi qua CLI AI cá nhân của bạn
                   (`claude`, `codex`, `agy`) để chấm khớp; tin khớp gửi tới bot Telegram hoặc Webhook
                   do chính bạn tạo.
                 </div>
-              </div>
-              <div className="card" style={{ background: "var(--warning-soft)", borderColor: "var(--warning)" }}>
+              </Card>
+              <Card style={{ background: "var(--warning-soft)", borderColor: "var(--warning)" }}>
                 <strong>4. Rủi ro với tài khoản mạng xã hội & trách nhiệm liên hệ</strong>
                 <div className="field-hint" style={{ marginTop: 3, color: "var(--warning)" }}>
                   Dù quét chậm và tự dừng ngay khi gặp trang xác minh (checkpoint), điều khoản nền
@@ -194,7 +194,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   mất. Bạn cam kết chỉ dùng với group mình là thành viên hợp lệ và tự chịu trách
                   nhiệm về cách liên hệ khách hàng.
                 </div>
-              </div>
+              </Card>
             </div>
 
             <label
@@ -219,27 +219,24 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 sách quyền riêng tư & Điều khoản sử dụng của DealSonar.
               </span>
             </label>
-          </div>
-          <div className="modal-footer">
+          </ModalBody>
+          <ModalFooter>
             <span className="field-hint">Không thu thập số liệu sử dụng khi chưa bật.</span>
-            <button
-              type="button"
-              className="btn btn-primary"
+            <Button
+              variant="primary"
               disabled={!consentChecked}
               onClick={handleAcceptConsent}
             >
               Đồng ý và bắt đầu cài đặt (5 bước)
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </ModalFooter>
+        </Modal>
     );
   }
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Hướng dẫn cài đặt lần đầu">
-      <div className="modal-panel" style={{ maxWidth: 820 }}>
-        <div className="modal-header">
+    <Modal label="Hướng dẫn cài đặt lần đầu" size="lg">
+        <ModalHeader>
           <div>
             <h2 style={{ margin: 0, fontSize: 17 }}>Thiết lập lần đầu: Sẵn sàng trong vài phút</h2>
             <div className="field-hint">
@@ -254,20 +251,19 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               { n: 4 as const, label: "4. Telegram", done: tgOk || tgSkipped },
               { n: 5 as const, label: "5. Radar đầu tiên", done: false },
             ].map((s) => (
-              <button
+              <Button
                 key={s.n}
-                type="button"
-                className={`btn btn-sm ${step === s.n ? "btn-primary" : ""}`}
+                variant={step === s.n ? "primary" : "default"} size="sm"
                 onClick={() => setStep(s.n)}
               >
                 {s.done ? "✓ " : ""}
                 {s.label}
-              </button>
+              </Button>
             ))}
           </div>
-        </div>
+        </ModalHeader>
 
-        <div className="modal-body">
+        <ModalBody>
           {step === 1 && (
             <div>
               <h3 style={{ marginTop: 0 }}>Bước 1: Kết nối Chrome Extension</h3>
@@ -275,35 +271,33 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 App tự động ghi file khai báo Native Messaging Host (`com.dealsonar.host.json`) để
                 trò chuyện an toàn với tiện ích Chrome trên máy của bạn.
               </p>
-              <div className="card" style={{ marginBottom: 12 }}>
+              <Card style={{ marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <span className={`badge ${chromeOk ? "badge-success" : "badge-warning"}`}>
+                    <Badge >
                       {chromeOk ? "✓ Đã kết nối Chrome Extension" : "Đang chờ cài đặt Extension"}
-                    </span>
+                    </Badge>
                     {chromeStatus?.manifest_path && (
                       <div className="field-hint" style={{ marginTop: 6 }}>
                         Native host: <code>{chromeStatus.manifest_path}</code>
                       </div>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    className="btn"
+                  <Button
                     disabled={checkingChrome}
                     onClick={() => void runChromeCheck()}
                   >
                     {checkingChrome ? "Đang kiểm tra…" : "Kiểm tra lại"}
-                  </button>
+                  </Button>
                 </div>
                 {chromeError && (
                   <div className="badge badge-danger" style={{ marginTop: 8 }}>
                     {chromeError}
                   </div>
                 )}
-              </div>
+              </Card>
 
-              <div className="card" style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>
+              <Card style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>
                   Ghép nối ID tiện ích thủ công (tuỳ chọn)
                 </div>
@@ -312,39 +306,36 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   <code>chrome://extensions</code> (32 ký tự) rồi bấm Ghép nối:
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <input
+                  <Input
                     type="text"
-                    className="input"
                     placeholder="Ví dụ: hkmjpcenjjebhpjicnbpmogidfcbmbjn"
                     value={customExtId}
                     onChange={(e) => setCustomExtId(e.target.value)}
                   />
-                  <button
-                    type="button"
-                    className="btn btn-primary"
+                  <Button
+                    variant="primary"
                     disabled={checkingChrome || !customExtId.trim()}
                     onClick={() => void runChromeCheck(customExtId)}
                   >
                     Ghép nối ID
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </Card>
 
               <div className="field-group">
                 <span className="field-label">Hướng dẫn theo hệ điều hành khi cần kiểm tra thủ công:</span>
                 <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
                   {(["macos", "windows", "linux"] as const).map((os) => (
-                    <button
+                    <Button
                       key={os}
-                      type="button"
-                      className={`btn btn-sm ${osTab === os ? "btn-primary" : ""}`}
+                      variant={osTab === os ? "primary" : "default"} size="sm"
                       onClick={() => setOsTab(os)}
                     >
                       {os === "macos" ? "macOS" : os === "windows" ? "Windows" : "Linux"}
-                    </button>
+                    </Button>
                   ))}
                 </div>
-                <div className="card" style={{ background: "var(--bg-subtle)", fontSize: 12.5 }}>
+                <Card style={{ background: "var(--bg-subtle)", fontSize: 12.5 }}>
                   {osTab === "macos" && (
                     <div>
                       Mở Chrome, vào <code>chrome://extensions</code>, bật <strong>Developer mode</strong>{" "}
@@ -364,7 +355,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                       <code>~/.config/google-chrome/NativeMessagingHosts/com.dealsonar.host.json</code>.
                     </div>
                   )}
-                </div>
+                </Card>
               </div>
             </div>
           )}
@@ -376,30 +367,28 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 DealSonar đọc bài bằng chính phiên đăng nhập Facebook trong trình duyệt Chrome của
                 bạn, không bao giờ hỏi mật khẩu hay đọc cookie.
               </p>
-              <div className="card">
+              <Card >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <span className={`badge ${fbOk ? "badge-success" : "badge-danger"}`}>
+                    <Badge >
                       {fbOk ? "✓ Phiên Facebook đang hoạt động ổn định" : "Chưa đăng nhập Facebook trong Chrome"}
-                    </span>
+                    </Badge>
                     <div className="field-hint" style={{ marginTop: 6 }}>
                       Nếu chưa đăng nhập, hãy mở facebook.com trong Chrome, đăng nhập rồi bấm Kiểm tra lại.
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      type="button"
-                      className="btn"
+                    <Button
                       onClick={() => openSafeSetupUrl("https://www.facebook.com")}
                     >
                       Mở facebook.com
-                    </button>
-                    <button type="button" className="btn btn-primary" onClick={() => void runChromeCheck()}>
+                    </Button>
+                    <Button variant="primary" onClick={() => void runChromeCheck()}>
                       Kiểm tra lại
-                    </button>
+                    </Button>
                   </div>
                 </div>
-              </div>
+              </Card>
             </div>
           )}
 
@@ -433,9 +422,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                               ? "OpenAI Codex (codex)"
                               : "Antigravity (agy)"}
                         </strong>
-                        <span className={`badge ${ready ? "badge-success" : "badge-warning"}`}>
+                        <Badge >
                           {ready ? "Sẵn sàng" : p?.installed ? "Chưa đăng nhập" : "Chưa cài"}
-                        </span>
+                        </Badge>
                       </div>
                       <div className="field-hint">
                         {p?.version ? `Phiên bản ${p.version}` : p?.error ?? "Đang dò…"}
@@ -446,7 +435,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               </div>
 
               {currentProbe?.available_models && currentProbe.available_models.length > 0 && (
-                <div className="card" style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>
+                <Card style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                     <strong>
                       Chọn mô hình cho {currentProbe.binary_name} (đã quét{" "}
@@ -456,9 +445,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <div className="field-group" style={{ marginBottom: 0 }}>
                       <label className="field-label">Mô hình tầng Fast (Chấm bài)</label>
-                      <select
+                      <Select
                         aria-label="Chọn mô hình Fast trong Onboarding"
-                        className="select"
                         value={modelTiersDraft[selectedProvider]?.fast ?? ""}
                         onChange={(e) => {
                           const nextFast = e.target.value;
@@ -478,13 +466,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                             {m.label}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                     <div className="field-group" style={{ marginBottom: 0 }}>
                       <label className="field-label">Mô hình tầng Smart (Đề xuất & Bộ luật)</label>
-                      <select
+                      <Select
                         aria-label="Chọn mô hình Smart trong Onboarding"
-                        className="select"
                         value={modelTiersDraft[selectedProvider]?.smart ?? ""}
                         onChange={(e) => {
                           const nextSmart = e.target.value;
@@ -504,14 +491,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                             {m.label}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                   </div>
-                </div>
+                </Card>
               )}
 
               {currentProbe && (!currentProbe.installed || !currentProbe.authenticated) && (
-                <div className="card" style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>
+                <Card style={{ marginBottom: 12, background: "var(--bg-subtle)" }}>
                   <strong>Lệnh cài đặt và đăng nhập cho {currentProbe.binary_name}:</strong>
                   <pre className="code-snippet" style={{ marginTop: 8, marginBottom: 8 }}>
                     {!currentProbe.installed
@@ -521,28 +508,24 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   <div className="field-hint">
                     Chạy lệnh trên trong Terminal/PowerShell, sau đó bấm «Thử lại».
                   </div>
-                </div>
+                </Card>
               )}
 
               <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  type="button"
-                  className="btn"
+                <Button
                   disabled={probingAi}
                   onClick={runAiProbe}
                 >
                   {probingAi ? "Đang dò CLI…" : "Thử lại"}
-                </button>
-                <button
-                  type="button"
-                  className="btn"
+                </Button>
+                <Button
                   onClick={() => {
                     setAiSkipped(true);
                     setStep(4);
                   }}
                 >
                   Bỏ qua (chỉ chạy bộ luật BĐS có sẵn)
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -553,33 +536,31 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               <ol style={{ paddingLeft: 18, lineHeight: 1.7 }}>
                 <li>
                   Mở{" "}
-                  <button
-                    type="button"
-                    className="btn btn-sm"
+                  <Button
+                    size="sm"
                     onClick={() => openSafeSetupUrl("https://t.me/BotFather")}
                   >
                     @BotFather trên Telegram
-                  </button>
+                  </Button>
                   , gửi lệnh <code>/newbot</code> và đặt tên cho bot riêng của bạn.
                 </li>
                 <li>Sao chép chuỗi Bot Token dán vào ô bên dưới:</li>
               </ol>
 
               <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                <input
+                <Input
                   type="password"
-                  className="input"
                   placeholder="123456789:AAHxyz..."
                   value={botToken}
                   onChange={(e) => setBotToken(e.target.value)}
                 />
-                <button type="button" className="btn btn-primary" onClick={handleConnectTelegram}>
+                <Button variant="primary" onClick={handleConnectTelegram}>
                   Lưu Token & Kiểm tra
-                </button>
+                </Button>
               </div>
 
               {tgStatus && (
-                <div className="card" style={{ marginBottom: 10, background: "var(--bg-subtle)" }}>
+                <Card style={{ marginBottom: 10, background: "var(--bg-subtle)" }}>
                   <div>
                     Bot: <strong>@{tgStatus.bot_username}</strong>:{" "}
                     {tgStatus.waiting_for_start
@@ -587,41 +568,37 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                       : "Đã nhận /start và tạo kênh báo thành công!"}
                   </div>
                   <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
+                    <Button
+                      size="sm"
                       onClick={() => openSafeSetupUrl(tgStatus.bot_link)}
                     >
                       Mở @{tgStatus.bot_username}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-primary"
+                    </Button>
+                    <Button
+                      variant="primary" size="sm"
                       onClick={handleSendTestTelegram}
                     >
                       Gửi tin thử
-                    </button>
+                    </Button>
                   </div>
-                </div>
+                </Card>
               )}
 
               {tgMsg && <div className="badge badge-success" style={{ marginBottom: 8 }}>{tgMsg}</div>}
               {tgError && <div className="badge badge-danger" style={{ marginBottom: 8 }}>{tgError}</div>}
 
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button type="button" className="btn" onClick={handleSendTestTelegram}>
+                <Button onClick={handleSendTestTelegram}>
                   Gửi tin thử
-                </button>
-                <button
-                  type="button"
-                  className="btn"
+                </Button>
+                <Button
                   onClick={() => {
                     setTgSkipped(true);
                     setStep(5);
                   }}
                 >
                   Bỏ qua (nhận tin trong app & thông báo hệ điều hành)
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -629,8 +606,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           {step === 5 && (
             <div>
               <h3 style={{ marginTop: 0 }}>Bước 5: Lưu ý vận hành & Tạo radar đầu tiên</h3>
-              <div
-                className="card"
+              <Card
                 style={{
                   background: "var(--primary-soft)",
                   borderColor: "var(--border-strong)",
@@ -641,7 +617,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 <p style={{ margin: "6px 0 0", color: "var(--text-secondary)" }}>
                   Radar chỉ chạy khi máy bật, Chrome mở và DealSonar đang chạy ở khay hệ thống.
                 </p>
-              </div>
+              </Card>
 
               <label
                 className="card"
@@ -667,43 +643,38 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               </label>
 
               <div style={{ display: "flex", gap: 10 }}>
-                <button
-                  type="button"
-                  className="btn btn-primary"
+                <Button
+                  variant="primary"
                   onClick={() => void finishWizard(true)}
                 >
                   Tạo radar đầu tiên ngay
-                </button>
-                <button type="button" className="btn" onClick={() => void finishWizard(false)}>
+                </Button>
+                <Button onClick={() => void finishWizard(false)}>
                   Vào màn hình chính
-                </button>
+                </Button>
               </div>
             </div>
           )}
-        </div>
+        </ModalBody>
 
-        <div className="modal-footer">
-          <button
-            type="button"
-            className="btn"
+        <ModalFooter>
+          <Button
             disabled={step === 1}
             onClick={() => setStep((s) => Math.max(1, s - 1) as 1 | 2 | 3 | 4 | 5)}
           >
             Quay lại
-          </button>
+          </Button>
           {step < 5 ? (
-            <button
-              type="button"
-              className="btn btn-primary"
+            <Button
+              variant="primary"
               onClick={() => setStep((s) => Math.min(5, s + 1) as 1 | 2 | 3 | 4 | 5)}
             >
               Bước tiếp theo
-            </button>
+            </Button>
           ) : (
             <span className="field-hint">Hoàn tất thiết lập ban đầu</span>
           )}
-        </div>
-      </div>
-    </div>
+        </ModalFooter>
+      </Modal>
   );
 };

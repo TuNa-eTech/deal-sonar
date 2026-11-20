@@ -18,6 +18,7 @@ import type {
   Radar,
 } from "../types/ipc";
 import { LeadDetailPanel } from "../components/LeadDetailPanel";
+import { Badge, Button, Card, Input, Modal, ModalBody, Select } from "../components/ui";
 
 const OPERATOR_LABELS: Record<FilterOperator, string> = {
   eq: "= Bằng",
@@ -195,6 +196,7 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
     const res = await api.leadExport({
       query: buildFilterQuery(null),
       format,
+      lead_ids: selectedRows.length ? selectedRows : undefined,
       include_post_text: includePostText,
     });
     setExportMsg(
@@ -221,28 +223,27 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
             />
             <span>Kèm nội dung bài gốc</span>
           </label>
-          <button type="button" className="btn" onClick={() => void handleExport("csv").catch(e=>setError(String(e)))}>
-            Xuất CSV
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
+          <Button disabled={loading || Boolean(error) || total === 0} onClick={() => void handleExport("csv").catch(e=>setError(String(e)))}>
+            Xuất CSV · {selectedRows.length ? `${selectedRows.length} đã chọn` : `tất cả ${total}`}
+          </Button>
+          <Button
+            variant="primary"
             title={
               license.limits.allow_xlsx_export
                 ? "Xuất Excel XLSX"
                 : "Xuất XLSX (Gói Chuyên nghiệp)"
             }
-            disabled={!license.limits.allow_xlsx_export}
+            disabled={loading || Boolean(error) || total === 0 || !license.limits.allow_xlsx_export}
             onClick={() => void handleExport("xlsx").catch(e=>setError(String(e)))}
           >
-            Xuất XLSX
-          </button>
+            Xuất XLSX · {selectedRows.length ? `${selectedRows.length} đã chọn` : `tất cả ${total}`}
+          </Button>
         </div>
       </div>
 
-      {error&&<div className="health-banner danger" role="alert">{error}<button className="btn" onClick={()=>void loadTable()}>Thử lại</button></div>}
-      <div className="toolbar-row table-options"><label><input type="checkbox" checked={includeWeak} onChange={e=>setIncludeWeak(e.target.checked)}/> Bao gồm cơ hội cần xem thêm</label><label><input type="checkbox" checked={unread} onChange={e=>setUnread(e.target.checked)}/> Chỉ chưa đọc</label><details><summary>Cột hiển thị</summary>{radarFields.map(f=><label key={f.key}><input type="checkbox" checked={!hiddenColumns.includes(f.key)} onChange={e=>setHiddenColumns(xs=>e.target.checked?xs.filter(k=>k!==f.key):[...xs,f.key])}/>{f.label}</label>)}</details><button className="btn btn-sm" onClick={()=>{setSearch("");setStatusFilter("all");setFilterRows([]);setUnread(false);}}>Xoá bộ lọc</button></div>
-      {selectedRows.length>0&&<div className="bulk-actions"><strong>Đã chọn {selectedRows.length} cơ hội</strong><button className="btn" disabled={loading} onClick={()=>{setLoading(true);void Promise.all(selectedRows.map(id=>api.leadSetStatus(id,"contacted"))).then(()=>{onLeadChanged();return loadTable();}).catch(e=>setError(String(e))).finally(()=>setLoading(false));}}>Đánh dấu đã liên hệ</button><button className="btn" onClick={()=>setSelectedRows([])}>Bỏ chọn</button></div>}
+      {error&&<div className="health-banner danger" role="alert">{error}<Button onClick={()=>void loadTable()}>Thử lại</Button></div>}
+      <div className="toolbar-row table-options"><label><input type="checkbox" checked={includeWeak} onChange={e=>setIncludeWeak(e.target.checked)}/> Gồm tin khớp yếu</label><label><input type="checkbox" checked={unread} onChange={e=>setUnread(e.target.checked)}/> Chỉ chưa đọc</label><details><summary>Cột hiển thị</summary>{radarFields.map(f=><label key={f.key}><input type="checkbox" checked={!hiddenColumns.includes(f.key)} onChange={e=>setHiddenColumns(xs=>e.target.checked?xs.filter(k=>k!==f.key):[...xs,f.key])}/>{f.label}</label>)}</details><Button size="sm" onClick={()=>{setSearch("");setStatusFilter("all");setFilterRows([]);setUnread(false);setSelectedRadarId("");setIncludeWeak(false);setSortBy("created_at");setSortDir("desc");}}>Xoá bộ lọc</Button></div>
+      {selectedRows.length>0&&<div className="bulk-actions"><strong>Đã chọn {selectedRows.length} cơ hội</strong><Button disabled={loading} onClick={()=>{setLoading(true);void Promise.all(selectedRows.map(id=>api.leadSetStatus(id,"contacted"))).then(()=>{onLeadChanged();return loadTable();}).catch(e=>setError(String(e))).finally(()=>setLoading(false));}}>Đánh dấu đã liên hệ</Button><Button onClick={()=>setSelectedRows([])}>Bỏ chọn</Button></div>}
       {exportMsg && (
         <div className="health-banner info" style={{ borderRadius: 6, marginBottom: 12 }}>
           <span>{exportMsg}</span>
@@ -251,9 +252,8 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
 
       {/* Primary Toolbar */}
       <div className="toolbar-row table-filters">
-        <select
+        <Select
           aria-label="Chọn Radar cho Bảng tin"
-          className="select"
           
           value={selectedRadarId}
           onChange={(e) => setSelectedRadarId(e.target.value)}
@@ -264,11 +264,10 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
               Radar: {r.name}
             </option>
           ))}
-        </select>
+        </Select>
 
-        <select
+        <Select
           aria-label="Trạng thái bảng tin"
-          className="select"
           
           value={statusFilter}
           onChange={(e) => {
@@ -282,12 +281,11 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
               {LEAD_STATUS_LABELS[st]}
             </option>
           ))}
-        </select>
+        </Select>
 
-        <input
+        <Input
           type="search"
           aria-label="Tìm toàn văn trên Bảng tin"
-          className="input"
           
           placeholder="Tìm toàn văn nội dung & tóm tắt…"
           value={search}
@@ -297,29 +295,25 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
           }}
         />
 
-        <button
-          type="button"
-          className="btn"
+        <Button
           disabled={radarFields.length === 0}
           onClick={addFilterRow}
         >
           + Thêm điều kiện lọc theo trường
-        </button>
+        </Button>
 
         <span className="field-hint">Tổng cộng: {total.toLocaleString("vi-VN")} tin</span>
       </div>
 
       {/* Dynamic Field Filter Builder (`03-desktop.md §4`) */}
       {filterRows.length > 0 && (
-        <div
-          className="card"
+        <Card
           style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}
         >
           {filterRows.map((row, idx) => (
             <div key={row.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <select
+              <Select
                 aria-label={`Trường lọc ${idx + 1}`}
-                className="select"
                 style={{ width: 190 }}
                 value={row.field}
                 onChange={(e) =>
@@ -333,11 +327,10 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
                     {fd.label}
                   </option>
                 ))}
-              </select>
+              </Select>
 
-              <select
+              <Select
                 aria-label={`Toán tử lọc ${idx + 1}`}
-                className="select"
                 style={{ width: 210 }}
                 value={row.op}
                 onChange={(e) =>
@@ -353,13 +346,12 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
                     {OPERATOR_LABELS[op]}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {row.op !== "is_empty" && (
-                <input
+                <Input
                   type="text"
                   aria-label={`Giá trị lọc ${idx + 1}`}
-                  className="input"
                   style={{ width: 210 }}
                   placeholder={
                     row.op === "in"
@@ -378,10 +370,9 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
               )}
 
               {row.op === "between" && (
-                <input
+                <Input
                   type="text"
                   aria-label={`Giá trị đến ${idx + 1}`}
-                  className="input"
                   style={{ width: 160 }}
                   placeholder="Giá trị đến…"
                   value={row.rawInputMax}
@@ -393,16 +384,15 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
                 />
               )}
 
-              <button
-                type="button"
-                className="btn btn-sm"
+              <Button
+                size="sm"
                 onClick={() => setFilterRows((prev) => prev.filter((_, i) => i !== idx))}
               >
                 Xoá
-              </button>
+              </Button>
             </div>
           ))}
-        </div>
+        </Card>
       )}
 
       {/* Dynamic Columns Table */}
@@ -445,12 +435,12 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
                 <td onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={`Chọn ${lead.summary}`} checked={selectedRows.includes(lead.id)} onChange={e=>setSelectedRows(xs=>e.target.checked?[...xs,lead.id]:xs.filter(id=>id!==lead.id))}/></td>
                 <td style={{ whiteSpace: "nowrap" }}>{formatExactTime(lead.post_created_at)}</td>
                 <td>
-                  <span className={`badge ${lead.is_weak_match ? "badge-warning" : "badge-success"}`}>
+                  <Badge >
                     {(lead.score * 100).toFixed(0)}%
-                  </span>
+                  </Badge>
                 </td>
                 <td>
-                  <span className="badge">{LEAD_STATUS_LABELS[lead.status]}</span>
+                  <Badge >{LEAD_STATUS_LABELS[lead.status]}</Badge>
                 </td>
                 {radarFields.filter(f=>!hiddenColumns.includes(f.key)).map((fd) => (
                   <td key={fd.key}>{formatExtractedFieldValue(fd, lead.fields[fd.key])}</td>
@@ -475,29 +465,26 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
 
       {/* Pagination */}
       <div className="pagination table-pagination">
-        <button
-          type="button"
-          className="btn btn-sm"
+        <Button
+          size="sm"
           disabled={!pageHistory.length}
           onClick={() => {setCursor(pageHistory[pageHistory.length-1]??null);setPageHistory(xs=>xs.slice(0,-1));}}
         >
           Trang trước
-        </button>
-        <button
-          type="button"
-          className="btn btn-sm"
+        </Button>
+        <Button
+          size="sm"
           disabled={!nextCursor}
           onClick={() => {setPageHistory(xs=>[...xs,cursor]);setCursor(nextCursor);}}
         >
           Trang tiếp theo
-        </button>
+        </Button>
       </div>
 
       {/* Slide-over Lead Detail Modal */}
       {activeLeadId && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Chi tiết tin từ Bảng tin">
-          <div className="modal-panel" style={{ maxWidth: 820 }}>
-            <div className="modal-body">
+        <Modal label="Chi tiết tin từ Bảng tin" size="lg">
+            <ModalBody>
               <LeadDetailPanel
                 key={activeLeadId}
                 leadId={activeLeadId}
@@ -507,9 +494,8 @@ export const LeadTableScreen: React.FC<LeadTableScreenProps> = ({
                   onLeadChanged();
                 }}
               />
-            </div>
-          </div>
-        </div>
+            </ModalBody>
+          </Modal>
       )}
     </div>
   );

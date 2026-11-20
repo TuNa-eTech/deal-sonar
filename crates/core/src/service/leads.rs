@@ -1,6 +1,7 @@
 //! Lead commands (`lead_*`).
 
 use super::*;
+use crate::dto::{FieldType, PosterActivity};
 
 impl CoreService {
     // ========================================================================
@@ -48,6 +49,7 @@ impl CoreService {
 
         let rw = self.rt.store.radar_get(&detail.lead.radar_id)?;
         let min_score = rw.as_ref().map(|r| r.radar.notify.min_score).unwrap_or(0.6);
+        let lead_ttl_hours = rw.as_ref().and_then(|r| r.radar.notify.lead_ttl_hours);
         let ver = self
             .rt
             .store
@@ -62,7 +64,7 @@ impl CoreService {
             .get(&detail.lead.evaluation_id)
             .and_then(|s| FeedbackLabel::from_db(s));
 
-        let lead_dto = lead_detail_to_lead_dto(&detail, min_score, feedback_label);
+        let lead_dto = lead_detail_to_lead_dto(&detail, min_score, lead_ttl_hours, feedback_label);
 
         let post_rec = self
             .rt
@@ -89,11 +91,32 @@ impl CoreService {
             })
             .collect();
 
+        // Best effort: a missing post row or author must not hide the lead itself.
+        let lead_phones: Vec<String> = radar_fields
+            .iter()
+            .filter(|f| f.r#type == FieldType::Phone)
+            .filter_map(|f| lead_dto.fields.get(&f.key))
+            .filter_map(|ef| ef.value.as_str().map(str::to_string))
+            .collect();
+        let poster = self
+            .rt
+            .store
+            .get_peer_signals(&detail.lead.post_id, &lead_phones, now_ms())
+            .ok()
+            .map(|s| PosterActivity {
+                posts_7d: s.author_followed_posts_7d,
+                groups_7d: s.author_group_count_7d,
+                same_post_groups: s.cluster_source_count,
+                phone_shared_by_authors: s.max_distinct_authors_for_phone,
+                looks_like_peer: s.is_peer_override,
+            });
+
         Ok(LeadDetail {
             lead: lead_dto,
             post: post_dto,
             radar_fields,
             events,
+            poster,
         })
     }
 
@@ -322,6 +345,11 @@ impl CoreService {
             page.next_cursor = next.next_cursor;
         }
 
+        if let Some(ids) = &input.lead_ids {
+            let selected: HashSet<_> = ids.iter().collect();
+            page.items.retain(|lead| selected.contains(&lead.lead.id));
+        }
+
         // Collect union of field definitions across matching radars (or specific radar)
         let notify_fields: Vec<dealsonar_notify::FieldDef> =
             if let Some(rid) = &input.query.radar_id {
@@ -449,6 +477,7 @@ impl CoreService {
         Ok(LeadListQuery {
             unread_only: q.unread_only,
             follow_up_before: q.follow_up_before,
+            follow_up_after: q.follow_up_after,
             exclude_weak: Some(q.include_weak == Some(false)),
             radar_id: q.radar_id.clone(),
             status: q
@@ -462,6 +491,10 @@ impl CoreService {
             sort,
             limit: q.limit.unwrap_or(50).clamp(1, 500),
             cursor: q.cursor.clone(),
+            expiry: q.expired.map(|expired| dealsonar_store::LeadExpiryFilter {
+                expired,
+                now_ms: now_ms(),
+            }),
         })
     }
 }

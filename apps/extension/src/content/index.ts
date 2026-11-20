@@ -1,6 +1,7 @@
 // Isolated-world content script entry (`manifest.json` -> `content.js`, `run_at: "document_idle"`).
 // Intentionally exports nothing so Rollup emits a pure anonymous IIFE with zero globals/imports.
 
+import { dsLog } from "../log";
 import {
   TAP_CONFIG_SOURCE,
   TAP_MESSAGE_SOURCE,
@@ -24,6 +25,13 @@ const MAX_BUFFERED_TAP_PAYLOADS = 60;
 
 function bootstrapContentScript(): void {
   if (typeof window === "undefined" || typeof document === "undefined") return;
+  // After an extension reload the orphaned script (dead `chrome.runtime`) can linger in the same
+  // isolated world, so only skip when the previous instance is still connected to the extension.
+  const guard = window as unknown as { __dealsonarAlive?: () => boolean };
+  if (guard.__dealsonarAlive?.()) return;
+  guard.__dealsonarAlive = () => {
+    try { return Boolean(chrome.runtime?.id); } catch { return false; }
+  };
 
   const networkPayloads: string[] = [];
   let currentProfile: ExtractorProfile = DEFAULT_EXTRACTOR_PROFILE;
@@ -155,6 +163,7 @@ function bootstrapContentScript(): void {
         }
 
         if (msg.kind === "dealsonar:crawl-execute") {
+          dsLog("nhận lệnh quét", { maxPosts: msg.maxPosts, maxScrollSteps: msg.maxScrollSteps, seen: msg.seenPostIds.length });
           currentProfile = msg.extractor ?? currentProfile;
           sendTapPatterns(currentProfile);
           passiveEnabled = false;
@@ -166,6 +175,7 @@ function bootstrapContentScript(): void {
             maxPosts: msg.maxPosts,
             maxScrollSteps: msg.maxScrollSteps,
             seenPostIds: msg.seenPostIds,
+            stopOnKnownPost: msg.stopOnKnownPost,
             extractor: currentProfile,
             getNetworkPayloads: () => networkPayloads,
             stepDelayMinMs: msg.stepDelayMinMs,

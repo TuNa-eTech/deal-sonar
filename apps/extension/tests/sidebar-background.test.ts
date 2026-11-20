@@ -58,11 +58,11 @@ describe("Sidebar manual scanning", () => {
     expect(sendToTab).not.toHaveBeenCalled();
   });
 
-  it("scans immediately without a schedule, reuses the user's tab without scrolling and persists a summary", async () => {
+  it("scans immediately without a schedule, reuses the user's tab with the default 10 scrolls and persists a summary", async () => {
     const response = await request({ kind: "popup:scan-now", source }) as PopupScanResponse;
     expect(response.ok).toBe(true);
     expect(sendToTab).toHaveBeenCalledWith(42, expect.objectContaining({
-      kind: "dealsonar:crawl-execute", maxPosts: 30, maxScrollSteps: 0, sourceRef: source,
+      kind: "dealsonar:crawl-execute", maxPosts: 30, maxScrollSteps: 10, sourceRef: source,
     }));
     expect(createTab).not.toHaveBeenCalled();
     expect(response.status.activeCrawl).toBeNull();
@@ -122,22 +122,28 @@ describe("Sidebar manual scanning", () => {
     { mode: "background", maxPosts: 0, maxScrollSteps: 3 },
     { mode: "background", maxPosts: 101, maxScrollSteps: 3 },
     { mode: "current_tab", maxPosts: 1.5, maxScrollSteps: 3 },
-    { mode: "background", maxPosts: 30, maxScrollSteps: 6 },
+    { mode: "background", maxPosts: 30, maxScrollSteps: 51 },
     { mode: "background", maxPosts: 30, maxScrollSteps: -1 },
     { mode: "invalid", maxPosts: 30, maxScrollSteps: 3 },
   ])("rejects invalid settings without replacing the saved values: %j", async (options) => {
     const response = await request({ kind: "popup:set-scan-options", options } as RuntimeMessage);
     expect(response.ok).toBe(false);
-    expect(state.quick_scan_options).toEqual({ mode: "current_tab", maxPosts: 30, maxScrollSteps: 3 });
+    expect(state.quick_scan_options).toEqual({ mode: "current_tab", maxPosts: 30, maxScrollSteps: 10 });
   });
 
-  it("current-tab mode uses the chosen post limit and never scrolls or opens a new tab", async () => {
-    await request({ kind: "popup:set-scan-options", options: { mode: "current_tab", maxPosts: 12, maxScrollSteps: 5 } });
+  it("current-tab mode uses the chosen post and scroll limits and never opens a new tab", async () => {
+    await request({ kind: "popup:set-scan-options", options: { mode: "current_tab", maxPosts: 12, maxScrollSteps: 7 } });
     const result = await request({ kind: "popup:scan-now", source });
     expect(result.ok).toBe(true);
     expect(queryTabs).toHaveBeenCalledWith({ active: true, currentWindow: true });
-    expect(sendToTab).toHaveBeenCalledWith(42, expect.objectContaining({ maxPosts: 12, maxScrollSteps: 0 }));
+    expect(sendToTab).toHaveBeenCalledWith(42, expect.objectContaining({ maxPosts: 12, maxScrollSteps: 7, stopOnKnownPost: false }));
     expect(createTab).not.toHaveBeenCalled();
+  });
+
+  it("accepts up to 50 scroll steps in current-tab mode", async () => {
+    await request({ kind: "popup:set-scan-options", options: { mode: "current_tab", maxPosts: 30, maxScrollSteps: 50 } });
+    expect((await request({ kind: "popup:scan-now", source })).ok).toBe(true);
+    expect(sendToTab).toHaveBeenCalledWith(42, expect.objectContaining({ maxScrollSteps: 50 }));
   });
 
   it("rejects a mismatched current tab rather than silently using another tab", async () => {
@@ -158,7 +164,7 @@ describe("Sidebar manual scanning", () => {
     expect(sendToTab).toHaveBeenCalledWith(42, expect.objectContaining({ kind: "dealsonar:crawl-execute" }));
   });
 
-  it.each([0, 5])("background mode always creates and closes its own tab with %i scroll steps", async (steps) => {
+  it.each([0, 10])("background mode always creates and closes its own tab with %i scroll steps", async (steps) => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     createTab.mockResolvedValue({ id: 99 });
     await request({ kind: "popup:set-scan-options", options: { mode: "background", maxPosts: 80, maxScrollSteps: steps } });
@@ -174,7 +180,7 @@ describe("Sidebar manual scanning", () => {
   it("restores safe defaults for old storage with no quick-scan options", async () => {
     delete (state as Partial<ExtensionStorageState>).quick_scan_options;
     const snapshot = await request({ kind: "popup:get-status" });
-    expect(snapshot.scanOptions).toEqual({ mode: "current_tab", maxPosts: 30, maxScrollSteps: 3 });
+    expect(snapshot.scanOptions).toEqual({ mode: "current_tab", maxPosts: 30, maxScrollSteps: 10 });
   });
 
   it("uses the visible options snapshot if another panel changed the saved defaults", async () => {
@@ -183,7 +189,7 @@ describe("Sidebar manual scanning", () => {
       options: { mode: "current_tab", maxPosts: 15, maxScrollSteps: 3 },
     });
     expect(result.ok).toBe(true);
-    expect(sendToTab).toHaveBeenCalledWith(42, expect.objectContaining({ maxPosts: 15, maxScrollSteps: 0 }));
+    expect(sendToTab).toHaveBeenCalledWith(42, expect.objectContaining({ maxPosts: 15, maxScrollSteps: 3 }));
     expect(createTab).not.toHaveBeenCalled();
   });
 

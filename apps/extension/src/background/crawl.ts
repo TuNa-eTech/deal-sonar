@@ -8,15 +8,17 @@ import {
   type SessionState,
   type RawPost,
 } from "../protocol";
-import type { QuickScanOptions } from "../scan-options";
+import { MAX_QUICK_SCAN_SCROLLS, type QuickScanOptions } from "../scan-options";
 import { checkCrawlEligibility, recordPageLoad, recordCrawlOutcome } from "./scheduler";
 import { detectSessionFromUrl } from "../content/drive";
 import { resolveSessionMarkers } from "../content/extract";
 import type { BgCrawlExecuteMessage, CrawlPageResult } from "../messages";
+import { dsLog, dsWarn } from "../log";
 import { updateActionBadge } from "./badge";
 import {
   ALARM_TAB_SAFETY_PREFIX,
-  CRAWL_EXECUTION_DEADLINE_MS,
+  crawlDeadlineMs,
+  tabLifetimeMs,
   getQueue,
   MAX_TAB_LIFETIME_MS,
   runtime,
@@ -28,6 +30,7 @@ import {
   findCurrentGroupTab,
   findExistingUserGroupTab,
   queryUserIdleState,
+  sendMessageToTab,
   safeCloseTab,
   sleepWithAbort,
   waitForTabComplete,
@@ -38,7 +41,7 @@ export async function cleanupOrphanedCrawlTab(now: number = Date.now()): Promise
   if (!state.active_crawl) return;
 
   const age = now - state.active_crawl.opened_at;
-  if (age >= MAX_TAB_LIFETIME_MS || runtime.activeCrawlAbort === null) {
+  if (age >= (state.active_crawl.max_lifetime_ms ?? MAX_TAB_LIFETIME_MS) || runtime.activeCrawlAbort === null) {
     const orphanTabId = state.active_crawl.owned_tab
       ? state.active_crawl.tab_id
       : null;
@@ -70,11 +73,15 @@ export async function executeActiveCrawl(params: {
   maxPosts: number;
   bypassScheduleWindow: boolean;
   manualOptions?: QuickScanOptions;
+  requestId?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   if (runtime.activeCrawlAbort !== null) return { ok: false, error: "Đang có một lượt quét khác. Vui lòng chờ." };
 
   const startedAt = Date.now();
-  const runId = generateUlid(startedAt);
+  const plannedScrolls = Math.min(params.manualOptions?.maxScrollSteps ?? 0, MAX_QUICK_SCAN_SCROLLS);
+  const deadlineMs = crawlDeadlineMs(plannedScrolls);
+  const lifetimeMs = tabLifetimeMs(plannedScrolls);
+  const runId = params.requestId ?? generateUlid(startedAt);
   const extId = params.sourceRef.external_id;
 
   const existingTab = params.manualOptions?.mode === "background" ? null
@@ -108,11 +115,13 @@ export async function executeActiveCrawl(params: {
       tab_id: existingTab?.id ?? null,
       owned_tab: ownedTab,
       opened_at: startedAt,
+      max_lifetime_ms: lifetimeMs,
     };
     return { allowed: true as const, state };
   }, startedAt);
 
   if (!reservation.allowed) {
+    dsWarn("quét bị chặn:", reservation.reason);
     await syncSchedulerAlarm(reservation.state, startedAt);
     return { ok: false, error: crawlBlockMessage(reservation.reason) };
   }
@@ -121,7 +130,7 @@ export async function executeActiveCrawl(params: {
   runtime.activeCrawlAbort = abortController;
   const deadlineTimer = setTimeout(
     () => abortController.abort(),
-    CRAWL_EXECUTION_DEADLINE_MS,
+    deadlineMs,
   );
 
   let tabId: number | null = existingTab?.id ?? null;
@@ -150,7 +159,7 @@ export async function executeActiveCrawl(params: {
         }
       });
       await chrome.alarms.create(`${ALARM_TAB_SAFETY_PREFIX}${tabId}`, {
-        when: startedAt + MAX_TAB_LIFETIME_MS,
+        when: startedAt + lifetimeMs,
       });
 
       const loadedTab = await waitForTabComplete(
@@ -194,9 +203,10 @@ export async function executeActiveCrawl(params: {
       throw new Error("Không tìm thấy tab group hợp lệ");
     }
 
-    // Reusing a user's open tab never scrolls their viewport (`maxScrollSteps: 0`)
-    const maxScrollSteps = ownedTab
-      ? Math.max(0, Math.min(params.manualOptions?.maxScrollSteps ?? configSnapshot.policy.max_scroll_steps, 5))
+    // Automatic runs never scroll a user's open tab (`maxScrollSteps: 0`); a manual current-tab scan scrolls as chosen.
+    const mayScroll = ownedTab || params.manualOptions?.mode === "current_tab";
+    const maxScrollSteps = mayScroll
+      ? Math.max(0, Math.min(params.manualOptions?.maxScrollSteps ?? configSnapshot.policy.max_scroll_steps, MAX_QUICK_SCAN_SCROLLS))
       : 0;
 
     const execMsg: BgCrawlExecuteMessage = {
@@ -205,13 +215,13 @@ export async function executeActiveCrawl(params: {
       maxPosts: params.maxPosts,
       maxScrollSteps,
       seenPostIds: seenBefore,
+      stopOnKnownPost: params.reason !== "manual",
       extractor: configSnapshot.extractor,
     };
 
-    const pageResult = (await chrome.tabs.sendMessage(
-      tabId,
-      execMsg,
-    )) as CrawlPageResult | undefined;
+    dsLog("quét bắt đầu", { reason: params.reason, mode: params.manualOptions?.mode, ownedTab, tabId, maxPosts: params.maxPosts, maxScrollSteps, seenBefore: seenBefore.length });
+    const pageResult = await sendMessageToTab<CrawlPageResult>(tabId, execMsg);
+    dsLog("quét xong", { status: pageResult?.status, posts: pageResult?.posts.length, strategy: pageResult?.strategy, error: pageResult?.error, diagnostic: pageResult?.diagnostic, ms: Date.now() - startedAt });
 
     if (!pageResult) {
       throw new Error("Content script không phản hồi");
@@ -231,6 +241,7 @@ export async function executeActiveCrawl(params: {
   } catch (err) {
     const endedAt = Date.now();
     const errMsg = err instanceof Error ? err.message : String(err);
+    dsWarn("quét lỗi", errMsg);
 
     // Check if failure was actually due to redirect outside `/groups/*` (where content script doesn't inject)
     let redirectSession: { state: SessionState; detail?: string } | null = null;
@@ -336,6 +347,7 @@ async function finalizeCrawlResult(args: {
       sourceExternalId: extId, status: outcomeSummary.reportStatus,
       postsSeen: result.posts.length, postsNew: freshPosts.length,
       endedAt, error: result.error,
+      ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}),
     };
     return { summary: outcomeSummary, newPosts: freshPosts };
   }, endedAt);

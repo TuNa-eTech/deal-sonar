@@ -1,5 +1,7 @@
 //! Post and rejected-evaluation commands.
 
+use crate::dto::{SourcePostCursor, SourcePostPage};
+
 use super::*;
 
 impl CoreService {
@@ -17,6 +19,32 @@ impl CoreService {
                 id: id.to_string(),
             })?;
         Ok(post_detail_to_dto(&detail))
+    }
+
+    pub fn post_list_by_source(
+        &self,
+        source_id: &str,
+        before: Option<&SourcePostCursor>,
+    ) -> CoreResult<SourcePostPage> {
+        const PAGE_SIZE: usize = 30;
+        let before = before.map(|cursor| (cursor.at, cursor.id.as_str()));
+        let mut rows = self
+            .rt
+            .store
+            .post_list_by_source(source_id, before, PAGE_SIZE + 1)?;
+        let has_more = rows.len() > PAGE_SIZE;
+        rows.truncate(PAGE_SIZE);
+        let next_cursor = rows
+            .last()
+            .filter(|_| has_more)
+            .map(|row| SourcePostCursor {
+                at: row.post.created_at.unwrap_or(row.post.captured_at),
+                id: row.post.id.clone(),
+            });
+        Ok(SourcePostPage {
+            items: rows.iter().map(post_detail_to_dto).collect(),
+            next_cursor,
+        })
     }
 
     pub fn post_search(

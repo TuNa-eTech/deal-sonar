@@ -690,6 +690,7 @@ async fn bridge_retries_once_on_invalid_output_and_records_both_calls() {
             user_profession: Some("môi giới BĐS".to_string()),
             language_hint: Some("vi".to_string()),
             closest_template: None,
+            source_candidates: Vec::new(),
         })
         .await
         .expect("second attempt should succeed");

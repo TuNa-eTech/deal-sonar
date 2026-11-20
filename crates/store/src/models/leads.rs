@@ -241,6 +241,7 @@ impl Default for LeadSort {
 pub struct LeadListQuery {
     pub unread_only: Option<bool>,
     pub follow_up_before: Option<i64>,
+    pub follow_up_after: Option<i64>,
     pub exclude_weak: Option<bool>,
     pub radar_id: Option<String>,
     pub status: Option<Vec<String>>,
@@ -253,7 +254,22 @@ pub struct LeadListQuery {
     #[serde(default = "default_lead_limit")]
     pub limit: usize,
     pub cursor: Option<String>,
+    /// Filter by lead lifetime (`radars.notify.lead_ttl_hours` from the post time).
+    #[serde(default)]
+    pub expiry: Option<LeadExpiryFilter>,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LeadExpiryFilter {
+    /// `true`: only expired leads; `false`: only leads still within their lifetime.
+    pub expired: bool,
+    pub now_ms: i64,
+}
+
+/// SQL expression for a lead's expiry instant, given `r` = radars and `p` = posts.
+/// NULL when the radar has no lifetime configured.
+pub const LEAD_EXPIRES_AT_SQL: &str = "(COALESCE(p.created_at, p.captured_at) + \
+     CAST(json_extract(r.notify, '$.lead_ttl_hours') AS INTEGER) * 3600000)";
 
 pub(super) fn default_lead_limit() -> usize {
     50

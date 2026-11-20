@@ -1,6 +1,8 @@
 //! JSON command dispatcher for UI <-> Desktop contract and E2E tests.
 
-use dealsonar_core::dto::{AiProviderId, BlocklistKind, ChromeConnectOptions, ModelTierMap};
+use dealsonar_core::dto::{
+    AiProviderId, BlocklistKind, ChromeConnectOptions, ModelTierMap, SourcePostCursor,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -72,7 +74,7 @@ pub async fn invoke_command_json(
         "radar_update" => to_json(c.radar_update(parse_arg(map, "input")?)?),
         "radar_suggest_fields" => to_json(c.radar_suggest_fields(parse_arg(map, "input")?).await?),
         "radar_set_status" => to_json(
-            c.radar_set_status(&parse_arg::<String>(map, "id")?, parse_arg(map, "status")?)
+            c.radar_set_status_from_desktop(&parse_arg::<String>(map, "id")?, parse_arg(map, "status")?, map.get("preview_id").and_then(Value::as_str))
                 .await?,
         ),
         "radar_preview_start" => to_json(c.radar_preview_start(parse_arg(map, "input")?).await?),
@@ -132,6 +134,11 @@ pub async fn invoke_command_json(
 
         // 5. Posts & Rejected Evaluations
         "post_get" => to_json(c.post_get(&parse_arg::<String>(map, "id")?)?),
+        "post_list_by_source" => {
+            let source_id: String = parse_arg(map, "source_id")?;
+            let before: Option<SourcePostCursor> = parse_opt_arg(map, "before")?;
+            to_json(c.post_list_by_source(&source_id, before.as_ref())?)
+        }
         "post_search" => {
             let query: String = parse_arg(map, "query")?;
             let source_id: Option<String> = parse_opt_arg(map, "source_id")?;

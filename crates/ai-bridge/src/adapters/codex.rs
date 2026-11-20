@@ -327,6 +327,8 @@ impl CodexCliProvider {
             "read-only".to_string(),
             "--skip-git-repo-check".to_string(),
             "--ephemeral".to_string(),
+            "-c".to_string(),
+            "mcp_servers.dealsonar.enabled=false".to_string(),
         ]);
         if caps.use_ignore_user_config {
             args.push("--ignore-user-config".to_string());

@@ -131,6 +131,7 @@ async fn streaming_preview_crawl_request_and_all_three_quality_warnings() {
             user_profession: Some("Môi giới cho thuê căn hộ".to_string()),
             template_id: None,
             language_hint: Some("vi".to_string()),
+            suggest_sources: false,
         })
         .await
         .expect("radar_suggest_fields");
@@ -162,7 +163,7 @@ async fn streaming_preview_crawl_request_and_all_three_quality_warnings() {
                 platform: "facebook".to_string(),
                 kind: "group".to_string(),
                 external_id: "grp_prev_1".to_string(),
-                name: "Nhóm Thử Radar".to_string(),
+                name: "Cho thuê căn hộ Quận 7".to_string(),
                 url: "https://www.facebook.com/groups/grp_prev_1".to_string(),
                 privacy: Some("public".to_string()),
                 member_count: Some(10_000),
@@ -173,6 +174,17 @@ async fn streaming_preview_crawl_request_and_all_three_quality_warnings() {
         )
         .expect("upsert source");
     let src_id = service.source_list().expect("sources")[0].id.clone();
+    let plan = service
+        .radar_suggest_fields(SuggestFieldsInput {
+            description: "Tìm người cần thuê căn hộ Quận 7 dưới 8 triệu/tháng".into(),
+            user_profession: None,
+            template_id: None,
+            language_hint: Some("vi".into()),
+            suggest_sources: true,
+        })
+        .await
+        .expect("suggest group and fields in one request");
+    assert_eq!(plan.suggested_source_ids, vec![src_id.clone()]);
 
     let draft = service
         .radar_create_draft(CreateRadarDraftInput {
@@ -333,6 +345,17 @@ async fn streaming_preview_crawl_request_and_all_three_quality_warnings() {
         0,
         "preview must NEVER create live leads in Inbox"
     );
+    assert!(
+        service
+            .radar_set_status_from_desktop(&radar_id, RadarStatus::Active, None)
+            .await
+            .is_err()
+    );
+    let activated = service
+        .radar_set_status_from_desktop(&radar_id, RadarStatus::Active, Some(&prev_broad.preview_id))
+        .await
+        .expect("the completed preview allows desktop activation");
+    assert_eq!(activated.status, RadarStatus::Active);
 
     drop(ext_stream);
     service.shutdown().await.expect("shutdown");

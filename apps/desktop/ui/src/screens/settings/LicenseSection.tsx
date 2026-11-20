@@ -3,6 +3,7 @@
 import React from "react";
 import { api } from "../../lib/api";
 import type { SettingsScreenModel } from "./useSettingsScreen";
+import { Badge, Button, Input } from "../../components/ui";
 
 export const LicenseSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
   const {
@@ -19,9 +20,9 @@ export const LicenseSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
       <h3 style={{ marginTop: 0 }}>4. Bản quyền & Giới hạn gói</h3>
       <div style={{ marginBottom: 10 }}>
         Gói hiện tại:{" "}
-        <span className="badge badge-primary">
+        <Badge tone="primary">
           {license.plan === "pro" ? "Chuyên nghiệp" : "Cá nhân"}
-        </span>{" "}
+        </Badge>{" "}
         Giới hạn:{" "}
         <strong>
           {license.limits.max_active_radars === null
@@ -32,17 +33,15 @@ export const LicenseSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
         </strong>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <input
+        <Input
           type="text"
-          className="input"
           style={{ maxWidth: 420 }}
           placeholder="Nhập khoá bản quyền Ed25519 (ví dụ: DS-PRO-2026-XXXX)…"
           value={licenseInput}
           onChange={(e) => setLicenseInput(e.target.value)}
         />
-        <button
-          type="button"
-          className="btn btn-primary"
+        <Button
+          variant="primary"
           onClick={async () => {
             const updated = await api.licenseSet(licenseInput);
             onLicenseUpdated(updated);
@@ -55,7 +54,7 @@ export const LicenseSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
           }}
         >
           Kích hoạt khoá
-        </button>
+        </Button>
       </div>
     </div>
   );

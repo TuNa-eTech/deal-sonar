@@ -6,7 +6,8 @@ use dealsonar_core::dto::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_dialog::DialogExt;
 
 use super::CommandError;
 use crate::security::{open_in_default_browser, validate_safe_external_url};
@@ -60,6 +61,20 @@ pub async fn workspace_action(
     input: Value,
 ) -> Result<Value, CommandError> {
     Ok(state.core().workspace_action(&action, input)?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn backup_pick_file(app: AppHandle) -> Result<Option<String>, CommandError> {
+    let (send, receive) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .add_filter("Bản sao SQLite", &["sqlite3", "sqlite", "db"])
+        .pick_file(move |file| {
+            let _ = send.send(file.map(|path| path.to_string()));
+        });
+    receive
+        .await
+        .map_err(|err| CommandError::new("file_picker_failed", err.to_string()))
 }
 
 #[tauri::command(rename_all = "snake_case")]

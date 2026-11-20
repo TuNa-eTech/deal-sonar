@@ -1,6 +1,6 @@
 // Shared bounds for the sidebar, durable preferences and manual crawl admission.
 export const MAX_QUICK_SCAN_POSTS = 100;
-export const MAX_QUICK_SCAN_SCROLLS = 5;
+export const MAX_QUICK_SCAN_SCROLLS = 50;
 
 export type QuickScanOptions = {
   mode: "current_tab" | "background";
@@ -9,7 +9,7 @@ export type QuickScanOptions = {
 };
 
 export const DEFAULT_QUICK_SCAN_OPTIONS: Readonly<QuickScanOptions> = {
-  mode: "current_tab", maxPosts: 30, maxScrollSteps: 3,
+  mode: "current_tab", maxPosts: 30, maxScrollSteps: 10,
 };
 
 export function isQuickScanOptions(value: unknown): value is QuickScanOptions {

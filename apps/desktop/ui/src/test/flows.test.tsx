@@ -3,14 +3,15 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { App } from "../App";
+import { api } from "../lib/api";
 import {
   getMockCommandCalls,
   resetMockBackend,
   setMockHealth,
 } from "../lib/mockBackend";
 
-describe("4-Step Radar Creation Wizard & UX Flows", () => {
-  it("completes 4-step Radar creation flow (template -> field customization -> sources -> streaming preview & activate)", async () => {
+describe("Radar setup and UX flows", () => {
+  it("chooses a source with AI, saves a draft and previews before the user's activation", async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -21,6 +22,7 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     const dialog = await screen.findByRole("dialog", { name: "Trình tạo và sửa Radar" });
 
     // Step 1: Select "Bài hỏi \"ai biết thợ…\"" template and fill inline placeholders
+    await user.click(within(dialog).getByRole("button", { name: /^Chọn mẫu theo ngành/ }));
     const thoTplBtn = within(dialog).getByRole("button", {
       name: /Dịch vụ nhà cửa/i,
     });
@@ -34,16 +36,12 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     await user.type(areaPlaceholder, "Quận Cầu Giấy");
 
     const descTextarea = within(dialog).getByLabelText(
-      "Câu mô tả chi tiết thứ cần tìm"
+      "Mô tả nhu cầu"
     ) as HTMLTextAreaElement;
     expect(descTextarea.value).toContain("sửa điều hoà âm trần");
     expect(descTextarea.value).toContain("Quận Cầu Giấy");
 
-    // Advance to Step 2: Fields
-    await user.click(within(dialog).getByRole("button", { name: /Tiếp tục: Xác nhận cách hiểu/i }));
-    expect(
-      await within(dialog).findByText(/Danh sách trường thông tin sẽ trích/i)
-    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "AI hiểu nhu cầu của bạn" })).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("button", {name:/Tùy chỉnh thông tin/}));
     // Add a custom field and customize its label
@@ -52,17 +50,7 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     await user.clear(customLabelInput);
     await user.type(customLabelInput, " Hãng máy lạnh");
 
-    // Advance to Step 3: Sources
-    await user.click(within(dialog).getByRole("button", { name: /Tiếp tục: Chọn nguồn group/i }));
-    const sourceCheckbox = await within(dialog).findByLabelText(
-      /Chọn nguồn Tìm Thợ Sửa Điện Nước/i
-    );
-    await user.click(sourceCheckbox);
-
-    // Advance to Step 4: Streaming Preview & Activate
-    await user.click(
-      within(dialog).getByRole("button", { name: /Tiếp tục: Xem thử trên bài thật/i })
-    );
+    await user.click(within(dialog).getByRole("button", { name: "Chạy xem thử" }));
 
     // Wait for streaming preview batch completion (5/5 posts)
     await waitFor(() => {
@@ -71,6 +59,14 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
 
     expect(within(dialog).getByText(/✓ Khớp \(2\)/)).toBeInTheDocument();
     expect(within(dialog).getByText(/✕ Không khớp \(3\)/)).toBeInTheDocument();
+    const beforeActivation = getMockCommandCalls();
+    const request = beforeActivation.find(call => call.cmd === "radar_suggest_fields");
+    expect(request?.args.input).toMatchObject({ suggest_sources: true });
+    const group = (await api.sourceList()).find(source => source.name.includes("Tìm Thợ Sửa Điện Nước"))!;
+    const created = beforeActivation.find(call => call.cmd === "radar_create_draft")!;
+    expect(created.args.input).toMatchObject({ source_ids: [group.id] });
+    expect(beforeActivation.some(call => call.cmd === "radar_set_status")).toBe(false);
+    expect((await api.radarList()).some(radar => radar.status === "draft" && radar.source_ids.includes(group.id))).toBe(true);
 
     // Give feedback on a preview item
     const correctBtns = within(dialog).getAllByRole("button", { name: /^Đúng$/i });
@@ -88,6 +84,23 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     expect(calls).toContain("radar_preview_start");
     expect(calls).toContain("lead_feedback");
     expect(calls).toContain("radar_set_status");
+    const activation = getMockCommandCalls().find(c => c.cmd === "radar_set_status");
+    expect(activation?.args.preview_id).toEqual(expect.any(String));
+    const presetRadar = (await api.radarList()).find(r => r.id === activation?.args.id);
+    expect(presetRadar?.notify).toMatchObject({ inherit_channels: false, channel_ids: [] });
+  });
+
+  it("stays on setup without creating a draft when AI finds no suitable group", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("heading", { name: "Cơ hội" });
+    await user.click(screen.getAllByRole("button", { name: "+ Tạo radar" })[0]!);
+    const dialog = await screen.findByRole("dialog", { name: "Trình tạo và sửa Radar" });
+    await user.type(within(dialog).getByLabelText("Mô tả nhu cầu"), "Tìm người cần mua đàn piano cho phòng thu ở Huế");
+    await user.click(within(dialog).getByRole("button", { name: "Chạy xem thử" }));
+    expect(await within(dialog).findByText(/AI chưa tìm thấy nhóm phù hợp/)).toBeInTheDocument();
+    expect(getMockCommandCalls().map(call => call.cmd)).not.toContain("radar_create_draft");
+    expect(within(dialog).queryByRole("button", { name: "Bật radar" })).not.toBeInTheDocument();
   });
 
   it("renders dynamic Bảng tin columns, builds typed LeadFilterQuery, exports CSV, and handles Lead feedback actions", async () => {
@@ -108,7 +121,7 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /^Sai/i }));
-    await user.click(screen.getByRole("button", { name: /Người cùng nghề/i }));
+    await user.click(screen.getByRole("menuitem", { name: /Người cùng nghề/i }));
     expect(screen.getByText(/Đánh dấu «Người cùng nghề»/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Chặn luôn tác giả này" }));
 
@@ -121,7 +134,7 @@ describe("4-Step Radar Creation Wizard & UX Flows", () => {
     expect((fbCall!.args.input as { block_author: boolean }).block_author).toBe(true);
 
     // 2. Navigate to Bảng tin (Dynamic CRM Table)
-    await user.click(screen.getByRole("button", { name: "Bảng tin" }));
+    await user.click(screen.getByRole("tab", { name: "Bảng tin" }));
     await screen.findByRole("heading", { name: /Bảng tin/i });
 
     await user.selectOptions(screen.getByLabelText("Chọn Radar cho Bảng tin"), screen.getByLabelText("Chọn Radar cho Bảng tin").querySelectorAll("option")[1]!.value);

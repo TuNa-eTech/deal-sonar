@@ -241,6 +241,7 @@ pub(super) async fn handle_telegram_incoming_event(
                 .lead_list(&dealsonar_store::models::LeadListQuery {
                     unread_only: None,
                     follow_up_before: None,
+                    follow_up_after: None,
                     exclude_weak: None,
                     radar_id: None,
                     status: None,
@@ -251,6 +252,7 @@ pub(super) async fn handle_telegram_incoming_event(
                     sort: None,
                     limit: 500,
                     cursor: None,
+                    expiry: None,
                 })?;
             let paused = rt
                 .store

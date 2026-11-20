@@ -240,7 +240,7 @@ describe("Popup UI (`03-ux-flows.md §4`)", () => {
     expect((document.getElementById("btn-scan-now") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("auto-saves options, restores them on reopening and keeps scroll limits only for background mode", async () => {
+  it("auto-saves options, restores them on reopening and keeps the scroll limit editable in every mode", async () => {
     const mount = () => {
       document.body.innerHTML = new DOMParser().parseFromString(popupHtml, "text/html").body.innerHTML;
     };
@@ -266,7 +266,7 @@ describe("Popup UI (`03-ux-flows.md §4`)", () => {
     const mode = document.getElementById("scan-mode") as HTMLSelectElement;
     const posts = document.getElementById("scan-max-posts") as HTMLInputElement;
     const scrolls = document.getElementById("scan-max-scrolls") as HTMLInputElement;
-    expect(scrolls.disabled).toBe(true);
+    expect(scrolls.disabled).toBe(false);
     mode.value = "background";
     mode.dispatchEvent(new Event("change"));
     await vi.waitFor(() => expect(scrolls.disabled).toBe(false));

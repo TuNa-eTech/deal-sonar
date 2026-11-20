@@ -301,21 +301,28 @@ pub(super) fn default_min_score() -> f64 {
 pub struct RadarNotifyConfig {
     #[serde(default)]
     pub channel_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inherit_channels: Option<bool>,
     #[serde(default)]
     pub mode: NotifyMode,
     #[serde(default = "default_min_score")]
     pub min_score: f64,
     #[serde(default)]
     pub quiet_hours: Option<QuietHours>,
+    /// Hours a lead stays actionable after the post time; `None` never expires.
+    #[serde(default)]
+    pub lead_ttl_hours: Option<u32>,
 }
 
 impl Default for RadarNotifyConfig {
     fn default() -> Self {
         Self {
             channel_ids: Vec::new(),
+            inherit_channels: None,
             mode: NotifyMode::Instant,
             min_score: 0.6,
             quiet_hours: None,
+            lead_ttl_hours: None,
         }
     }
 }
@@ -383,4 +390,10 @@ pub struct RadarTemplate {
     pub match_policy: MatchPolicy,
     #[serde(default)]
     pub seed_ruleset: Option<String>,
+    /// Recommended lead lifetime for this trade (minutes for bargains, days for hiring).
+    #[serde(default)]
+    pub lead_ttl_hours: Option<u32>,
+    /// Recommended delivery: `instant` when speed wins deals, `digest` when volume matters more.
+    #[serde(default)]
+    pub notify_mode: Option<NotifyMode>,
 }

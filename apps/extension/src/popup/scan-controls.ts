@@ -48,12 +48,12 @@ export function renderScanControls(status: PopupStatusSnapshot): void {
   select.disabled = running || !popupState.selectedSources.length;
   byId<HTMLSelectElement>("scan-mode").disabled = running || popupState.optionsSaving;
   byId<HTMLInputElement>("scan-max-posts").disabled = running || popupState.optionsSaving;
-  byId<HTMLInputElement>("scan-max-scrolls").disabled = running || popupState.optionsSaving || !background;
+  byId<HTMLInputElement>("scan-max-scrolls").disabled = running || popupState.optionsSaving;
   byId("scan-mode-help").textContent = background
     ? "Mở tab riêng, tự cuộn trong giới hạn rồi đóng khi xong."
-    : "Đọc bài đã tải ở tab hiện tại, không tự cuộn trang.";
+    : "Đọc bài ở tab hiện tại, tự cuộn theo số lần đã chọn.";
   byId("scan-options-summary").textContent = validOptions
-    ? `${background ? "Tab nền" : "Tab hiện tại"}, ${preferences.maxPosts} bài${background ? `, ${preferences.maxScrollSteps} cuộn` : ""}`
+    ? `${background ? "Tab nền" : "Tab hiện tại"}, ${preferences.maxPosts} bài, ${preferences.maxScrollSteps} cuộn`
     : "Kiểm tra giới hạn";
   const wrongTab = !background && (!popupState.currentGroupCandidate ||
     select.value.toLowerCase() !== popupState.currentGroupCandidate.external_id.toLowerCase());
@@ -64,13 +64,13 @@ export function renderScanControls(status: PopupStatusSnapshot): void {
   button.setAttribute("aria-busy", String(running));
   byId("scan-scope").textContent = background
     ? `Tab nền, tối đa ${validOptions ? preferences.maxPosts : "—"} bài, ${preferences.maxScrollSteps} lần cuộn. Có thể dừng sớm.`
-    : `Tab hiện tại, tối đa ${validOptions ? preferences.maxPosts : "—"} bài đã tải, không cuộn trang.`;
+    : `Tab hiện tại, tối đa ${validOptions ? preferences.maxPosts : "—"} bài, ${preferences.maxScrollSteps} lần cuộn. Có thể dừng sớm.`;
   byId("scan-feedback").textContent = running ? "Đang đọc bài viết. Bạn có thể tiếp tục duyệt web."
     : !status.connected || !status.desktopAvailable ? "Mở DealSonar Desktop để bắt đầu."
     : status.pause.paused || status.pause.requiresDesktopResume ? "Đang tạm dừng. Xem mục Tạm dừng & khôi phục."
     : status.session.state !== "ok" ? "Kiểm tra phiên Facebook ở phần Kết nối."
     : !popupState.selectedSources.length ? "Mở một nhóm Facebook để bắt đầu."
-    : !validOptions ? "Số bài từ 1–100, số lần cuộn từ 0–5."
+    : !validOptions ? "Số bài từ 1–100, số lần cuộn từ 0–50."
     : popupState.optionsSaving ? "Đang lưu tùy chọn…"
     : popupState.optionsUnsaved ? "Tùy chọn chưa lưu. Kiểm tra phần Tùy chọn quét."
     : wrongTab ? "Mở đúng nhóm đã chọn hoặc chuyển sang quét bằng tab nền."
@@ -84,6 +84,6 @@ export function renderScanControls(status: PopupStatusSnapshot): void {
     const failed = scan.status === "error" || scan.status === "blocked";
     result.classList.toggle("err", failed);
     result.textContent = failed ? `Quét chưa thành công: ${scan.error || "Kiểm tra phiên Facebook và thử lại."}`
-      : `Lượt gần nhất: ${scan.postsSeen} bài đã đọc, ${scan.postsNew} bài mới`;
+      : `Lượt gần nhất: ${scan.postsSeen} bài đã đọc, ${scan.postsNew} bài mới${scan.diagnostic ? ` (${scan.diagnostic})` : ""}`;
   }
 }

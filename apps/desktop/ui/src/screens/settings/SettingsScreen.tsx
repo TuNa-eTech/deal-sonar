@@ -8,6 +8,7 @@ import { LicenseSection } from "./LicenseSection";
 import { DataSection } from "./DataSection";
 import { DeleteAllModal } from "./DeleteAllModal";
 import { type SettingsScreenProps, useSettingsScreen } from "./useSettingsScreen";
+import { Button } from "../../components/ui";
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = (props) => {
   const s = useSettingsScreen(props);
@@ -33,13 +34,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = (props) => {
             Cấu hình CLI AI, Telegram & Webhook, tần suất quét an toàn, bản quyền và quản lý dữ liệu
           </p>
         </div>
-        <button type="button" className="btn" onClick={onReopenOnboarding}>
+        <Button onClick={onReopenOnboarding}>
           Mở lại trình hướng dẫn cài đặt ban đầu
-        </button>
+        </Button>
       </div>
 
-      <div className="settings-layout"><nav className="settings-navigation" aria-label="Nhóm cài đặt">{[["ai","AI & Kết nối"],["notifications","Thông báo"],["schedule","Lịch quét"],["license","Gói sử dụng"],["data","Dữ liệu"]].map(([id,label])=><button key={id} className={`btn ${section===id?"btn-primary":""}`} onClick={()=>setSection(id!)} aria-pressed={section===id}>{label}</button>)}</nav><div className="settings-content">
-      <div className="draft-status" role="status">{saving?"Đang lưu…":dirtyKeys.length?"Có thay đổi chưa áp dụng. Bản nhập được giữ trên máy khi chuyển mục.":"Tất cả thay đổi đã được lưu."}{dirtyKeys.length>0&&<button className="btn btn-sm" onClick={()=>setDraft(settings)}>Bỏ thay đổi chưa lưu</button>}</div>
+      <div className="settings-layout"><nav className="settings-navigation" aria-label="Nhóm cài đặt">{[["ai","AI & Kết nối"],["notifications","Thông báo"],["schedule","Lịch quét"],["license","Gói sử dụng"],["data","Dữ liệu"]].map(([id,label])=><Button key={id} variant={section===id ? "primary" : "default"} onClick={()=>setSection(id!)} aria-pressed={section===id}>{label}</Button>)}</nav><div className="settings-content">
+      <div className="draft-status" role="status">{saving?"Đang lưu…":dirtyKeys.length?"Có thay đổi chưa áp dụng. Bản nhập được giữ trên máy khi chuyển mục.":"Tất cả thay đổi đã được lưu."}{dirtyKeys.length>0&&<Button size="sm" onClick={()=>setDraft(settings)}>Bỏ thay đổi chưa lưu</Button>}</div>
       {banner && (
         <div
           className={`health-banner ${banner.kind === "err" ? "danger" : "info"}`}

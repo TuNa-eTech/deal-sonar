@@ -49,6 +49,6 @@ pub use types::{
     AiResponse, AuthorRole, CompileRulesInput, DetectedIntent, ExtractedField, FeedbackExample,
     FieldDef, FieldSource, FieldType, HardFilter, JudgeExtractOutput, JudgeItemResult,
     LabeledSample, ModelTier, ModelTierMap, PostPromptInput, PrefilterHint, ProbeMode, ProbeResult,
-    ProviderId, ProviderTierModels, RadarPromptContext, SuggestFieldsInput, SuggestFieldsOutput,
-    SuggestedField, TaskKind, Usage, WantIntent,
+    ProviderId, ProviderTierModels, RadarPromptContext, RadarSourceCandidate, SuggestFieldsInput,
+    SuggestFieldsOutput, SuggestedField, TaskKind, Usage, WantIntent,
 };

@@ -31,7 +31,7 @@ impl Store {
 
         let sort = query.sort.clone().unwrap_or_default();
         let dynamic_sort_field = match sort.by.as_str() {
-            "created_at" | "updated_at" | "score" => None,
+            "created_at" | "updated_at" | "score" | "follow_up_at" => None,
             field_key => {
                 if !is_valid_field_key(field_key) {
                     return Err(StoreError::InvalidFieldKey(field_key.to_string()));
@@ -57,6 +57,12 @@ impl Store {
         if query.unread_only == Some(true) {
             where_clauses.push("l.read_at IS NULL".into());
         }
+        if let Some(start) = query.follow_up_after {
+            let p = push_param(&mut sql_params, SqlValue::Integer(start));
+            where_clauses.push(format!(
+                "l.follow_up_at >= {p} AND l.status NOT IN ('won','lost','ignored')"
+            ));
+        }
         if let Some(due) = query.follow_up_before {
             let p = push_param(&mut sql_params, SqlValue::Integer(due));
             where_clauses.push(format!(
@@ -75,6 +81,17 @@ impl Store {
                 }
                 where_clauses.push(format!("l.status IN ({})", ph.join(", ")));
             }
+        }
+
+        if let Some(expiry) = query.expiry {
+            let p = push_param(&mut sql_params, SqlValue::Integer(expiry.now_ms));
+            let has_ttl = "json_extract(r.notify, '$.lead_ttl_hours') IS NOT NULL";
+            let expires = crate::models::LEAD_EXPIRES_AT_SQL;
+            where_clauses.push(if expiry.expired {
+                format!("({has_ttl} AND {expires} <= {p})")
+            } else {
+                format!("(NOT ({has_ttl}) OR {expires} > {p})")
+            });
         }
 
         if let Some(since) = query.since {
@@ -131,6 +148,7 @@ impl Store {
             let col = match sort.by.as_str() {
                 "updated_at" => "l.updated_at",
                 "score" => "l.score",
+                "follow_up_at" => "l.follow_up_at",
                 _ => "l.created_at",
             };
             format!("{col} {dir_sql}, l.id {dir_sql}")

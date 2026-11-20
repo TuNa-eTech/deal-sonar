@@ -136,15 +136,17 @@ impl CoreService {
             _ => CrawlReason::Manual,
         };
         let settings = self.rt.load_settings()?;
+        let run_id = dealsonar_protocol::new_ulid();
         let sent = push_crawl_request(
             &self.rt,
             &source,
             crawl_reason,
             settings.crawl_policy.max_posts_per_visit,
+            run_id.clone(),
         );
         Ok(SourceCrawlNowResult {
             queued: sent > 0,
-            run_id: dealsonar_protocol::new_ulid(),
+            run_id,
         })
     }
 

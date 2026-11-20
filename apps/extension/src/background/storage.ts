@@ -67,6 +67,7 @@ export type ActiveCrawlRecord = {
   tab_id: number | null;
   owned_tab: boolean;
   opened_at: number;
+  max_lifetime_ms?: number;
 };
 
 export type ExtensionStorageState = {

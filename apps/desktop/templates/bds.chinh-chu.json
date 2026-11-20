@@ -77,5 +77,7 @@
     "exclude_roles": ["peer"],
     "hard_filters": []
   },
-  "seed_ruleset": "bds-vi-v1"
+  "seed_ruleset": "bds-vi-v1",
+  "lead_ttl_hours": 72,
+  "notify_mode": "instant"
 }

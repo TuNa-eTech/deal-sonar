@@ -305,4 +305,24 @@ describe("Extractors, Group Discovery, Session Detection & Safe Page Driver", ()
     expect(result.posts).toHaveLength(1);
     expect(scrollSpy).toHaveBeenCalledTimes(0);
   });
+
+  it("manual scans (`stopOnKnownPost: false`) keep scrolling past known posts", async () => {
+    const doc = parseHtml(readFixture("embedded-feed.html"));
+    const scrollSpy = vi.fn();
+    const result = await driveCrawlInPage({
+      doc,
+      win: window,
+      sourceRef: { platform: "facebook", kind: "group", external_id: "555666777" },
+      maxPosts: 30,
+      maxScrollSteps: 3,
+      seenPostIds: ["222333444"],
+      stopOnKnownPost: false,
+      extractor: DEFAULT_EXTRACTOR_PROFILE,
+      getNetworkPayloads: () => [],
+      scrollFn: scrollSpy,
+      sleepFn: async () => {},
+    });
+    expect(result.posts).toHaveLength(1);
+    expect(scrollSpy).toHaveBeenCalledTimes(3);
+  });
 });

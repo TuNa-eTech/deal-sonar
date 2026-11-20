@@ -51,8 +51,9 @@ pub async fn radar_set_status(
     state: State<'_, DesktopState>,
     id: String,
     status: RadarStatus,
+    preview_id: Option<String>,
 ) -> Result<Radar, CommandError> {
-    Ok(state.core().radar_set_status(&id, status).await?)
+    Ok(state.core().radar_set_status_from_desktop(&id, status, preview_id.as_deref()).await?)
 }
 
 #[tauri::command(rename_all = "snake_case")]

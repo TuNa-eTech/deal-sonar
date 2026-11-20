@@ -235,21 +235,12 @@ pub(super) fn flush_digest_for_radar(rt: &Arc<CoreRuntime>, radar_id: &str) -> C
 
     let now = now_ms();
     let all_channels = rt.store.channel_list()?;
-    let target_channels: Vec<_> = if !rw.radar.notify.channel_ids.is_empty() {
-        all_channels
-            .into_iter()
-            .filter(|c| {
-                c.kind == "telegram"
-                    && c.state == "ok"
-                    && rw.radar.notify.channel_ids.iter().any(|id| id == &c.id)
-            })
-            .collect()
-    } else {
-        all_channels
-            .into_iter()
-            .filter(|c| c.kind == "telegram" && c.state == "ok")
-            .collect()
-    };
+    let target_channels: Vec<_> = all_channels
+        .into_iter()
+        .filter(|channel| channel.kind == "telegram"
+            && channel.state == "ok"
+            && rw.radar.notify.sends_to_channel(&channel.id))
+        .collect();
 
     let mut queued = 0usize;
     for ch in target_channels {

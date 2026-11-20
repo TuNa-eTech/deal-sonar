@@ -1,5 +1,6 @@
 import React from "react";
 import type { FunnelStats } from "../types/ipc";
+import { Badge, Card } from "./ui";
 
 interface FunnelChartProps {
   stats: FunnelStats | null;
@@ -11,7 +12,7 @@ export const FunnelChart: React.FC<FunnelChartProps> = ({
   title = "Phễu xử lý 7 ngày gần nhất",
 }) => {
   if (!stats) {
-    return <div className="card text-muted">Đang tải số liệu phễu 7 ngày…</div>;
+    return <Card className="text-muted">Đang tải số liệu phễu 7 ngày…</Card>;
   }
 
   const total = Math.max(1, stats.posts_captured);
@@ -70,7 +71,7 @@ export const FunnelChart: React.FC<FunnelChartProps> = ({
         }}
       >
         <strong style={{ fontSize: 14 }}>{title}</strong>
-        <span className="badge badge-primary">{stats.days} ngày qua</span>
+        <Badge tone="primary">{stats.days} ngày qua</Badge>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

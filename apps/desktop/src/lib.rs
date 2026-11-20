@@ -54,6 +54,7 @@ pub fn run() {
         ))
         // 3. Native OS notifications (`07-notifications-export.md §4`)
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .on_page_load(|webview, payload| {
             tracing::info!(
                 label = webview.label(),
@@ -200,6 +201,7 @@ pub fn run() {
             commands::lead_feedback,
             commands::lead_export,
             commands::post_get,
+            commands::post_list_by_source,
             commands::post_search,
             commands::evaluation_list_rejected,
             commands::contact_list,
@@ -229,6 +231,7 @@ pub fn run() {
             commands::ai_usage_get,
             commands::diagnostic_bundle_create,
             commands::data_backup,
+            commands::backup_pick_file,
             commands::workspace_action,
             commands::data_purge,
             commands::data_delete_all,

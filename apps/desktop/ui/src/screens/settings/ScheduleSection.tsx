@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { SettingsScreenModel } from "./useSettingsScreen";
+import { Button, Input } from "../../components/ui";
 
 export const ScheduleSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
   const {
@@ -22,9 +23,8 @@ export const ScheduleSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => 
       <div className="settings-fields">
         <div>
           <label className="field-label">Chu kỳ mỗi group (10–120 phút)</label>
-          <input
+          <Input
             type="number"
-            className="input"
             min={10}
             max={120}
             value={draft.crawl_policy.group_interval_minutes}
@@ -41,9 +41,8 @@ export const ScheduleSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => 
         </div>
         <div>
           <label className="field-label">Ngân sách tải/giờ (20–90)</label>
-          <input
+          <Input
             type="number"
-            className="input"
             min={20}
             max={90}
             value={draft.crawl_policy.hourly_page_load_budget}
@@ -60,9 +59,8 @@ export const ScheduleSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => 
         </div>
         <div>
           <label className="field-label">Ngân sách tải/ngày (100–900)</label>
-          <input
+          <Input
             type="number"
-            className="input"
             min={100}
             max={900}
             value={draft.crawl_policy.daily_page_load_budget}
@@ -80,9 +78,8 @@ export const ScheduleSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => 
         <div>
           <label className="field-label">Giờ hoạt động (Từ – Đến)</label>
           <div style={{ display: "flex", gap: 6 }}>
-            <input
+            <Input
               type="time"
-              className="input"
               value={draft.crawl_policy.active_hours.from}
               onChange={(e) =>
                 setDraft((d) => ({
@@ -94,9 +91,8 @@ export const ScheduleSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => 
                 }))
               }
             />
-            <input
+            <Input
               type="time"
-              className="input"
               value={draft.crawl_policy.active_hours.to}
               onChange={(e) =>
                 setDraft((d) => ({
@@ -136,9 +132,8 @@ export const ScheduleSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => 
         </label>
       </div>
 
-      <button
-        type="button"
-        className="btn btn-primary btn-sm"
+      <Button
+        variant="primary" size="sm"
         onClick={() =>
           void savePatch({
             launch_at_login: draft.launch_at_login,
@@ -147,7 +142,7 @@ export const ScheduleSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => 
         }
       >
         Lưu chính sách quét
-      </button>
+      </Button>
     </div>
   );
 };

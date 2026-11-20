@@ -9,6 +9,7 @@ import type {
   SuggestFieldsInput,
   SuggestFieldsResult,
   FieldDef,
+  HardFilter,
   RadarStatus,
   PreviewStartInput,
   PreviewItem,
@@ -78,6 +79,7 @@ export const radarCommands: MockCommandTable = {
         quiet_hours:
           input.notify?.quiet_hours ??
           (state.settings.quiet_hours_enabled ? state.settings.quiet_hours : null),
+        lead_ttl_hours: input.notify?.lead_ttl_hours ?? null,
       },
       created_at: now,
       updated_at: now,
@@ -204,6 +206,12 @@ export const radarCommands: MockCommandTable = {
 
   radar_suggest_fields: async (args) => {
     const input = args.input as SuggestFieldsInput;
+    const folded = removeVietnameseDiacritics(input.description).toLowerCase();
+    const topics = ["can ho", "chung cu", "thue nha", "tim tho", "dien nuoc", "sua", "xe cu", "tuyen dung"];
+    const suggestedSourceIds = input.suggest_sources ? state.sources
+      .filter(source => source.state === "ok" && topics.some(topic =>
+        folded.includes(topic) && removeVietnameseDiacritics(source.name).toLowerCase().includes(topic)))
+      .slice(0, 3).map(source => source.id) : [];
     if (input.template_id) {
       const tpl = TEMPLATES.find((t) => t.id === input.template_id);
       if (tpl) {
@@ -214,11 +222,11 @@ export const radarCommands: MockCommandTable = {
           hard_filters: tpl.match_policy.hard_filters,
           clarifying_questions: [],
           prefilter_hint: null,
+          suggested_source_ids: suggestedSourceIds,
         } satisfies SuggestFieldsResult);
       }
     }
 
-    const folded = removeVietnameseDiacritics(input.description).toLowerCase();
     const isBds =
       folded.includes("can ho") ||
       folded.includes("chung cu") ||
@@ -327,12 +335,21 @@ export const radarCommands: MockCommandTable = {
       clarifying.push("Có ngưỡng ngân sách tối đa hay tối thiểu nào cần lọc cứng không?");
     }
 
+    const budget = folded.match(/(duoi|khong qua|toi da)\s+(\d+(?:[.,]\d+)?)\s+trieu/u);
+    const hardFilters: HardFilter[] = budget ? [{
+      field: isBds ? "price" : "budget",
+      op: budget[1] === "duoi" ? "lt" : "lte",
+      value: Number(budget[2]!.replace(",", ".")) * 1_000_000,
+      when_missing: "fail",
+    }] : [];
+
     const result: SuggestFieldsResult = {
       suggested_name: input.description.trim().slice(0, 48) || "Radar tuỳ chỉnh",
       want_intent: folded.includes("can ban") || folded.includes("cho thue") ? "supply" : "demand",
       fields,
-      hard_filters: [],
+      hard_filters: hardFilters,
       clarifying_questions: clarifying,
+      suggested_source_ids: suggestedSourceIds,
       prefilter_hint: {
         any: ["can", "tim"],
         none: ["tuyen cong tac vien"],
@@ -347,6 +364,13 @@ export const radarCommands: MockCommandTable = {
     const radar = state.radars.find((r) => r.id === id);
     if (!radar) throw new Error(`Không tìm thấy radar: ${id}`);
 
+    if (status === "active" && !radar.source_ids.length) throw new Error("Hãy chọn ít nhất một nhóm cho radar.");
+    if (status === "active" && radar.status === "draft") {
+      const preview = state.previews[radar.id];
+      if (!preview || preview.preview_id !== args.preview_id || preview.status !== "done" || !preview.total_posts) {
+        throw new Error("Cần hoàn tất xem thử trên bài thật.");
+      }
+    }
     if (status === "active" && radar.status !== "active") {
       const maxActive = state.license.limits.max_active_radars;
       const activeCount = state.radars.filter((r) => r.status === "active").length;
@@ -388,6 +412,7 @@ export const radarCommands: MockCommandTable = {
       radar_id: input.radar_id,
       radar_version:
         detail.pending_version_data?.version ?? detail.current_version_data.version,
+      source_ids: input.source_ids ?? detail.radar.source_ids,
       status: secondBatch.length > 0 ? "evaluating" : "done",
       total_posts: allItems.length,
       evaluated_posts: firstBatch.length,

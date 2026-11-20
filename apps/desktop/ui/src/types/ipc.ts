@@ -69,10 +69,13 @@ export interface QuietHours {
 }
 
 export interface RadarNotifyConfig {
+  inherit_channels?: boolean;
   channel_ids: string[];
   mode: "instant" | "digest";
   min_score: number;
   quiet_hours: QuietHours | null;
+  /** Hours a lead stays worth acting on after the post time; null never expires. */
+  lead_ttl_hours?: number | null;
 }
 
 export interface Radar {
@@ -127,6 +130,10 @@ export interface RadarTemplate {
   fields: FieldDef[];
   match_policy: MatchPolicy;
   seed_ruleset: string | null;
+  /** Recommended lead lifetime for this trade. */
+  lead_ttl_hours?: number | null;
+  /** Recommended delivery for this trade. */
+  notify_mode?: "instant" | "digest" | null;
 }
 
 export type SourceState = "ok" | "error" | "inaccessible";
@@ -238,6 +245,8 @@ export interface Lead {
   author_name: string;
   permalink: string;
   post_created_at: number | null;
+  /** Post time + radar lifetime; null when the radar's leads never expire. */
+  expires_at?: number | null;
   also_seen_in: AlsoSeenSource[];
   notified_at: number | null;
   follow_up_at: number | null;
@@ -274,11 +283,31 @@ export interface Post {
   purged_at: number | null;
 }
 
+export interface SourcePostCursor {
+  at: number;
+  id: string;
+}
+
+export interface SourcePostPage {
+  items: Post[];
+  next_cursor: SourcePostCursor | null;
+}
+
 export interface LeadDetail {
   lead: Lead;
   post: Post;
   radar_fields: FieldDef[];
   events: LeadEvent[];
+  /** What the poster has been doing lately; absent when the post has no known author. */
+  poster?: PosterActivity | null;
+}
+
+export interface PosterActivity {
+  posts_7d: number;
+  groups_7d: number;
+  same_post_groups: number;
+  phone_shared_by_authors: number;
+  looks_like_peer: boolean;
 }
 
 export interface DynamicFieldFilter {
@@ -290,6 +319,7 @@ export interface DynamicFieldFilter {
 export interface LeadFilterQuery {
   unread_only?: boolean;
   follow_up_before?: number;
+  follow_up_after?: number;
   radar_id?: string | null;
   status?: LeadStatus[];
   include_weak?: boolean;
@@ -302,6 +332,8 @@ export interface LeadFilterQuery {
   };
   limit?: number;
   cursor?: string | null;
+  /** false: only leads still within their lifetime; true: only expired; omitted: both. */
+  expired?: boolean;
 }
 
 export interface LeadListResponse {
@@ -623,6 +655,7 @@ export interface SuggestFieldsInput {
   user_profession?: string | null;
   template_id?: string | null;
   language_hint?: string | null;
+  suggest_sources?: boolean;
 }
 
 export interface SuggestFieldsResult {
@@ -631,6 +664,7 @@ export interface SuggestFieldsResult {
   fields: FieldDef[];
   hard_filters: HardFilter[];
   clarifying_questions: string[];
+  suggested_source_ids?: string[];
   prefilter_hint: {
     any: string[];
     none: string[];
@@ -667,6 +701,7 @@ export interface PreviewRunState {
   preview_id: string;
   radar_id: string;
   radar_version: number;
+  source_ids?: string[];
   status: "crawling" | "evaluating" | "done" | "error";
   total_posts: number;
   evaluated_posts: number;
@@ -704,6 +739,7 @@ export interface LeadFeedbackResult {
 }
 
 export interface LeadExportInput {
+  lead_ids?: string[];
   query: LeadFilterQuery;
   format: "csv" | "xlsx";
   include_post_text: boolean;
@@ -758,6 +794,7 @@ export interface TauriEventMap {
   "lead:reminder": Lead;
   "lead:updated": Lead;
   "preview:progress": PreviewProgressEvent;
+  "radar:draft-created": string;
   "health:changed": HealthStatus;
   "crawl:finished": CrawlRun;
   "job:failed": JobFailedEvent;

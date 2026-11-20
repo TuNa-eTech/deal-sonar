@@ -19,14 +19,18 @@ describe("Workspace recovery actions",()=>{
   expect(await screen.findByText(/Đã hủy khôi phục/)).toBeInTheDocument();
   expect(getMockCommandCalls().some(c=>c.cmd==="workspace_action"&&c.args.action==="restore_cancel")).toBe(true);
  });
- it("publishes a selected historical definition and rejects stale versions",async()=>{
+ it("rolls back in one click, offers undo, and rejects stale versions",async()=>{
   const list=await api.radarList();const id=list[0]!.id;const before=await api.radarGet(id);
   await api.radarUpdate({id,description:"Updated target",confirm_version_upgrade:true});
-  const current=await api.radarGet(id);const user=userEvent.setup();render(<VersionHistory detail={current} onChanged={()=>{}}/>);
-  await user.selectOptions(screen.getByLabelText("Phiên bản đối chiếu"),String(before.radar.current_version));
-  await user.click(screen.getByRole("checkbox"));await user.click(screen.getByRole("button",{name:"Quay lại định nghĩa đã chọn"}));
-  await screen.findByText(/Đã áp dụng thành/);
+  const current=await api.radarGet(id);const user=userEvent.setup();
+  render(<><VersionHistory detail={current} onChanged={()=>{}}/><UndoCenter/></>);
+  await user.click(screen.getByText("Lịch sử thay đổi"));
+  expect(screen.getByText(/Mục tiêu:/)).toBeInTheDocument();
+  await user.click(screen.getAllByRole("button",{name:"Quay lại bản này"})[0]!);
+  await screen.findByText(/Đã quay lại bản/,{selector:"p"});
   expect((await api.radarGet(id)).current_version_data.description).toBe(before.current_version_data.description);
+  await user.click(screen.getByRole("button",{name:"Hoàn tác"}));
+  await waitFor(async()=>expect((await api.radarGet(id)).current_version_data.description).toBe("Updated target"));
   await expect(api.workspaceAction("rollback",{radar_id:id,version:before.radar.current_version,expected_version:current.radar.current_version})).rejects.toThrow();
  });
  it("keeps undo pending on failure and permits a retry",async()=>{

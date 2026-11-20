@@ -36,7 +36,7 @@ const EXPECTED_TEMPLATES: Record<
   },
   "van-tai.ghep-hang.json": {
     industry: "Vận tải, ghép hàng",
-    want_intent: "any",
+    want_intent: "demand",
     seed_ruleset: null,
   },
   "order.hoi-mua.json": {

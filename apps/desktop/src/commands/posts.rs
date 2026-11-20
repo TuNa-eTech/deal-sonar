@@ -1,6 +1,6 @@
 //! Post and rejected-evaluation commands (`post_*`, `evaluation_list_rejected`).
 
-use dealsonar_core::dto::{Post, RejectedEvaluation};
+use dealsonar_core::dto::{Post, RejectedEvaluation, SourcePostCursor, SourcePostPage};
 use tauri::State;
 
 use super::CommandError;
@@ -9,6 +9,17 @@ use crate::state::DesktopState;
 #[tauri::command(rename_all = "snake_case")]
 pub async fn post_get(state: State<'_, DesktopState>, id: String) -> Result<Post, CommandError> {
     Ok(state.core().post_get(&id)?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn post_list_by_source(
+    state: State<'_, DesktopState>,
+    source_id: String,
+    before: Option<SourcePostCursor>,
+) -> Result<SourcePostPage, CommandError> {
+    Ok(state
+        .core()
+        .post_list_by_source(&source_id, before.as_ref())?)
 }
 
 #[tauri::command(rename_all = "snake_case")]

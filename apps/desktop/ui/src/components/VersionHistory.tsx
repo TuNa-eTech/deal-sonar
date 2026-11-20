@@ -1,19 +1,92 @@
 import React,{useEffect,useRef,useState} from "react";
 import {api} from "../lib/api";
+import {describeChanges,formatVersionTime} from "../lib/versionDiff";
+import {offerUndo} from "./UndoCenter";
 import type {RadarDetail,PreviewRunState,RadarVersion} from "../types/ipc";
+import { Badge, Button } from "./ui";
+
+type Impact={version:number;text:string;flips:{id:string;label:string;nowMatches:boolean}[]};
+
+/** Lịch sử thay đổi của radar: mỗi dòng nói rõ đã đổi gì và cho quay lại bằng một nút (có hoàn tác). */
 export function VersionHistory({detail,onChanged}:{detail:RadarDetail;onChanged:()=>void}){
- const [target,setTarget]=useState(detail.versions.find(v=>v.version!==detail.radar.current_version)?.version??detail.radar.current_version),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
- const alive=useRef(true);useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
- const current=detail.current_version_data,other=detail.versions.find(v=>v.version===target)??current;
+ const [busy,setBusy]=useState<number|null>(null),[message,setMessage]=useState(""),[impact,setImpact]=useState<Impact|null>(null);
+ const alive=useRef(true),currentPreview=useRef<PreviewRunState|null>(null);
+ useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
+ const current=detail.current_version_data,radarId=detail.radar.id;
+ const asc=[...detail.versions].sort((a,b)=>a.version-b.version);
+ const timeline=[...asc].reverse().map(v=>{const older=asc[asc.indexOf(v)-1];return {v,changes:older?describeChanges(older,v):null,same:describeChanges(v,current).length===0};});
+
  const preview=async(v:RadarVersion)=>{
-  let state=await api.radarPreviewStart({radar_id:detail.radar.id,description:v.description,user_profession:v.user_profession,fields:v.fields,match_policy:v.match_policy,source_ids:detail.radar.source_ids});
+  let state=await api.radarPreviewStart({radar_id:radarId,description:v.description,user_profession:v.user_profession,fields:v.fields,match_policy:v.match_policy,source_ids:detail.radar.source_ids});
   for(let i=0;i<600&&["crawling","evaluating"].includes(state.status);i++){
-   if(!alive.current){await api.radarPreviewCancel(detail.radar.id,state.preview_id);throw new Error("Đã đóng so sánh");}
-   await new Promise(r=>setTimeout(r,1000));state=await api.radarPreviewGet(detail.radar.id,state.preview_id);
+   if(!alive.current){await api.radarPreviewCancel(radarId,state.preview_id);throw new Error("Đã đóng so sánh");}
+   await new Promise(r=>setTimeout(r,1000));state=await api.radarPreviewGet(radarId,state.preview_id);
   }
-  if(["crawling","evaluating"].includes(state.status))await api.radarPreviewCancel(detail.radar.id,state.preview_id);
+  if(["crawling","evaluating"].includes(state.status))await api.radarPreviewCancel(radarId,state.preview_id);
   if(state.status!=="done")throw new Error(state.error??"Chưa hoàn tất xem thử");return state;
  };
- const compare=async()=>{setBusy(true);setMessage("Đang đánh giá phiên bản hiện tại…");try{const a=await preview(current);setMessage("Đang đánh giá phiên bản được chọn…");const b=await preview(other);const map=new Map(a.items.map(i=>[i.post_id,i]));const common=b.items.filter(i=>map.has(i.post_id));if(!common.length)throw new Error("Không có bài chung để so sánh. Thu thập bài rồi chạy lại.");const changed=common.filter(i=>i.verdict!==map.get(i.post_id)!.verdict).length;setMessage(`So sánh ${common.length} bài chung: v${current.version} khớp ${common.filter(i=>map.get(i.post_id)!.verdict==="match").length}; v${other.version} khớp ${common.filter(i=>i.verdict==="match").length}; ${changed} bài đổi quyết định. ${a.items.length-common.length+b.items.length-common.length} kết quả ngoài phần giao không được tính. Hai lượt đánh giá có thể chịu biến động mô hình.`);}catch(e){setMessage(String(e));}finally{setBusy(false);}};
- return <section className="card"><h3>Phiên bản & Quay lại cấu hình</h3><label>So với v{current.version} đang áp dụng<select className="select" aria-label="Phiên bản đối chiếu" value={target} disabled={busy} onChange={e=>{setTarget(Number(e.target.value));setConfirm(false);setMessage("");}}>{detail.versions.map(v=><option key={v.id} value={v.version}>v{v.version}{v.version===current.version?" · hiện tại":""}</option>)}</select></label><table className="crm-table"><thead><tr><th>Nội dung</th><th>Hiện tại</th><th>Được chọn</th></tr></thead><tbody><tr><td>Mục tiêu</td><td>{current.description}</td><td>{other.description}</td></tr><tr><td>Thông tin trích xuất</td><td>{current.fields.map(f=>f.label).join(", ")}</td><td>{other.fields.map(f=>f.label).join(", ")}</td></tr><tr><td>Điều kiện</td><td><pre>{JSON.stringify(current.match_policy,null,2)}</pre></td><td><pre>{JSON.stringify(other.match_policy,null,2)}</pre></td></tr></tbody></table><p>Nguồn và kênh thông báo giữ cấu hình hiện tại. Quay lại tạo một phiên bản mới từ định nghĩa được chọn, giữ lịch sử và không gửi lại tin cũ.</p><button className="btn" disabled={busy||target===current.version} onClick={()=>void compare()}>So sánh kết quả trên bài chung</button><label><input type="checkbox" checked={confirm} disabled={busy} onChange={e=>setConfirm(e.target.checked)}/> Tôi muốn áp dụng định nghĩa v{target} thay cho cấu hình hiện tại.</label><button className="btn btn-primary" disabled={busy||!confirm||target===current.version} onClick={()=>{setBusy(true);void api.workspaceAction<RadarDetail>("rollback",{radar_id:detail.radar.id,version:target,expected_version:current.version}).then(result=>{setMessage(`Đã áp dụng thành v${result.radar.current_version}.`);onChanged();}).catch(e=>setMessage(String(e))).finally(()=>setBusy(false));}}>Quay lại định nghĩa đã chọn</button>{message&&<p role="status">{message}</p>}</section>;
+
+ const showImpact=async(target:RadarVersion)=>{
+  setBusy(target.version);setImpact(null);setMessage("Đang đánh giá các bài gần đây…");
+  try{
+   const a=currentPreview.current??(currentPreview.current=await preview(current));
+   const b=await preview(target);
+   const before=new Map(a.items.map(i=>[i.post_id,i]));
+   const common=b.items.filter(i=>before.has(i.post_id));
+   if(!common.length)throw new Error("Chưa có bài chung để so sánh. Hãy thu thập bài rồi thử lại.");
+   const flips=common.filter(i=>i.verdict!==before.get(i.post_id)!.verdict).map(i=>({id:i.post_id,label:i.summary||i.post_text.slice(0,80),nowMatches:i.verdict==="match"}));
+   const text=flips.length?`Trên ${common.length} bài gần đây, quay lại bản này sẽ đổi kết quả ${flips.length} bài:`:`Trên ${common.length} bài gần đây, quay lại bản này không đổi kết quả bài nào.`;
+   if(alive.current){setImpact({version:target.version,text,flips:flips.slice(0,5)});setMessage("Kết quả do AI đánh giá nên có thể lệch nhẹ giữa các lần chạy.");}
+  }catch(e){if(alive.current){setMessage(e instanceof Error?e.message:String(e));}}
+  finally{if(alive.current)setBusy(null);}
+ };
+
+ const rollback=async(target:RadarVersion)=>{
+  setBusy(target.version);setMessage("");setImpact(null);
+  const previousVersion=current.version,label=formatVersionTime(target.created_at);
+  try{
+   await api.workspaceAction<RadarDetail>("rollback",{radar_id:radarId,version:target.version,expected_version:previousVersion});
+   // Hoàn tác = quay lại chính bản vừa rời đi (lịch sử vẫn còn nguyên).
+   offerUndo(`Đã quay lại bản ${label}`,async()=>{
+    const latest=await api.radarGet(radarId);
+    await api.workspaceAction("rollback",{radar_id:radarId,version:previousVersion,expected_version:latest.radar.current_version});
+    onChanged();
+   });
+   if(alive.current)setMessage(`Đã quay lại bản ${label}. Bấm “Hoàn tác” ở góc màn hình nếu muốn trở về.`);
+   onChanged();
+  }catch(e){if(alive.current)setMessage(e instanceof Error?e.message:String(e));}
+  finally{if(alive.current)setBusy(null);}
+ };
+
+ return <section className="card version-history">
+  <details>
+   <summary><h3 style={{display:"inline"}}>Lịch sử thay đổi</h3> <span className="field-hint">({detail.versions.length} bản)</span></summary>
+   <p className="field-hint">Nguồn và kênh thông báo giữ nguyên. Quay lại bản cũ sẽ tạo một bản mới, lịch sử không bị mất và không gửi lại tin cũ.</p>
+   <ol className="version-timeline" style={{listStyle:"none",padding:0,margin:0}}>
+    {timeline.map(({v,changes,same})=>{
+     const isCurrent=v.version===current.version;
+     return <li key={v.id} className="version-entry" style={{padding:"var(--space-sm, 8px) 0",borderTop:"1px solid var(--border, rgba(128,128,128,.25))"}}>
+      <div className="toolbar-row" style={{display:"flex",gap:"var(--space-sm, 8px)",alignItems:"center",flexWrap:"wrap"}}>
+       <strong>{formatVersionTime(v.created_at)}</strong>
+       {isCurrent&&<Badge >Hiện tại</Badge>}
+       <span style={{flex:1}}/>
+       {!isCurrent&&!same&&<>
+        <Button size="sm" disabled={busy!==null} onClick={()=>void showImpact(v)}>Xem thử tác động</Button>
+        <Button variant="primary" size="sm" disabled={busy!==null} onClick={()=>void rollback(v)}>Quay lại bản này</Button>
+       </>}
+       {!isCurrent&&same&&<span className="field-hint">Giống bản hiện tại</span>}
+      </div>
+      {changes===null?<p className="field-hint">Bản đầu tiên</p>
+       :changes.length?<ul style={{margin:"4px 0 0",paddingLeft:"1.2em"}}>{changes.map(c=><li key={c}>{c}</li>)}</ul>
+       :<p className="field-hint">Chỉ đổi cài đặt khác (nguồn, thông báo…), nội dung radar không đổi.</p>}
+      {impact?.version===v.version&&<div role="status" className="version-impact">
+       <p>{impact.text}</p>
+       {impact.flips.length>0&&<ul>{impact.flips.map(f=><li key={f.id}>{f.nowMatches?"✓ sẽ được nhận":"✗ sẽ bị loại"} · {f.label}</li>)}</ul>}
+      </div>}
+     </li>;
+    })}
+   </ol>
+   {message&&<p role="status">{message}</p>}
+  </details>
+ </section>;
 }

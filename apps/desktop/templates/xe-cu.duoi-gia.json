@@ -1,8 +1,8 @@
 {
   "id": "xe-cu.duoi-gia",
   "industry": "Xe và đồ cũ",
-  "name": "Tin bán dưới giá thị trường",
-  "description_template": "Người dùng cá nhân cần bán gấp {dòng hàng} ở {khu vực}, tầm giá {tầm giá}",
+  "name": "Tin bán trong tầm giá bạn đặt",
+  "description_template": "Người dùng cá nhân cần bán {dòng hàng} ở {khu vực}, giá {tầm giá}",
   "placeholders": [
     { "key": "dòng hàng", "hint": "ô tô Vios/Accent, xe máy SH, MacBook cũ…" },
     { "key": "khu vực", "hint": "Hà Nội, TP.HCM, miền Bắc…" },
@@ -86,5 +86,7 @@
     "exclude_roles": ["peer"],
     "hard_filters": []
   },
-  "seed_ruleset": null
+  "seed_ruleset": null,
+  "lead_ttl_hours": 6,
+  "notify_mode": "instant"
 }

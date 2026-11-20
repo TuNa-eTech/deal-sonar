@@ -1,25 +1,15 @@
 {
   "id": "van-tai.ghep-hang",
   "industry": "Vận tải, ghép hàng",
-  "name": "Cần xe / có xe trống",
-  "description_template": "Tin {loại tin} tuyến {tuyến đường}, tải trọng {tải trọng}",
+  "name": "Chủ hàng cần xe (lấp xe trống)",
+  "description_template": "Chủ hàng cần tìm xe chở {loại hàng} tuyến {tuyến đường}, khoảng {tải trọng}",
   "placeholders": [
-    { "key": "loại tin", "hint": "cần tìm xe ghép hàng, có xe tải quay đầu trống…" },
+    { "key": "loại hàng", "hint": "nội thất, hàng lẻ, nông sản…" },
     { "key": "tuyến đường", "hint": "Hà Nội - Hải Phòng, Sài Gòn - Bình Dương…" },
     { "key": "tải trọng", "hint": "1.5 tấn, 5 tấn, hàng lẻ…" }
   ],
-  "user_profession": "điều vận vận tải ghép hàng",
+  "user_profession": "nhà xe, điều vận vận tải",
   "fields": [
-    {
-      "key": "listing_kind",
-      "label": "Loại tin",
-      "type": "enum",
-      "description": "Chủ hàng cần tìm xe hay nhà xe có xe trống tìm hàng",
-      "required": true,
-      "options": ["cần xe", "có xe trống"],
-      "show_in_alert": true,
-      "order": 1
-    },
     {
       "key": "origin_location",
       "label": "Điểm đi",
@@ -28,7 +18,7 @@
       "required": true,
       "options": null,
       "show_in_alert": true,
-      "order": 2
+      "order": 1
     },
     {
       "key": "destination_location",
@@ -38,7 +28,7 @@
       "required": true,
       "options": null,
       "show_in_alert": true,
-      "order": 3
+      "order": 2
     },
     {
       "key": "depart_date",
@@ -48,7 +38,7 @@
       "required": false,
       "options": null,
       "show_in_alert": true,
-      "order": 4
+      "order": 3
     },
     {
       "key": "capacity",
@@ -58,7 +48,7 @@
       "required": false,
       "options": null,
       "show_in_alert": true,
-      "order": 5
+      "order": 4
     },
     {
       "key": "cargo_type",
@@ -68,7 +58,7 @@
       "required": false,
       "options": null,
       "show_in_alert": true,
-      "order": 6
+      "order": 5
     },
     {
       "key": "phone",
@@ -78,13 +68,15 @@
       "required": false,
       "options": null,
       "show_in_alert": true,
-      "order": 7
+      "order": 6
     }
   ],
   "match_policy": {
-    "want_intent": "any",
+    "want_intent": "demand",
     "exclude_roles": [],
     "hard_filters": []
   },
-  "seed_ruleset": null
+  "seed_ruleset": null,
+  "lead_ttl_hours": 12,
+  "notify_mode": "instant"
 }

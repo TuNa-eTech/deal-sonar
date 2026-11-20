@@ -188,7 +188,7 @@ export async function handleRuntimeMessage(
 
     case "popup:set-scan-options": {
       if (!isQuickScanOptions(msg.options)) {
-        throw new Error("Tùy chọn không hợp lệ: số bài từ 1–100, số lần cuộn từ 0–5.");
+        throw new Error("Tùy chọn không hợp lệ: số bài từ 1–100, số lần cuộn từ 0–50.");
       }
       await storage.update((state) => {
         state.quick_scan_options = {

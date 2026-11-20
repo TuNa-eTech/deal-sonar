@@ -118,6 +118,34 @@ Startup flags supported by the `dealsonar` binary:
    - Automatic scanning is **off by default**, including the first upgrade to the side panel. Turn on **Quét tự động** to use the Desktop plan. This preference persists across browser restarts; Facebook session checks, safety pauses, and load limits apply to manual scans too.
    - The panel updates when you switch tabs and shows scan progress, the latest result, queued posts, and connection status. DealSonar Desktop must be running and connected for scanning.
 
+### 3. Create a Radar from a Codex or Claude chat
+
+Open DealSonar Desktop and pair at least one relevant Facebook group. Use the absolute path to the
+bundled `dealsonar-native-host` binary. For a local build, run `cargo build -p dealsonar-native-host`
+and use the binary in `target/debug/` (`.exe` on Windows).
+
+```bash
+codex mcp add dealsonar -- "/absolute/path/to/dealsonar-native-host" --mcp
+claude mcp add --transport stdio --scope user dealsonar -- "/absolute/path/to/dealsonar-native-host" --mcp
+```
+
+For [Claude Desktop](https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-local-servers),
+add `"dealsonar": { "command": "/absolute/path/to/dealsonar-native-host", "args": ["--mcp"] }` to
+the `mcpServers` object in **Settings → Developer → Edit Config**, then restart Claude Desktop.
+If DealSonar uses `DEALSONAR_DATA_DIR` or `DEALSONAR_IPC_PATH` overrides, pass the same values in
+the MCP server's environment.
+
+Start a new chat and ask, for example:
+
+> Dùng DealSonar tạo Radar tìm người cần thuê căn hộ ở Tân Phú, ngân sách dưới 8 triệu/tháng.
+> Tự chọn nhóm phù hợp và chạy xem thử.
+
+The agent selects from existing DealSonar groups, saves a draft, starts a real preview and reports
+the counts and warnings. Open **Radar → Xem kết quả** in DealSonar to inspect individual posts,
+review notifications and click **Bật radar**. If the selected groups have no cached posts, the
+preview may need the connected Chrome extension to fetch them. The **DealSonar** MCP tools provide
+group names, activity counts and preview summaries. Individual posts stay in the DealSonar review.
+
 ---
 
 ## Scripts & Quality Gates

@@ -7,6 +7,7 @@ import type { AiModelOption, AiProviderId, Channel, LicenseStatus, ProbeResult, 
 import { FALLBACK_MODELS_BY_PROVIDER } from "./constants";
 
 export interface SettingsScreenProps {
+  initialSection?: string;
   settings: Settings;
   license: LicenseStatus;
   onSettingsUpdated: (s: Settings) => void;
@@ -17,6 +18,7 @@ export interface SettingsScreenProps {
 
 export function useSettingsScreen({
   settings,
+  initialSection = "ai",
   license,
   onSettingsUpdated,
   onLicenseUpdated,
@@ -26,7 +28,7 @@ export function useSettingsScreen({
   const [draft, setDraft] = useState<Settings>(()=>({...settings,...readWorkspace<Partial<Settings>>("settings-draft",{})}));
   const baseline = useRef(settings);
   const [saving, setSaving] = useState(false);
-  const [section, setSection] = useState("ai");
+  const [section, setSection] = useState(initialSection);
   const mergeSettings = (next:Settings, savedKeys:string[]=[]) => {
     const before=baseline.current;
     setDraft(current=>Object.fromEntries(Object.entries(next).map(([key,value])=>[key, savedKeys.includes(key)||JSON.stringify(current[key as keyof Settings])===JSON.stringify(before[key as keyof Settings])?value:current[key as keyof Settings]])) as unknown as Settings);

@@ -189,14 +189,9 @@ async fn real_native_host_binary_stdio_to_desktop_commands_e2e() {
     .expect("radar_create_draft");
     let radar_id = draft["radar"]["id"].as_str().unwrap().to_string();
 
-    let activated = invoke_command_json(
-        &state,
-        "radar_set_status",
-        json!({ "id": radar_id, "status": "active" }),
-    )
-    .await
-    .expect("radar_set_status active");
-    assert_eq!(activated["status"], json!("active"));
+    // Populate an active fixture for the native-host relay.
+    state.core().radar_set_status(&radar_id, dealsonar_core::dto::RadarStatus::Active)
+        .await.expect("activate fixture for native-host relay");
 
     // Drain pushed `config.update` relayed through `dealsonar-native-host` stdout
     let active_cfg = recv_stdio_envelope(&mut child_stdout).await;

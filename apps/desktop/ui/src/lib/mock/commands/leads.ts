@@ -21,11 +21,19 @@ import { nextId } from "../ids";
 import { invokeMockCommand } from "../index";
 import { state } from "../store";
 
+/** Mirrors the core: post time (or capture) + the radar's `notify.lead_ttl_hours`. */
+function withExpiry(lead: Lead): Lead {
+  const ttl = state.radars.find((r) => r.id === lead.radar_id)?.notify.lead_ttl_hours;
+  const base = lead.post_created_at ?? lead.created_at;
+  return { ...lead, expires_at: ttl ? base + ttl * 3_600_000 : null };
+}
+
 export const leadCommands: MockCommandTable = {
   lead_list: async (args) => {
     const query = (args.query ?? args) as LeadFilterQuery;
     let items = [...state.leads];
     if (query.unread_only) items = items.filter(l=>!l.read_at && l.status!=="viewed");
+    if (query.follow_up_after!=null) items=items.filter(l=>l.follow_up_at!=null && l.follow_up_at>=query.follow_up_after! && !["won","lost","ignored"].includes(l.status));
     if (query.follow_up_before!=null) items=items.filter(l=>l.follow_up_at!=null && l.follow_up_at<=query.follow_up_before! && !["won","lost","ignored"].includes(l.status));
 
     if (query.radar_id) {
@@ -57,6 +65,15 @@ export const leadCommands: MockCommandTable = {
       items = items.filter((l) => l.created_at >= query.since!);
     }
 
+    if (query.expired != null) {
+      const now = Date.now();
+      items = items.filter((l) => {
+        const exp = withExpiry(l).expires_at;
+        const expired = exp != null && exp <= now;
+        return query.expired ? expired : !expired;
+      });
+    }
+
     if (query.search && query.search.trim().length > 0) {
       const q = removeVietnameseDiacritics(query.search.trim()).toLowerCase();
       items = items.filter((l) => {
@@ -78,6 +95,7 @@ export const leadCommands: MockCommandTable = {
     const dir = query.sort?.dir === "asc" ? 1 : -1;
     items.sort((a, b) => {
       if (sortBy === "created_at") return (a.created_at - b.created_at) * dir;
+      if (sortBy === "follow_up_at") return ((a.follow_up_at ?? 0) - (b.follow_up_at ?? 0)) * dir;
       if (sortBy === "score") return (a.score - b.score) * dir;
       const na = getNumericComparable(a.fields[sortBy], "min");
       const nb = getNumericComparable(b.fields[sortBy], "min");
@@ -94,7 +112,7 @@ export const leadCommands: MockCommandTable = {
       startOffset + limit < items.length ? String(startOffset + limit) : null;
 
     const resp: LeadListResponse = {
-      items: structuredClone(paged),
+      items: structuredClone(paged.map(withExpiry)),
       total: items.length,
       next_cursor: nextCursor,
     };
@@ -131,11 +149,21 @@ export const leadCommands: MockCommandTable = {
         purged_at: null,
       };
     const rv = state.radarVersions.find((v) => v.id === lead.radar_version_id);
+    const sameAuthor = lead.author_id ? state.leads.filter((l) => l.author_id === lead.author_id) : [];
     const detail: LeadDetail = {
-      lead: structuredClone(lead),
+      lead: structuredClone(withExpiry(lead)),
       post: structuredClone(post),
       radar_fields: structuredClone(rv?.fields ?? []),
       events: structuredClone(state.leadEvents[lead.id] ?? []),
+      poster: lead.author_id
+        ? {
+            posts_7d: sameAuthor.length,
+            groups_7d: new Set(sameAuthor.map((l) => l.source_id)).size,
+            same_post_groups: 1 + lead.also_seen_in.length,
+            phone_shared_by_authors: 1,
+            looks_like_peer: false,
+          }
+        : null,
     };
     return detail;
   },
@@ -301,7 +329,7 @@ export const leadCommands: MockCommandTable = {
       ...fields.map((f) => f.label),
     ];
 
-    const rows = listRes.items.map((lead) => {
+    const rows = listRes.items.filter(lead => !input.lead_ids || input.lead_ids.includes(lead.id)).map((lead) => {
       const post = state.posts.find((p) => p.id === lead.post_id);
       const fixed = [
         lead.post_created_at ? new Date(lead.post_created_at).toISOString() : "",
@@ -326,7 +354,7 @@ export const leadCommands: MockCommandTable = {
     const result: LeadExportResult = {
       path: outPath,
       format: input.format,
-      row_count: listRes.items.length,
+      row_count: rows.length,
       content_preview: csvBody,
     };
     return result;

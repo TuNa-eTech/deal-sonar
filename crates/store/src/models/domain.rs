@@ -92,21 +92,37 @@ pub struct QuietHours {
 pub struct NotifyConfig {
     #[serde(default)]
     pub channel_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inherit_channels: Option<bool>,
     #[serde(default = "default_notify_mode")]
     pub mode: String,
     #[serde(default = "default_min_score")]
     pub min_score: f64,
     #[serde(default)]
     pub quiet_hours: Option<QuietHours>,
+    /// How long a lead stays worth acting on, counted from the post time. `None` never expires.
+    /// Lives with delivery settings (not the versioned definition) because it changes how a
+    /// lead is delivered and queued, not what matches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lead_ttl_hours: Option<u32>,
+}
+
+impl NotifyConfig {
+    pub fn sends_to_channel(&self, channel_id: &str) -> bool {
+        self.inherit_channels.unwrap_or(self.channel_ids.is_empty())
+            || self.channel_ids.iter().any(|id| id == channel_id)
+    }
 }
 
 impl Default for NotifyConfig {
     fn default() -> Self {
         Self {
             channel_ids: Vec::new(),
+            inherit_channels: None,
             mode: default_notify_mode(),
             min_score: default_min_score(),
             quiet_hours: None,
+            lead_ttl_hours: None,
         }
     }
 }

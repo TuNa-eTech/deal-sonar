@@ -3,6 +3,7 @@
 import React from "react";
 import { api } from "../../lib/api";
 import type { SettingsScreenModel } from "./useSettingsScreen";
+import { Badge, Button, Input, Select } from "../../components/ui";
 
 export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
   const {
@@ -29,17 +30,15 @@ export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }
     <div className="settings-section" hidden={section!=="notifications"}>
       <h3 style={{ marginTop: 0 }}>2. Kênh Telegram, Chế độ gửi gộp & Giờ yên lặng</h3>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <input
+        <Input
           type="password"
-          className="input"
           style={{ maxWidth: 360 }}
           placeholder="Cập nhật Bot Token Telegram (lưu trong Kho khoá hệ điều hành)…"
           value={tgToken}
           onChange={(e) => setTgToken(e.target.value)}
         />
-        <button
-          type="button"
-          className="btn btn-primary"
+        <Button
+          variant="primary"
           onClick={async () => {
             try {
               await api.telegramSetToken(tgToken);
@@ -52,24 +51,21 @@ export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }
           }}
         >
           Cập nhật Token
-        </button>
-        <button
-          type="button"
-          className="btn"
+        </Button>
+        <Button
           onClick={async () => {
             const res = await api.telegramTest();
             setBanner({ kind: "ok", text: res.message });
           }}
         >
           Gửi tin thử
-        </button>
+        </Button>
       </div>
 
       <div className="settings-fields">
         <div>
           <label className="field-label">Chế độ báo cho radar tạo mới</label>
-          <select
-            className="select"
+          <Select
             value={draft.default_notify_mode}
             onChange={(e) =>
               setDraft((d) => ({
@@ -80,13 +76,12 @@ export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }
           >
             <option value="instant">Tức thời (instant)</option>
             <option value="digest">Gửi gộp định kỳ (digest)</option>
-          </select>
+          </Select>
         </div>
         <div>
           <label className="field-label">Chu kỳ gửi gộp (phút)</label>
-          <input
+          <Input
             type="number"
-            className="input"
             min={10}
             max={180}
             value={draft.digest_interval_minutes}
@@ -105,9 +100,8 @@ export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }
                 setDraft((d) => ({ ...d, quiet_hours_enabled: e.target.checked }))
               }
             />
-            <input
+            <Input
               type="time"
-              className="input"
               value={draft.quiet_hours.from}
               onChange={(e) =>
                 setDraft((d) => ({
@@ -116,9 +110,8 @@ export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }
                 }))
               }
             />
-            <input
+            <Input
               type="time"
-              className="input"
               value={draft.quiet_hours.to}
               onChange={(e) =>
                 setDraft((d) => ({
@@ -144,9 +137,8 @@ export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }
         </div>
       </div>
 
-      <button
-        type="button"
-        className="btn btn-primary btn-sm"
+      <Button
+        variant="primary" size="sm"
         onClick={() =>
           void savePatch({
             default_notify_mode: draft.default_notify_mode,
@@ -158,7 +150,7 @@ export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }
         }
       >
         Lưu tuỳ chọn thông báo
-      </button>
+      </Button>
 
       {/* Connected Channels List + Webhook (`07-notifications-export.md §6`) */}
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
@@ -166,18 +158,17 @@ export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }
         <ul style={{ paddingLeft: 18, margin: "8px 0" }}>
           {channels.map((ch) => (
             <li key={ch.id} style={{ marginBottom: 4 }}>
-              <span className="badge">{ch.kind}</span> <strong>{ch.name}</strong>{" "}
+              <Badge >{ch.kind}</Badge> <strong>{ch.name}</strong>{" "}
               {ch.config.url ? `(${ch.config.url})` : ""} ·{" "}
-              <button
-                type="button"
-                className="btn btn-sm"
+              <Button
+                size="sm"
                 onClick={async () => {
                   await api.channelRemove(ch.id);
                   await loadAux();
                 }}
               >
                 Gỡ
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -198,30 +189,26 @@ export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }
             </span>
           </label>
           <div className="settings-webhook-fields">
-            <input
+            <Input
               type="text"
-              className="input"
               placeholder="Tên gợi nhớ Webhook"
               value={whName}
               onChange={(e) => setWhName(e.target.value)}
             />
-            <input
+            <Input
               type="url"
-              className="input"
               placeholder="https://crm.example.com/webhooks/dealsonar"
               value={whUrl}
               onChange={(e) => setWhUrl(e.target.value)}
             />
-            <input
+            <Input
               type="password"
-              className="input"
               placeholder="Bí mật ký HMAC-SHA256"
               value={whSecret}
               onChange={(e) => setWhSecret(e.target.value)}
             />
-            <button
-              type="button"
-              className="btn btn-primary"
+            <Button
+              variant="primary"
               disabled={!whPrivacyAck}
               onClick={async () => {
                 try {
@@ -240,7 +227,7 @@ export const NotificationsSection: React.FC<{ s: SettingsScreenModel }> = ({ s }
               }}
             >
               + Thêm Webhook
-            </button>
+            </Button>
           </div>
         </div>
       </div>

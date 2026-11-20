@@ -2,9 +2,28 @@
 
 import { extractGroupSlugOrIdFromUrl } from "../content/extract";
 import type { PageContextResponse } from "../messages";
+import { dsLog } from "../log";
 import { ALARM_TAB_SAFETY_PREFIX } from "./context";
 
 // ── Active Crawl Tab Lifecycle (`02-extension.md §5`) ──
+
+const NO_RECEIVER_RE = /Receiving end does not exist|Could not establish connection/i;
+
+// Tabs opened before the extension was installed/reloaded never get the manifest content scripts,
+// so `tabs.sendMessage` fails with "Receiving end does not exist". Inject them on demand, then retry.
+export async function sendMessageToTab<T>(tabId: number, message: unknown): Promise<T | undefined> {
+  try {
+    return (await chrome.tabs.sendMessage(tabId, message)) as T | undefined;
+  } catch (err) {
+    const text = err instanceof Error ? err.message : String(err);
+    if (!NO_RECEIVER_RE.test(text) || !chrome.scripting?.executeScript) throw err;
+  }
+  dsLog("tab", tabId, "chưa có content script, đang inject lại");
+  await chrome.scripting.executeScript({ target: { tabId }, files: ["tap.js"], world: "MAIN" });
+  await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+  await new Promise((r) => setTimeout(r, 300));
+  return (await chrome.tabs.sendMessage(tabId, message)) as T | undefined;
+}
 
 export function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -63,9 +82,9 @@ export async function findCurrentGroupTab(externalId: string): Promise<chrome.ta
   if (!slug) return null;
   if (slug.toLowerCase() === externalId.toLowerCase()) return tab;
   try {
-    const context = await chrome.tabs.sendMessage(tab.id, {
+    const context = await sendMessageToTab<PageContextResponse>(tab.id, {
       kind: "dealsonar:get-page-context",
-    }) as PageContextResponse | undefined;
+    });
     // Facebook can expose a numeric group ID on a tab with a vanity slug URL.
     if (context?.groupInfo?.external_id.toLowerCase() === externalId.toLowerCase()) return tab;
   } catch { /* Content script unavailable: fail without touching a different tab. */ }

@@ -462,6 +462,15 @@ pub struct SuggestFieldsInput {
     pub language_hint: Option<String>,
     #[serde(default)]
     pub closest_template: Option<serde_json::Value>,
+    #[serde(default)]
+    pub source_candidates: Vec<RadarSourceCandidate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RadarSourceCandidate {
+    pub id: String,
+    pub name: String,
+    pub stored_posts: i64,
 }
 
 /// Field item proposed by `suggest_fields` (`06-ai-bridge.md §5.1`).
@@ -513,6 +522,8 @@ pub struct SuggestFieldsOutput {
     pub clarifying_questions: Vec<String>,
     #[serde(default)]
     pub prefilter_hint: Option<PrefilterHint>,
+    #[serde(default)]
+    pub suggested_source_ids: Vec<String>,
 }
 
 /// User feedback example included in `judge_extract` prompts (`06-ai-bridge.md §5.2`, `02-radar-spec.md §6`).

@@ -416,6 +416,10 @@ impl Store {
                 let before = notify_cfg.channel_ids.len();
                 notify_cfg.channel_ids.retain(|cid| cid != channel_id);
                 if notify_cfg.channel_ids.len() != before {
+                    // Removing a selected channel must not broaden future delivery.
+                    if notify_cfg.inherit_channels.is_none() {
+                        notify_cfg.inherit_channels = Some(false);
+                    }
                     let updated_json = serde_json::to_string(&notify_cfg)?;
                     tx.execute(
                         "UPDATE radars SET notify = ?1 WHERE id = ?2",

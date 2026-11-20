@@ -240,6 +240,9 @@ pub struct Lead {
     pub author_name: String,
     pub permalink: String,
     pub post_created_at: Option<i64>,
+    /// When the lead stops being worth acting on (post time + radar `lead_ttl_hours`).
+    #[serde(default)]
+    pub expires_at: Option<i64>,
     pub also_seen_in: Vec<AlsoSeenSource>,
     pub notified_at: Option<i64>,
     pub follow_up_at: Option<i64>,
@@ -279,11 +282,42 @@ pub struct Post {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SourcePostCursor {
+    pub at: i64,
+    pub id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SourcePostPage {
+    pub items: Vec<Post>,
+    pub next_cursor: Option<SourcePostCursor>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LeadDetail {
     pub lead: Lead,
     pub post: Post,
     pub radar_fields: Vec<FieldDef>,
     pub events: Vec<LeadEvent>,
+    /// What this poster has been doing lately, so the user can judge "real customer or broker?"
+    /// at a glance. `None` when it could not be computed.
+    #[serde(default)]
+    pub poster: Option<PosterActivity>,
+}
+
+/// Behavioural history of the poster, from the same signals the pipeline uses to flag peers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PosterActivity {
+    /// Posts by this author in followed groups over the last 7 days.
+    pub posts_7d: i64,
+    /// Distinct groups this author posted in over the last 7 days.
+    pub groups_7d: i64,
+    /// Groups the same text was posted to.
+    pub same_post_groups: i64,
+    /// Most distinct authors seen using one of this lead's phone numbers.
+    pub phone_shared_by_authors: i64,
+    /// True when the behaviour alone is enough to treat the poster as a peer.
+    pub looks_like_peer: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -306,6 +340,7 @@ pub struct LeadFilterQuery {
     pub unread_only: Option<bool>,
     #[serde(default)]
     pub follow_up_before: Option<i64>,
+    pub follow_up_after: Option<i64>,
     #[serde(default)]
     pub radar_id: Option<String>,
     #[serde(default)]
@@ -324,6 +359,10 @@ pub struct LeadFilterQuery {
     pub limit: Option<usize>,
     #[serde(default)]
     pub cursor: Option<String>,
+    /// `Some(false)`: only leads still within their radar's lifetime. `Some(true)`: only
+    /// expired leads. `None`: both.
+    #[serde(default)]
+    pub expired: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

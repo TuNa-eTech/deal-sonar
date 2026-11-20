@@ -36,6 +36,7 @@ tracing = ">=0.1.40, <0.1.42"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "json"] }
 url = "2.5"
+tauri-plugin-dialog = "2"
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -908,6 +908,7 @@ async fn full_e2e_ipc_pipeline_telegram_feedback_and_export() {
     let csv_path = tmp.path().join("leads.csv");
     let csv_res = service
         .lead_export(LeadExportInput {
+            lead_ids: None,
             query: LeadFilterQuery {
                 radar_id: Some(radar_id.clone()),
                 ..Default::default()
@@ -930,6 +931,7 @@ async fn full_e2e_ipc_pipeline_telegram_feedback_and_export() {
     let xlsx_path = tmp.path().join("leads.xlsx");
     let xlsx_err = service
         .lead_export(LeadExportInput {
+            lead_ids: None,
             query: LeadFilterQuery {
                 radar_id: Some(radar_id.clone()),
                 ..Default::default()
@@ -955,6 +957,7 @@ async fn full_e2e_ipc_pipeline_telegram_feedback_and_export() {
 
     let xlsx_res = service
         .lead_export(LeadExportInput {
+            lead_ids: None,
             query: LeadFilterQuery {
                 radar_id: Some(radar_id.clone()),
                 ..Default::default()

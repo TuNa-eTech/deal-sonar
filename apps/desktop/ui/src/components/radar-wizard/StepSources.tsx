@@ -4,6 +4,7 @@ import React from "react";
 import { api } from "../../lib/api";
 import { openSafeSetupUrl } from "../../lib/security";
 import type { RadarWizardModel } from "./useRadarWizard";
+import { Badge, Button, Card, Input } from "../ui";
 
 export const StepSources: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
   const {
@@ -22,55 +23,49 @@ export const StepSources: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     <div>
       <div className="toolbar-row" style={{ justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1 }}>
-          <input
+          <Input
             type="search"
-            className="input"
             style={{ maxWidth: 340 }}
             placeholder="Tìm group theo tên…"
             value={sourceQuery}
             onChange={(e) => setSourceQuery(e.target.value)}
           />
-          <span className="badge badge-primary">
+          <Badge tone="primary">
             Đã chọn {selectedSourceIds.length} group · Tổng theo dõi:{" "}
             {totalSelectedFollowed} / {maxGroups} group (Gói{" "}
             {license.plan === "pro" ? "Chuyên nghiệp" : "Cá nhân"})
-          </span>
+          </Badge>
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            className="btn"
+          <Button
             onClick={async () => {
               const list = await api.sourceList();
               setSources(list);
             }}
           >
             Làm mới danh sách
-          </button>
-          <button
-            type="button"
-            className="btn"
+          </Button>
+          <Button
             onClick={() => openSafeSetupUrl("https://www.facebook.com/groups/joins/")}
           >
             Mở trang group của tôi trên Facebook
-          </button>
+          </Button>
         </div>
       </div>
 
       {filteredSources.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", padding: 32 }}>
+        <Card style={{ textAlign: "center", padding: 32 }}>
           <p style={{ marginTop: 0 }}>
             Extension chưa phát hiện group nào hoặc không khớp từ khoá tìm kiếm.
           </p>
-          <button
-            type="button"
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             onClick={() => openSafeSetupUrl("https://www.facebook.com/groups/joins/")}
           >
             Mở trang group của tôi trên Facebook
-          </button>
-        </div>
+          </Button>
+        </Card>
       ) : (
         <div className="table-wrap">
           <table className="crm-table">
@@ -100,9 +95,9 @@ export const StepSources: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
                       <strong>{src.name}</strong>
                     </td>
                     <td>
-                      <span className="badge">
+                      <Badge >
                         {src.privacy === "private" ? "Group kín" : "Công khai"}
-                      </span>
+                      </Badge>
                     </td>
                     <td>
                       {src.member_count

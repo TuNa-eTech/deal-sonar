@@ -3,6 +3,7 @@
 import React from "react";
 import { api } from "../../lib/api";
 import type { SettingsScreenModel } from "./useSettingsScreen";
+import { Button, Input, Modal, ModalBody, ModalFooter, ModalHeader } from "../../components/ui";
 
 export const DeleteAllModal: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
   const {
@@ -14,14 +15,13 @@ export const DeleteAllModal: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
   } = s;
 
   return (
-      <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Xác nhận xoá toàn bộ dữ liệu">
-        <div className="modal-panel" style={{ maxWidth: 520 }}>
-          <div className="modal-header">
+      <Modal label="Xác nhận xoá toàn bộ dữ liệu" size="sm">
+          <ModalHeader>
             <h3 style={{ margin: 0, color: "var(--danger)" }}>
               Xoá toàn bộ dữ liệu trên máy (Bước {deleteStep}/2)
             </h3>
-          </div>
-          <div className="modal-body">
+          </ModalHeader>
+          <ModalBody>
             {deleteStep === 1 ? (
               <p style={{ margin: 0 }}>
                 Thao tác này sẽ xoá vĩnh viễn file cơ sở dữ liệu SQLite (`dealsonar.db`), toàn bộ
@@ -34,33 +34,30 @@ export const DeleteAllModal: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
                   Để xác nhận lần cuối, hãy gõ chính xác cụm chữ in hoa{" "}
                   <code>XOA TOAN BO</code> vào ô bên dưới:
                 </p>
-                <input
+                <Input
                   type="text"
                   aria-label="Nhập cụm từ xác nhận xoá"
-                  className="input"
                   placeholder="XOA TOAN BO"
                   value={deletePhrase}
                   onChange={(e) => setDeletePhrase(e.target.value)}
                 />
               </div>
             )}
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn" onClick={() => setDeleteStep(0)}>
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={() => setDeleteStep(0)}>
               Huỷ bỏ
-            </button>
+            </Button>
             {deleteStep === 1 ? (
-              <button
-                type="button"
-                className="btn btn-danger"
+              <Button
+                variant="danger"
                 onClick={() => setDeleteStep(2)}
               >
                 Tôi hiểu, tiếp tục bước xác nhận cuối
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                className="btn btn-danger"
+              <Button
+                variant="danger"
                 disabled={deletePhrase.trim() !== "XOA TOAN BO"}
                 onClick={async () => {
                   await api.dataDeleteAll(deletePhrase.trim());
@@ -69,10 +66,9 @@ export const DeleteAllModal: React.FC<{ s: SettingsScreenModel }> = ({ s }) => {
                 }}
               >
                 Xoá vĩnh viễn toàn bộ dữ liệu
-              </button>
+              </Button>
             )}
-          </div>
-        </div>
-      </div>
+          </ModalFooter>
+        </Modal>
   );
 };

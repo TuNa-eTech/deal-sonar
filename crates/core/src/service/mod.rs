@@ -78,6 +78,7 @@ use crate::workers::{
     tick_jobs_once,
 };
 
+mod agent;
 mod builder;
 mod channels;
 mod chrome;
@@ -90,6 +91,7 @@ mod settings;
 mod sources;
 mod system;
 
+pub(crate) use agent::{handle_agent_request, issue_agent_token};
 pub use builder::*;
 use contacts::*;
 use posts::*;

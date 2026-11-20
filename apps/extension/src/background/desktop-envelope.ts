@@ -62,6 +62,7 @@ export async function handleDesktopEnvelope(env: DesktopEnvelope): Promise<void>
       }
       void executeActiveCrawl({
         sourceRef: env.payload.source_ref,
+        requestId: env.payload.request_id,
         reason: env.payload.reason,
         maxPosts: env.payload.max_posts,
         bypassScheduleWindow: true,

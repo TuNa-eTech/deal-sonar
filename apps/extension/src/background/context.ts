@@ -12,6 +12,14 @@ export const PING_IDLE_INTERVAL_MS = 25_000; // 25s idle ping (`01-protocol.md ย
 export const MAX_TAB_LIFETIME_MS = 60_000; // Hard 60s tab lifetime cap (`02-extension.md ยง5.6`)
 export const CRAWL_EXECUTION_DEADLINE_MS = 54_000; // Leave 6s headroom before 60s hard tab close
 
+// Long manual scans (many scroll steps, up to ~4.5s each) need a proportionally longer budget.
+export function crawlDeadlineMs(scrollSteps: number): number {
+  return Math.max(CRAWL_EXECUTION_DEADLINE_MS, 24_000 + Math.max(0, scrollSteps) * 4_500);
+}
+export function tabLifetimeMs(scrollSteps: number): number {
+  return crawlDeadlineMs(scrollSteps) + (MAX_TAB_LIFETIME_MS - CRAWL_EXECUTION_DEADLINE_MS);
+}
+
 export const storage = new StorageManager();
 let outboundQueue: OutboundQueue | null = null;
 

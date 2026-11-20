@@ -36,6 +36,8 @@ import type {
   Ruleset,
   RulesetBody,
   Settings,
+  SourcePostCursor,
+  SourcePostPage,
   Source,
   SuggestFieldsInput,
   SuggestFieldsResult,
@@ -81,6 +83,7 @@ export async function onDesktopEvent<K extends keyof TauriEventMap>(
  * Complete typed Tauri IPC client matching `03-desktop.md §4` (all snake_case commands).
  */
 export const api = {
+  backupPickFile: () => callCommand<string | null>("backup_pick_file"),
   workspaceAction: <T>(action:string,input:Record<string,unknown>={}) => callCommand<T>("workspace_action",{action,input}),
   // --- Radar ---
   radarList: () => callCommand<Radar[]>("radar_list"),
@@ -91,8 +94,8 @@ export const api = {
     callCommand<RadarUpdateResult>("radar_update", { input }),
   radarSuggestFields: (input: SuggestFieldsInput) =>
     callCommand<SuggestFieldsResult>("radar_suggest_fields", { input }),
-  radarSetStatus: (id: string, status: RadarStatus) =>
-    callCommand<Radar>("radar_set_status", { id, status }),
+  radarSetStatus: (id: string, status: RadarStatus, preview_id?: string) =>
+    callCommand<Radar>("radar_set_status", { id, status, preview_id }),
   radarPreviewStart: (input: PreviewStartInput) =>
     callCommand<PreviewRunState>("radar_preview_start", { input }),
   radarPreviewCancel: (radar_id: string, preview_id: string) =>
@@ -139,6 +142,8 @@ export const api = {
 
   // --- Posts & Rejected Evaluations ---
   postGet: (id: string) => callCommand<Post>("post_get", { id }),
+  postListBySource: (source_id: string, before: SourcePostCursor | null = null) =>
+    callCommand<SourcePostPage>("post_list_by_source", { source_id, before }),
   postSearch: (query: string, source_id?: string | null, limit = 30) =>
     callCommand<Post[]>("post_search", { query, source_id: source_id ?? null, limit }),
   evaluationListRejected: (radar_id: string, limit = 30) =>

@@ -66,5 +66,7 @@
     "exclude_roles": ["peer"],
     "hard_filters": []
   },
-  "seed_ruleset": null
+  "seed_ruleset": null,
+  "lead_ttl_hours": 48,
+  "notify_mode": "instant"
 }

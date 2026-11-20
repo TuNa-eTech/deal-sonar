@@ -54,6 +54,7 @@ function buildSelfContainedContentScripts(): Plugin {
 
 export default defineConfig({
   root: rootDir,
+  define: { __BUILD_ID__: JSON.stringify(new Date().toISOString().slice(5, 16).replace("T", " ")) },
   plugins: [buildSelfContainedContentScripts()],
   build: {
     outDir: "dist",
