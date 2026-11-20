@@ -13,6 +13,7 @@
     "build:backend": "node scripts/build-backend.mjs"
   },
   "dependencies": {
+    "@dealsonar/native-host": "workspace:*",
     "better-sqlite3": "^11.5.0"
   },
   "devDependencies": {
