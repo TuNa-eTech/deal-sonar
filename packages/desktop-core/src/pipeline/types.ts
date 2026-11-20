@@ -307,6 +307,7 @@ export class AiHookError extends Error {
     readonly kind: "not_installed" | "not_authenticated" | "rate_limited" | "timeout" | "invalid_output" | "refused" | "security_flags_unsupported" | "process",
     message: string,
     readonly retryAfterMs: number | null = null,
+    readonly calls: readonly AiCallTelemetry[] = [],
   ) {
     super(message);
     this.name = "AiHookError";

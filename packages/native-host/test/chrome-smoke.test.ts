@@ -22,6 +22,7 @@ import { DEFAULT_CHROME_EXTENSION_ID, HELPER_BASENAME } from "../src/constants.j
 import { installHelper } from "../src/install-helper.js";
 import { DesktopIpcServer, type ExtensionConnection } from "../src/ipc.js";
 import { connectChrome } from "../src/provision.js";
+import { writeCandidateRoute } from "../src/route.js";
 import { cleanupTmpDirs, isWindows, testEndpoint, tmpDir, waitFor } from "./helpers.js";
 
 afterAll(cleanupTmpDirs);
@@ -45,12 +46,16 @@ describe.skipIf(!enabled)("installed Chrome starts the helper through native mes
     const endpoint = testEndpoint(root);
 
     // Helper: SEA binary when provided, otherwise a wrapper that runs the bundle with this node.
-    const bundle = await bundleHost(path.join(root, "host.cjs"));
+    const bundle = await bundleHost(path.join(dataDir, "bin", "host.cjs"));
     const source = path.join(root, HELPER_BASENAME);
     const seaBin = process.env.DEALSONAR_NATIVE_HOST_TEST_BIN;
     if (seaBin) fs.copyFileSync(seaBin, source);
     else fs.writeFileSync(source, `#!/bin/sh\nexec "${process.execPath}" "${bundle}" "$@"\n`);
     const helper = installHelper({ sourcePath: source, destPath: path.join(dataDir, "bin", HELPER_BASENAME) }).path;
+    writeCandidateRoute({ dataDir, ipcEndpoint: endpoint });
+    const browserEnv = { ...process.env };
+    delete browserEnv.DEALSONAR_IPC_PATH;
+    delete browserEnv.DEALSONAR_DATA_DIR;
 
     // Register ONLY inside the throwaway profile (Chrome reads <user-data-dir>/NativeMessagingHosts).
     const manifestPath = path.join(profile, "NativeMessagingHosts", "com.dealsonar.host.json");
@@ -94,7 +99,7 @@ describe.skipIf(!enabled)("installed Chrome starts the helper through native mes
           `--load-extension=${extensionDist}`,
           "about:blank",
         ],
-        { env: { ...process.env, DEALSONAR_IPC_PATH: endpoint }, stdio: "ignore" },
+        { env: browserEnv, stdio: "ignore" },
       );
       await waitFor(
         () => received.some((f) => JSON.parse(f.toString("utf8")).type === "hello"),

@@ -13,7 +13,7 @@
 // the AI health state machine. These hooks therefore call `AiBridge.invokeOnce` directly and return
 // the per-call telemetry instead of going through `runAiTask`, which would record every call a
 // second time. When a task fails, the thrown `PipelineAiError` carries the attempts made so far in
-// `.calls` (the pipeline's catch arms ignore it today; it is available for accounting).
+// `.calls` (the pipeline records these attempts when the task fails).
 
 import type { AiBridge, AiCallRecord } from "../ai/bridge";
 import { AiError, type AiRequest } from "../ai/types";
@@ -56,9 +56,9 @@ export class PipelineAiError extends AiHookError {
     kind: AiHookError["kind"],
     message: string,
     retryAfterMs: number | null,
-    readonly calls: AiCallTelemetry[],
+    calls: AiCallTelemetry[],
   ) {
-    super(kind, message, retryAfterMs);
+    super(kind, message, retryAfterMs, calls);
     this.name = "PipelineAiError";
   }
 }

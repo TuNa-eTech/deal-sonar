@@ -20,7 +20,7 @@ import type { RuntimeContext } from "../backend/runtime";
 import { DomainShapeError, normalizeFieldDefs, normalizeMatchPolicy } from "../store/domain";
 import type { RadarWithVersion, RulesetRecord } from "../store/radars";
 import { newUlid } from "../store/util";
-import { aiCoreError, recordAiCalls, requireAi } from "../pipeline/ai-batch";
+import { aiCoreError, recordAiCalls, recordFailedAiCalls, requireAi } from "../pipeline/ai-batch";
 import { rulesetRecordToDto, radarToDto, type DtoRulesetBody, type RulesetDto } from "../pipeline/dto";
 import { ingestRawPost, runSilentBackfill24h, type IngestPostOutcome, type RawPost } from "../pipeline/ingest";
 import { BackgroundWorkers, executeJob, tickJobsOnce } from "../pipeline/jobs";
@@ -217,6 +217,11 @@ export class PipelineService {
     try {
       task = await rt.withInflightAi(() => ai.suggestFields(bridgeInput));
     } catch (err) {
+      try {
+        recordFailedAiCalls(rt, err, now);
+      } catch (error) {
+        rt.log(`record suggest_fields ai call failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
       throw aiCoreError(err);
     }
     // Rust records every call with item_count 1 and ignores bookkeeping failures.

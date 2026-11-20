@@ -13,6 +13,7 @@ import {
   callStatusOf,
   mergeCandidateFields,
   recordAiCalls,
+  recordFailedAiCalls,
   requireAi,
   toPromptPosts,
 } from "./ai-batch";
@@ -371,7 +372,7 @@ async function evaluatePreviewPosts(
         if (err instanceof PreviewAbort) throw err;
         check();
         const chunkNow = rt.now();
-        const call = rt.store.aiCalls.record({
+        const callId = recordFailedAiCalls(rt, err, chunkNow) ?? rt.store.aiCalls.record({
           id: null,
           provider: ai.providerId(),
           model: null,
@@ -385,8 +386,8 @@ async function evaluatePreviewPosts(
           status: callStatusOf(err),
           error: toMessage(err),
           now_ms: chunkNow,
-        });
-        for (const item of chunk) rt.store.leads.markEvaluationAiFailed(item.evaluation.id, call.id, toMessage(err), chunkNow);
+        }).id;
+        for (const item of chunk) rt.store.leads.markEvaluationAiFailed(item.evaluation.id, callId, toMessage(err), chunkNow);
         state.failed_posts += chunk.length;
         throw aiCoreError(err);
       }

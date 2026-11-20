@@ -81,7 +81,7 @@ Smoke runs with a temporary home, data directory and Chromium profile. It uses i
 records: resources outside ASAR, native helper executable, backend handshake, renderer isolation (no `require`/`process`),
 IPC round trip, unknown-command and external-URL rejection, `window.open`/navigation guards, tray, single-instance
 second launch, graceful shutdown (SIGTERM; in-app hold timer on Windows), and for macOS the ad-hoc signature.
-The result is written to `release/smoke/smoke-<platform>-<arch>-<mode>.json`. Stub-backed runs report `backend_kind: "stub"`. The manual GitHub Actions workflow builds the SQLite backend and the Node 24 native helper on each target by default.
+The result is written to `release/smoke/smoke-<platform>-<arch>-<mode>.json`. Stub-backed runs report `backend_kind: "stub"`. The GitHub Actions workflow builds the SQLite backend and the Node 24 native helper on each target by default. Pushes to `migration/electron-integration` trigger the installer matrix.
 
 ## Known limits
 

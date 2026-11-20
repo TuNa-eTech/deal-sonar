@@ -64,6 +64,11 @@ export function recordAiCalls(rt: PipelineRuntime, calls: readonly AiCallTelemet
   return last;
 }
 
+/** Persist attempts attached by the AI bridge when a task aborts. */
+export function recordFailedAiCalls(rt: PipelineRuntime, err: unknown, now: number): string | null {
+  return err instanceof AiHookError ? recordAiCalls(rt, err.calls, now) : null;
+}
+
 /** Schedule or wake `evaluate_batch:<radar_version_id>` (`05-pipeline-rules.md §7`). */
 export function scheduleEvaluateBatchJob(rt: PipelineRuntime, radarVersionId: string, immediate: boolean, now: number): void {
   const pending = rt.store.leads.listPendingAiForVersion(radarVersionId, false, rt.config.batchTriggerCount + 1);
@@ -191,21 +196,23 @@ export async function runEvaluateBatchForVersion(rt: PipelineRuntime, radarVersi
     report = await rt.withInflightAi(() => ai.judgeExtractAll(promptCtx, promptPosts, LIVE_BATCH));
   } catch (err) {
     const decidedNow = rt.now();
-    rt.store.aiCalls.record({
-      id: null,
-      provider: ai.providerId(),
-      model: null,
-      task: "judge_extract",
-      radar_version_id: radarVersionId,
-      item_count: pendingItems.length,
-      input_tokens: null,
-      output_tokens: null,
-      cost_usd: null,
-      duration_ms: 0,
-      status: callStatusOf(err),
-      error: err instanceof Error ? err.message : String(err),
-      now_ms: decidedNow,
-    });
+    if (recordFailedAiCalls(rt, err, decidedNow) === null) {
+      rt.store.aiCalls.record({
+        id: null,
+        provider: ai.providerId(),
+        model: null,
+        task: "judge_extract",
+        radar_version_id: radarVersionId,
+        item_count: pendingItems.length,
+        input_tokens: null,
+        output_tokens: null,
+        cost_usd: null,
+        duration_ms: 0,
+        status: callStatusOf(err),
+        error: err instanceof Error ? err.message : String(err),
+        now_ms: decidedNow,
+      });
+    }
     if (err instanceof AiHookError && err.kind === "rate_limited") {
       const waitMs = Math.max(err.retryAfterMs ?? 60_000, 1_000);
       rt.aiHealth.rateLimitResetAt = decidedNow + waitMs;

@@ -19,6 +19,7 @@ import {
   callStatusOf,
   LIVE_BATCH,
   recordAiCalls,
+  recordFailedAiCalls,
   requireAi,
 } from "./ai-batch";
 import { dtoRulesetBodyToRules, rulesetRecordToDto, type DtoRulesetBody, type RulesetDto, type RulesetMetrics } from "./dto";
@@ -106,21 +107,24 @@ export async function runCompileRulesetForVersion(rt: PipelineRuntime, radarVers
   try {
     result = await rt.withInflightAi(() => ai.compileRules(compileInput));
   } catch (err) {
-    rt.store.aiCalls.record({
-      id: null,
-      provider: ai.providerId(),
-      model: null,
-      task: "compile_rules",
-      radar_version_id: radarVersionId,
-      item_count: compileInput.labeled_samples.length,
-      input_tokens: null,
-      output_tokens: null,
-      cost_usd: null,
-      duration_ms: 0,
-      status: callStatusOf(err),
-      error: err instanceof Error ? err.message : String(err),
-      now_ms: rt.now(),
-    });
+    const now = rt.now();
+    if (recordFailedAiCalls(rt, err, now) === null) {
+      rt.store.aiCalls.record({
+        id: null,
+        provider: ai.providerId(),
+        model: null,
+        task: "compile_rules",
+        radar_version_id: radarVersionId,
+        item_count: compileInput.labeled_samples.length,
+        input_tokens: null,
+        output_tokens: null,
+        cost_usd: null,
+        duration_ms: 0,
+        status: callStatusOf(err),
+        error: err instanceof Error ? err.message : String(err),
+        now_ms: now,
+      });
+    }
     throw aiCoreError(err);
   }
 
@@ -239,6 +243,7 @@ export async function runAuditRuleset(rt: PipelineRuntime, radarVersionId: strin
   try {
     report = await rt.withInflightAi(() => ai.judgeExtractAll(ctx, promptPosts, LIVE_BATCH));
   } catch (err) {
+    recordFailedAiCalls(rt, err, rt.now());
     throw aiCoreError(err);
   }
 

@@ -13,7 +13,7 @@ The Rust crates stay in the tree as the behavior oracle until the cutover task.
 | Credential adapters (macOS Keychain, Windows Credential Manager, Linux Secret Service) over the original `DealSonar` entries | ported + unit tested with a fake runner; **not yet exercised against a real OS keychain** |
 | utilityProcess entry: `backend:ready/fatal/shutdown/toggle_crawl_paused`, `os:notification`, wire errors, candidate IPC isolation, Host integration seam, `main.cjs` bundle script | ported + tested with fake parentPort/Host |
 | Service layer and IPC | 58 backend command IDs registered. The startup test exercises a renderer command, a Chrome Protocol v2 handshake, an MCP method and a ruleset write. |
-| Pipeline, rules, preview, scheduler, workers, notifications, license, diagnostics, exports and templates | Connected to the Electron backend. Pipeline AI prompts, validators and task orchestration are tracked separately. |
+| Pipeline, rules, preview, scheduler, workers, notifications, license, diagnostics, exports and templates | Connected to the Electron backend. AI tasks use the configured CLI provider with structured schemas, validation and per-attempt telemetry. |
 
 ## Layout
 
@@ -83,8 +83,7 @@ close IPC + SQLite, reply, exit 0), `backend:toggle_crawl_paused`, `os:notificat
 `resolveDesktopDataDir`, `resolveDesktopIpcEndpoint`, `DesktopIpcServer.bind`, `issueAgentToken`, `AgentError`.
 The backend validates Protocol v2 frames and dispatches them to the pipeline peer for that connection. The same IPC server routes authenticated Radar MCP calls to the agent service.
 **Windows candidate pipe**: `\\.\pipe\dealsonar-candidate-<user>` (explicit, distinct from Tauri's `dealsonar-<user>`); an explicit
-`DEALSONAR_IPC_PATH` still wins. The relay/native helper launched by Chrome does not inherit that env, so Host must make the helper
-derive the same pipe for the candidate (open item for the Host task).
+`DEALSONAR_IPC_PATH` still wins. Chrome-launched helpers read their candidate profile and endpoint from a route file beside the installed binary.
 
 ## Commands
 

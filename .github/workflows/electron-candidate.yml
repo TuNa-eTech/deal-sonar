@@ -1,9 +1,10 @@
 name: electron-candidate
 
 # Builds the Electron CANDIDATE installers and installs/launches each one on its own OS.
-# Manual only: it never publishes a release, signs with a real identity, or touches updater feeds.
-# Artifacts are uploaded to the workflow run for inspection, nothing else.
+# Produces test artifacts without publishing a release or signing with a production identity.
 on:
+  push:
+    branches: [migration/electron-integration]
   workflow_dispatch:
     inputs:
       allow_stub:
