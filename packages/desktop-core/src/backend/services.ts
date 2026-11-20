@@ -19,6 +19,7 @@ import {
   startIntegrations,
 } from "../services/integrations";
 import { PipelineService } from "../services/pipeline";
+import { createContextAiHooks } from "../services/pipeline-ai-context";
 import { PIPELINE_HANDLERS } from "../services/pipeline-handlers";
 import { isSilentOrPreview, repostAfter72h } from "../pipeline/types";
 import { makeEnvelope } from "../pipeline/runtime";
@@ -101,6 +102,7 @@ export function createDesktopServices(
       const rt = svc.runtime;
       svc.configure({
         log,
+        ai: createContextAiHooks(ctx, { log }),
         templates: { get: (id) => getTemplate(id) },
         license: {
           limits: (now) => {
