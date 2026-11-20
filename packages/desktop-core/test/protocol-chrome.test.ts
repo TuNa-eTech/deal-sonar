@@ -245,6 +245,14 @@ describe("chrome_connect (candidate channel never touches the live profile)", ()
     await expect(
       chromeConnect(chromeCtx({ channel: "candidate" }), deps({ manifestPath: "/iso/m.json", registryKeyPath: REAL_KEY.toLowerCase(), devExtensionIds: [] })),
     ).rejects.toMatchObject({ kind: "validation" });
+    await expect(chromeConnect(
+      chromeCtx({ channel: "candidate", platform: "linux" }),
+      deps({ manifestPath: path.posix.dirname(REAL_MANIFEST) + "/unused/../" + path.posix.basename(REAL_MANIFEST), registryKeyPath: null, devExtensionIds: [] }),
+    )).rejects.toMatchObject({ kind: "validation" });
+    await expect(chromeConnect(
+      chromeCtx({ channel: "candidate", platform: "win32" }),
+      deps({ manifestPath: "C:\\iso\\m.json", registryKeyPath: REAL_KEY.replace("HKCU", "HKEY_CURRENT_USER"), devExtensionIds: [] }),
+    )).rejects.toMatchObject({ kind: "validation" });
     expect(fake.calls.connect).toHaveLength(0);
   });
 

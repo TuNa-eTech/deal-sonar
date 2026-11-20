@@ -17,6 +17,7 @@
 // with `chromeProvisioningFrom`), like `HostBindings`, so this module typechecks without it.
 
 import * as fs from "node:fs";
+import * as path from "node:path";
 
 import { type BackendConfig, type Env, hostPlatform } from "../backend/config";
 import type { HostPlatform } from "../backend/host";
@@ -184,8 +185,29 @@ interface Target {
 
 type TargetResolution = { kind: "target"; target: Target } | { kind: "isolated" };
 
-const samePath = (a: string, b: string, platform: HostPlatform): boolean =>
-  platform === "windows" ? a.toLowerCase() === b.toLowerCase() : a === b;
+function canonicalManifestPath(value: string, platform: HostPlatform): string {
+  const paths = platform === "windows" ? path.win32 : path.posix;
+  let current = paths.resolve(value);
+  if (platform === hostPlatform(process.platform)) {
+    try {
+      current = fs.realpathSync.native(current);
+    } catch {
+      // The manifest may not exist yet. Its parent can still be a symlink.
+      try {
+        current = paths.join(fs.realpathSync.native(paths.dirname(current)), paths.basename(current));
+      } catch {
+        // Compare the normalized path if the parent does not exist yet.
+      }
+    }
+  }
+  return platform === "linux" ? current : current.toLowerCase();
+}
+
+const canonicalRegistryKey = (key: string): string => key
+  .trim()
+  .toLowerCase()
+  .replace(/^hkey_current_user(?=\\)/, "hkcu")
+  .replace(/\\+$/, "");
 
 /**
  * Decide where the manifest goes, enforcing the candidate boundary.
@@ -204,10 +226,10 @@ function resolveTarget(ctx: ChromeContext, deps: ChromeConnectDeps): TargetResol
     } catch {
       /* cannot resolve the real location: nothing to collide with */
     }
-    if (real !== null && samePath(real, boundary.manifestPath, platform)) {
+    if (real !== null && canonicalManifestPath(real, platform) === canonicalManifestPath(boundary.manifestPath, platform)) {
       throw CoreError.validation("candidate không được ghi vào vị trí Native Messaging của Chrome thật");
     }
-    if (boundary.registryKeyPath !== null && boundary.registryKeyPath.toLowerCase() === REAL_CHROME_REGISTRY_KEY.toLowerCase()) {
+    if (boundary.registryKeyPath !== null && canonicalRegistryKey(boundary.registryKeyPath) === canonicalRegistryKey(REAL_CHROME_REGISTRY_KEY)) {
       throw CoreError.validation("candidate không được ghi vào khoá registry Native Messaging của Chrome thật");
     }
     return {

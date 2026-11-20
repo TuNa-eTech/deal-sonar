@@ -217,8 +217,9 @@ export function resolveHelperRoute(options: ResolveHelperRouteOptions): Env {
   const routeFile = pathFor(platform).join(binDir, HELPER_ROUTE_FILENAME);
   let text: string;
   try {
-    const size = fs.statSync(routeFile).size;
-    if (size > MAX_ROUTE_BYTES) throw new HelperRouteError("route file is too large");
+    const info = fs.lstatSync(routeFile);
+    if (!info.isFile()) throw new HelperRouteError("route must be a regular file");
+    if (info.size > MAX_ROUTE_BYTES) throw new HelperRouteError("route file is too large");
     text = fs.readFileSync(routeFile, "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return env;
@@ -226,7 +227,7 @@ export function resolveHelperRoute(options: ResolveHelperRouteOptions): Env {
     throw new HelperRouteError(`route file is unreadable: ${(error as Error).message}`);
   }
 
-  const route = parseHelperRoute(text, platform);
+  const route = buildCandidateRoute({ ...parseHelperRoute(text, platform), env, platform });
   if (!sameLocation(pathFor(platform).join(route.dataDir, "bin"), binDir, platform)) {
     throw new HelperRouteError("route file does not belong to this helper's directory");
   }
