@@ -10,7 +10,8 @@ const candidateVersion = process.env.DEALSONAR_CANDIDATE_VERSION?.trim();
 /** @type {import("electron-builder").Configuration} */
 module.exports = {
   appId: identity.appId,
-  productName: identity.productName,
+  // The DEB target derives its /opt directory from this name.
+  productName: process.platform === "linux" ? identity.executableName : identity.productName,
   copyright: "DealSonar",
   artifactName: `${identity.artifactPrefix}-\${version}-\${os}-\${arch}.\${ext}`,
   directories: { output: "release" },
@@ -54,6 +55,8 @@ module.exports = {
   linux: {
     icon: "../desktop/icons/icon.png",
     category: "Office",
+    desktop: { entry: { Name: identity.productName } },
+    syncDesktopName: true,
     executableName: identity.executableName,
     maintainer: "DealSonar <support@dealsonar.invalid>",
     synopsis: "DealSonar candidate",

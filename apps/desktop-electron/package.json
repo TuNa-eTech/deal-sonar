@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "DealSonar Electron desktop shell (candidate): window, tray, dialogs, notifications, autostart, backend utilityProcess supervision.",
+  "desktopName": "dealsonar-candidate.desktop",
   "homepage": "https://github.com/TuNa-eTech/deal-sonar",
   "author": "DealSonar <support@dealsonar.invalid>",
   "main": "dist/main.cjs",

@@ -181,7 +181,7 @@ function installDeb(deb) {
     if (r.code !== 0) sh("sudo", ["apt-get", "-f", "install", "-y"]);
     const again = r.code === 0 ? r : sh("sudo", ["dpkg", "-i", deb]);
     step("deb_dpkg_install", again.code === 0, again.out.slice(-300));
-    const exe = `/opt/${identity.productName}/${identity.executableName}`;
+    const exe = `/opt/${identity.executableName}/${identity.executableName}`;
     step("deb_installed_exe", existsSync(exe), exe);
     return {
       launch: { cmd: exe, args: [], extraArgs: [] },
@@ -194,7 +194,7 @@ function installDeb(deb) {
   const root = join(dirs.install, "deb-root");
   const x = sh("dpkg-deb", ["-x", deb, root]);
   step("deb_extract", x.code === 0, x.out.slice(0, 200));
-  const exe = join(root, "opt", identity.productName, identity.executableName);
+  const exe = join(root, "opt", identity.executableName, identity.executableName);
   step("deb_extracted_exe", existsSync(exe), exe);
   evidence.limits.push("deb: extracted with dpkg-deb -x (not dpkg -i) and run with --no-sandbox, because chrome-sandbox cannot be root-owned 4755 here; use --system-install on a runner with sudo for the real path");
   return { launch: { cmd: exe, args: [], extraArgs: ["--no-sandbox"] }, cleanup: async () => {} };
