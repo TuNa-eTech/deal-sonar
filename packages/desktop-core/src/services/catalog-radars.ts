@@ -220,7 +220,6 @@ export function radarUpdate(ctx: RuntimeContext, services: CatalogServices, inpu
         source_ids: input.source_ids,
         description: null,
         language_hint: null,
-        user_profession: null,
         fields: null,
         match_policy: null,
         activate_immediately: true,
@@ -236,8 +235,6 @@ export function radarUpdate(ctx: RuntimeContext, services: CatalogServices, inpu
     };
   }
 
-  const nextProfession =
-    input.user_profession !== undefined ? input.user_profession : existing.current_version.user_profession;
   const activateImmediately = existing.radar.status !== "active" || input.confirm_version_upgrade === true;
 
   const result = ctx.store.radars.update(input.id, {
@@ -246,7 +243,7 @@ export function radarUpdate(ctx: RuntimeContext, services: CatalogServices, inpu
     source_ids: input.source_ids,
     description: input.description,
     language_hint: null,
-    user_profession: input.user_profession !== undefined ? nextProfession : null,
+    user_profession: input.user_profession,
     fields: input.fields,
     match_policy: input.match_policy ? matchPolicyToStore(input.match_policy) : null,
     activate_immediately: activateImmediately,

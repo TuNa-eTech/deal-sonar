@@ -66,6 +66,7 @@ export interface UpdateRadarInput {
   description?: string | null;
   /** `null`/absent keeps the value (serde `Option<Option<_>>` JSON semantics). */
   language_hint?: string | null;
+  /** Omit to keep the current value; null explicitly clears it. */
   user_profession?: string | null;
   fields?: FieldDef[] | null;
   match_policy?: MatchPolicy | null;
@@ -296,7 +297,7 @@ export class Radars {
       const nextDesc = input.description ?? cur.description;
       // serde `Option<Option<String>>`: JSON `null` deserializes to the outer `None` (keep).
       const nextLang = input.language_hint ?? cur.language_hint;
-      const nextProf = input.user_profession ?? cur.user_profession;
+      const nextProf = input.user_profession === undefined ? cur.user_profession : input.user_profession;
       const nextFields = inputFields ?? cur.fields;
       const nextPolicy = input.match_policy ? normalizeMatchPolicy(input.match_policy) : cur.match_policy;
 

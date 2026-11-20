@@ -410,6 +410,32 @@ describe("radars", () => {
     expect(pushes.length).toBe(2);
   });
 
+  it("preserves omitted professions and clears an explicit null through version confirmation", async () => {
+    const h = harness();
+    const draft = await h.call("radar_create_draft", {
+      input: { name: "Radar", description: "Tìm căn hộ", user_profession: "Môi giới" },
+    });
+    const id = draft.radar.id;
+    h.store.radars.setStatus(id, "active", Date.now());
+
+    const renamed = await h.call("radar_update", { input: { id, name: "Radar mới" } });
+    expect(renamed.created_new_version).toBe(false);
+    expect(renamed.detail.current_version_data.user_profession).toBe("Môi giới");
+
+    const cleared = await h.call("radar_update", { input: { id, user_profession: null } });
+    expect(cleared).toMatchObject({ created_new_version: true, requires_confirmation: true });
+    expect(cleared.detail.current_version_data.user_profession).toBe("Môi giới");
+    expect(cleared.detail.pending_version_data).toMatchObject({ version: 2, user_profession: null });
+
+    const confirmed = await h.call("radar_update", {
+      input: { id, name: "Đã duyệt", confirm_version_upgrade: true },
+    });
+    expect(confirmed).toMatchObject({ created_new_version: false, requires_confirmation: false });
+    expect(confirmed.detail.current_version_data).toMatchObject({ version: 2, user_profession: null });
+    expect(confirmed.detail.pending_version_data).toBeNull();
+    expect(confirmed.detail.versions).toHaveLength(2);
+  });
+
   it("applies the license field limit on update and reports unknown radars", async () => {
     const h = harness();
     const draft = await h.call("radar_create_draft", { input: { name: "R", description: "d" } });
