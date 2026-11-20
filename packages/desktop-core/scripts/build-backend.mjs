@@ -3,7 +3,7 @@
 //
 //   main.cjs                      single-file CJS bundle (utilityProcess entry; esbuild, node22 target)
 //   migrations/000N_*.sql         the retained SQL migrations, read at runtime (byte-identical copies)
-//   node_modules/better-sqlite3   JS loader and the current target's native Node-API binding
+//   vendor/better-sqlite3   JS loader and the current target's native Node-API binding
 //
 // The shell stages this directory as `<resources>/backend` outside ASAR. Run the script on
 // the package target (OS and architecture), after installing the pnpm workspace.
@@ -29,7 +29,18 @@ await build({
   platform: "node",
   format: "cjs",
   target: "node22",
-  external: ["better-sqlite3", "electron"],
+  external: ["electron"],
+  plugins: [{
+    name: "staged-sqlite",
+    setup(build) {
+      // Electron Builder filters node_modules from extraResources. Use a relative
+      // reference to the private copy staged beside this bundle.
+      build.onResolve({ filter: /^better-sqlite3$/ }, () => ({
+        path: "./vendor/better-sqlite3",
+        external: true,
+      }));
+    },
+  }],
   sourcemap: "linked",
   legalComments: "none",
   logLevel: "info",
@@ -41,7 +52,7 @@ await build({
 cpSync(path.join(pkgRoot, "migrations"), path.join(outDir, "migrations"), { recursive: true });
 
 const sqliteSrc = path.dirname(require.resolve("better-sqlite3/package.json"));
-const sqliteDest = path.join(outDir, "node_modules", "better-sqlite3");
+const sqliteDest = path.join(outDir, "vendor", "better-sqlite3");
 const localBinding = path.join(sqliteSrc, "build", "Release", "better_sqlite3.node");
 const binding = existsSync(localBinding)
   ? localBinding

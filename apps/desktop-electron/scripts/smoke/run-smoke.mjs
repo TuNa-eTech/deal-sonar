@@ -249,6 +249,7 @@ function appEnv(extra = {}) {
     DEALSONAR_SMOKE_HOLD_MS: "60000",
     DEALSONAR_DISABLE_AUTOSTART_SYNC: "1",
     DEALSONAR_DISABLE_BROWSER_SPAWN: "1",
+    DEALSONAR_IN_MEMORY_SECRETS: "1",
     ELECTRON_ENABLE_LOGGING: "1",
     ...(display ? { DISPLAY: display } : {}),
     ...extra,

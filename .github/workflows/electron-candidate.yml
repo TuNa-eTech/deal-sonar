@@ -9,7 +9,7 @@ on:
       allow_stub:
         description: "Use the marked stub backend/native helper (shell + installer testing only, not a release candidate)"
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
@@ -44,6 +44,31 @@ jobs:
       - run: pnpm ui:build
       - run: pnpm electron:test
       - run: pnpm electron:typecheck
+      - run: pnpm --filter @dealsonar/desktop-core typecheck
+      - run: pnpm --filter @dealsonar/desktop-core test
+      - name: Build packaged backend
+        if: ${{ !inputs.allow_stub }}
+        run: pnpm --filter @dealsonar/desktop-core build:backend
+      - uses: actions/setup-node@v4
+        if: ${{ !inputs.allow_stub }}
+        with:
+          node-version: 24
+      - name: Build and test standalone native host
+        if: ${{ !inputs.allow_stub }}
+        shell: bash
+        run: |
+          pnpm --filter @dealsonar/native-host build:sea
+          target=$(node -p 'process.platform + "-" + process.arch')
+          suffix=$(node -p 'process.platform === "win32" ? ".exe" : ""')
+          host="$PWD/packages/native-host/dist-sea/$target/dealsonar-native-host$suffix"
+          backend="$PWD/packages/desktop-core/dist/backend"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            host=$(cygpath -m "$host")
+            backend=$(cygpath -m "$backend")
+          fi
+          DEALSONAR_NATIVE_HOST_TEST_BIN="$host" pnpm --filter @dealsonar/native-host test
+          echo "DEALSONAR_NATIVE_HOST_SRC=$host" >> "$GITHUB_ENV"
+          echo "DEALSONAR_BACKEND_BUNDLE_DIR=$backend" >> "$GITHUB_ENV"
       - name: Stage resources
         shell: bash
         run: |
