@@ -524,8 +524,8 @@ describe("IPC peers, health and crawl pause", () => {
       type: "crawl.request",
       payload: { request_id: res.run_id, reason: "preview", max_posts: 25, source_ref: { platform: "facebook", kind: "group", external_id: "g1" } },
     });
-    await expect(PIPELINE_HANDLERS.source_crawl_now!(t.ctx, { id: "missing" })).rejects.toBeInstanceOf(CoreError);
-    await expect(PIPELINE_HANDLERS.source_crawl_now!(t.ctx, {})).rejects.toMatchObject({ code: "validation_error" });
+    await expect(async () => PIPELINE_HANDLERS.source_crawl_now!(t.ctx, { id: "missing" })).rejects.toBeInstanceOf(CoreError);
+    await expect(async () => PIPELINE_HANDLERS.source_crawl_now!(t.ctx, {})).rejects.toMatchObject({ code: "validation_error" });
   });
 });
 
@@ -537,9 +537,9 @@ describe("handler table and scheduler", () => {
 
   it("validates handler arguments like Tauri parse_arg", async () => {
     const t = setup();
-    await expect(PIPELINE_HANDLERS.radar_set_status!(t.ctx, { id: "x", status: "bogus" })).rejects.toMatchObject({ code: "validation_error" });
-    await expect(PIPELINE_HANDLERS.radar_preview_start!(t.ctx, { input: { radar_id: 5 } })).rejects.toMatchObject({ code: "validation_error" });
-    await expect(PIPELINE_HANDLERS.radar_preview_get!(t.ctx, { radar_id: "none" })).rejects.toMatchObject({ code: "not_found" });
+    await expect(async () => PIPELINE_HANDLERS.radar_set_status!(t.ctx, { id: "x", status: "bogus" })).rejects.toMatchObject({ code: "validation_error" });
+    await expect(async () => PIPELINE_HANDLERS.radar_preview_start!(t.ctx, { input: { radar_id: 5 } })).rejects.toMatchObject({ code: "validation_error" });
+    await expect(async () => PIPELINE_HANDLERS.radar_preview_get!(t.ctx, { radar_id: "none" })).rejects.toMatchObject({ code: "not_found" });
     expect(await PIPELINE_HANDLERS.crawl_run_list!(t.ctx, { limit: 5 })).toEqual([]);
   });
 

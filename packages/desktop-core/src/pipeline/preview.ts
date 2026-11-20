@@ -256,7 +256,7 @@ export function startRadarPreview(rt: PipelineRuntime, input: PreviewStartInput)
       state.status = "evaluating";
       savePreviewState(rt, state);
       emitPreviewProgress(rt, state, []);
-      await evaluatePreviewPosts(rt, rw, effectiveVer, posts, state, { check, abortable });
+      state.status = await evaluatePreviewPosts(rt, rw, effectiveVer, posts, state, { check, abortable });
     } catch (err) {
       if (err instanceof PreviewAbort) state.error = abortToError(err.why).message;
       else state.error = toWireError(err).message;
@@ -315,7 +315,7 @@ async function evaluatePreviewPosts(
   posts: readonly PostRecord[],
   state: PreviewRunState,
   guard: AbortGuard,
-): Promise<void> {
+): Promise<"done" | "error"> {
   const { check, abortable } = guard;
   const now = rt.now();
   // Step 1: T3-T4 on every post (T2 dedup intentionally skipped so duplicates are visible).
@@ -451,11 +451,11 @@ async function evaluatePreviewPosts(
     if (am !== bm) return am ? -1 : 1;
     return b.score > a.score ? 1 : b.score < a.score ? -1 : 0;
   });
-  state.status = state.failed_posts === 0 ? "done" : "error";
   if (state.failed_posts > 0) {
     state.error = `${state.failed_posts} bài không chấm được. Kết quả đã hoàn tất vẫn được giữ; hãy kiểm tra AI và chạy lại.`;
   }
   state.warnings = state.failed_posts === 0 ? computePreviewWarnings(state.items, effectiveVer) : [];
+  return state.failed_posts === 0 ? "done" : "error";
 }
 
 /** Fetch a preview run by `(radar_id, optional preview_id)`; rebuilds from DB rows after a restart. */

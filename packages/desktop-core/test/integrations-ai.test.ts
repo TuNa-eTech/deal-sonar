@@ -206,7 +206,8 @@ describe("codex JSONL and model discovery", () => {
     const parsed = parseAgyModelsStdout("⠋ loading\rgemini-2.5-flash Gemini Flash\n\ngemini-4-carbon-high Carbon High\nnot a model\n");
     expect(parsed.map((m) => [m.id, m.recommended_tier])).toEqual([
       ["gemini-2.5-flash", "fast"],
-      ["gemini-4-carbon-high", "smart"],
+      // Match Rust discovery: the slug "gemini" contains "mini".
+      ["gemini-4-carbon-high", "fast"],
     ]);
   });
 });
