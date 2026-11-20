@@ -1,0 +1,16 @@
+[package]
+name = "gen-tauri-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Detached from the root workspace on purpose: this is test tooling for packages/desktop-core and
+# must not change Cargo.lock or the Rust build graph. It links the REAL Rust store as the oracle.
+[workspace]
+
+[dependencies]
+dealsonar-store = { path = "../../../../crates/store" }
+serde_json = "1"
+# Same version/feature set as crates/store (bundled SQLite); used only to write schema-v1 legacy
+# rows with the 0001 columns, because the current Store API already depends on later columns.
+rusqlite = { version = "0.32", features = ["bundled"] }
