@@ -211,6 +211,8 @@ export interface DesktopIpcServerOptions {
   agentToken?: Buffer | null;
   /** Backend implementation of the four agent methods. */
   agentBackend?: AgentBackend | null;
+  /** Lazy authorization for a listener acquired before its database is opened. */
+  agentAccess?: () => { token: Buffer; backend: AgentBackend } | null;
   /** Called once per relay connection after its first frame was classified as protocol traffic. */
   onExtensionConnection: (connection: ExtensionConnection) => void;
   logger?: (message: string) => void;
@@ -446,11 +448,11 @@ export class DesktopIpcServer {
   }
 
   private async serveAgent(socket: net.Socket, payload: Buffer): Promise<void> {
-    const response = await handleAgentFrame(
-      payload,
-      this.options.agentToken ?? null,
-      this.options.agentBackend ?? null,
-    );
+    const options = this.options;
+    const access = options.agentAccess
+      ? options.agentAccess()
+      : { token: options.agentToken, backend: options.agentBackend };
+    const response = await handleAgentFrame(payload, access?.token ?? null, access?.backend ?? null);
     try {
       const frame = encodeFrame(Buffer.from(JSON.stringify(response), "utf8"), AGENT_MAX_FRAME_BYTES);
       socket.end(frame);

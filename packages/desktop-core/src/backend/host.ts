@@ -36,6 +36,7 @@ export interface HostIpcServerOptions {
   endpoint: string;
   agentToken?: Buffer | null;
   agentBackend?: HostAgentBackend | null;
+  agentAccess?: () => { token: Buffer; backend: HostAgentBackend } | null;
   onExtensionConnection: (connection: HostExtensionConnection) => void;
   logger?: (message: string) => void;
 }

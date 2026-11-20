@@ -268,7 +268,8 @@ describe("startBackend / DesktopRuntime", () => {
     if (process.platform !== "win32") expect(fs.statSync(dataDir).mode & 0o777).toBe(0o700);
     expect(fs.existsSync(path.join(dataDir, "agent-access"))).toBe(true);
     expect(fh.bound[0].endpoint).toBe(path.join(dataDir, "ipc.sock"));
-    expect(fh.bound[0].agentToken?.length).toBe(32);
+    const agent = fh.bound[0].agentAccess!();
+    expect(agent?.token.length).toBe(32);
 
     const raw = started!.runtime.context.store.listSchemaMigrations();
     expect(raw.map((m) => m.version)).toEqual([1, 2, 3]);
@@ -290,8 +291,8 @@ describe("startBackend / DesktopRuntime", () => {
     expect(sent[0]).toMatchObject({ type: "hello.ok", reply_to: "hello-from-chrome" });
     expect(sent[1]).toMatchObject({ type: "config.update" });
     expect(await started!.runtime.invoke("health_get", {})).toMatchObject({ extension_connected: true });
-    await expect(fh.bound[0].agentBackend!.handle("list_radar_sources", {})).resolves.toMatchObject({ sources: [] });
-    await expect(fh.bound[0].agentBackend!.handle("prepare_radar", {})).rejects.toBeInstanceOf(fh.AgentError);
+    await expect(agent!.backend.handle("list_radar_sources", {})).resolves.toMatchObject({ sources: [] });
+    await expect(agent!.backend.handle("prepare_radar", {})).rejects.toBeInstanceOf(fh.AgentError);
     disconnect();
 
     port.send({ id: 1, command: "source_list", args: {} });
@@ -340,17 +341,22 @@ describe("startBackend / DesktopRuntime", () => {
     expect(codes).toEqual([1]);
   });
 
-  it("pushes backend:fatal and releases the database when IPC binding fails", async () => {
+  it("preserves the staged restore when a running desktop owns the IPC endpoint", async () => {
     const fh = fakeHost();
     fh.host.bindIpcServer = async () => { throw new Error("EADDRINUSE"); };
+    const dataDir = path.join(tmp, "y");
+    const staging = path.join(dataDir, "restore-pending.sqlite3");
+    fs.mkdirSync(dataDir);
+    fs.writeFileSync(staging, "restore fixture must stay untouched");
     const port = new FakePort();
     const exited = new Promise<void>((resolve) => {
       void startBackend({ port, env: candidateEnv(path.join(tmp, "y")), loadHost: async () => fh.host, platform: "linux", exit: () => resolve() });
     });
     await exited;
     expect(port.sent[0]).toEqual({ event: "backend:fatal", payload: { code: "internal_error", message: "lỗi nội bộ hệ thống: EADDRINUSE" } });
-    // the db is closed again, so the file can be removed/reopened by a restart
-    Store.open(path.join(tmp, "y", "dealsonar.db"), path.join(tmp, "y", "backups")).close();
+    expect(fs.readFileSync(staging, "utf8")).toBe("restore fixture must stay untouched");
+    expect(fs.existsSync(path.join(dataDir, "dealsonar.db"))).toBe(false);
+    expect(fs.existsSync(path.join(dataDir, "agent-access"))).toBe(false);
   });
 
   it("delivers OS notifications through the shell push channel", async () => {

@@ -1,10 +1,8 @@
 // Data-owner runtime of the Electron backend (`CoreServiceBuilder::open_production` + `start`).
 //
-// Startup order matches the Rust builder: prepare directories (data dir 0700, backups/, ai-workdir/,
-// logs/), apply a staged restore *before* opening SQLite, open `dealsonar.db` (WAL, migrations,
-// automatic pre-migration backup), wire the OS credential store, issue the agent token, then bind
-// the local IPC endpoint through the Host package. Only after all that does the server push
-// `backend:ready`.
+// Claim IPC before any restore, migration or token write. The previous desktop may still own
+// the profile on a shared production endpoint. Clients can connect after the store and services
+// have been initialized and the backend has sent its readiness signal.
 //
 import * as fs from "node:fs";
 
@@ -75,46 +73,49 @@ export class DesktopRuntime implements BackendRuntime {
     const { config, host } = this.deps;
     this.emitFn = emit;
 
-    prepareDataDirectories(config);
-    // A staged restore replaces the database offline, before anything opens it.
-    Store.applyPendingRestore(config.dbPath, config.backupDir);
-    const store = Store.open(config.dbPath, config.backupDir);
-    this.store = store;
-
-    const secrets = this.deps.secrets ?? (config.inMemorySecrets
-      ? new InMemorySecretStore()
-      : createOsSecretStore({
-        platform: config.platform,
-        service: config.channel === "candidate" ? `${KEYRING_SERVICE} Candidate` : KEYRING_SERVICE,
-      }));
-
-    const ctx: RuntimeContext = {
-      config,
-      store,
-      secrets,
-      emit: (event, payload) => this.emitFn(event, payload),
-      notifyOs: (payload) => this.emitFn(BACKEND_CONTROL.osNotification, payload),
-      isShuttingDown: () => this.shuttingDown,
-    };
-    this.ctx = ctx;
-
+    let agentAccess: { token: Buffer; backend: HostAgentBackend } | null = null;
+    let ready = false;
     try {
-      const agentToken = host.issueAgentToken(config.dataDir);
-      const agentBackend = this.deps.agentBackend?.(ctx) ?? refusingAgentBackend(host);
       this.ipc = await host.bindIpcServer({
         endpoint: config.ipcEndpoint,
-        agentToken,
-        agentBackend,
+        agentAccess: () => this.shuttingDown ? null : agentAccess,
         onExtensionConnection: (connection) => {
-          if (this.deps.onExtensionConnection) this.deps.onExtensionConnection(ctx, connection);
-          else {
-            this.log("extension connection refused: protocol handler not available");
+          if (ready && !this.shuttingDown && this.ctx && this.deps.onExtensionConnection) {
+            this.deps.onExtensionConnection(this.ctx, connection);
+          } else {
             connection.close();
           }
         },
         logger: (m) => this.log(m),
       });
+
+      prepareDataDirectories(config);
+      Store.applyPendingRestore(config.dbPath, config.backupDir);
+      const store = Store.open(config.dbPath, config.backupDir);
+      this.store = store;
+
+      const secrets = this.deps.secrets ?? (config.inMemorySecrets
+        ? new InMemorySecretStore()
+        : createOsSecretStore({
+          platform: config.platform,
+          service: config.channel === "candidate" ? `${KEYRING_SERVICE} Candidate` : KEYRING_SERVICE,
+        }));
+
+      const ctx: RuntimeContext = {
+        config,
+        store,
+        secrets,
+        emit: (event, payload) => this.emitFn(event, payload),
+        notifyOs: (payload) => this.emitFn(BACKEND_CONTROL.osNotification, payload),
+        isShuttingDown: () => this.shuttingDown,
+      };
+      this.ctx = ctx;
+
+      const token = host.issueAgentToken(config.dataDir);
+      const backend = this.deps.agentBackend?.(ctx) ?? refusingAgentBackend(host);
       await this.deps.onStarted?.(ctx);
+      agentAccess = { token, backend };
+      ready = true;
     } catch (err) {
       await this.shutdown().catch((cleanupError: unknown) => this.log(String(cleanupError)));
       throw err;
@@ -139,12 +140,6 @@ export class DesktopRuntime implements BackendRuntime {
     this.shuttingDown = true;
     const errors: unknown[] = [];
     try {
-      await this.ipc?.close();
-    } catch (err) {
-      errors.push(err);
-    }
-    this.ipc = null;
-    try {
       if (this.ctx) await this.deps.onStopping?.(this.ctx);
     } catch (err) {
       errors.push(err);
@@ -155,6 +150,12 @@ export class DesktopRuntime implements BackendRuntime {
       errors.push(err);
     }
     this.store = null;
+    try {
+      await this.ipc?.close();
+    } catch (err) {
+      errors.push(err);
+    }
+    this.ipc = null;
     if (errors.length > 0) throw errors[0];
   }
 }
