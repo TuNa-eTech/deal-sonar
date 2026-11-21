@@ -55,7 +55,7 @@ Hai kết nối mạng duy nhất rời máy do DealSonar khởi tạo: tới Te
 | **Extension** | `apps/extension` | Mở trang group theo lịch, trích bài, đệm và gửi về desktop, báo trạng thái phiên Facebook | Không quyết định bài nào khớp, không gọi AI, không giữ cấu hình radar |
 | **Native host** | `packages/native-host` | Chuyển nguyên văn message giữa stdio và IPC cục bộ | Không diễn giải message ngoài `ping` |
 | **Protocol** | `fixtures/protocol-v2-examples.json` | Fixture dùng để kiểm tra hợp đồng với `apps/extension/src/protocol.ts` | |
-| **Desktop** | `apps/desktop-electron` | Vỏ ứng dụng, giao diện, khay hệ thống, tự khởi động, cài native host | |
+| **Desktop** | `apps/desktop` | Vỏ ứng dụng, giao diện, khay hệ thống, tự khởi động, cài native host | |
 | **Core** | `packages/desktop-core/src/backend` | Kiểu miền (radar, bài, tin), điều phối chuỗi xử lý, lập lịch | |
 | **Store** | `packages/desktop-core/src/store` | SQLite, migration, truy vấn, tìm toàn văn | |
 | **Rules** | `packages/desktop-core/src/rules` | Chuẩn hoá văn bản, lọc trùng, bộ máy chạy bộ luật, bộ trích dựng sẵn | |
@@ -66,8 +66,8 @@ Nguyên tắc phân chia: **extension càng mỏng càng tốt.** Extension là 
 
 ## 4. Cấu trúc repo
 
-- `apps/desktop-electron` chạy Electron main, preload và khay hệ thống.
-- `apps/desktop/ui` chứa giao diện React. `apps/extension` chứa Chrome extension.
+- `apps/desktop` chứa Electron main, preload, khay hệ thống và giao diện React trong `ui`.
+- `apps/extension` chứa Chrome extension.
 - `packages/desktop-core` chạy xử lý dữ liệu cục bộ trong Electron utility process.
 - `packages/native-host` đóng gói tiến trình chuyển tiếp độc lập.
 - `pnpm protocol:verify` kiểm tra fixture Protocol v2.

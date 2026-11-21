@@ -35,7 +35,7 @@ module.exports = {
   ],
   mac: {
     category: "public.app-category.business",
-    icon: "../desktop/icons/icon.icns",
+    icon: "icons/icon.icns",
     target: [{ target: "dmg" }],
     identity: "-", // ad-hoc
     hardenedRuntime: false,
@@ -44,7 +44,7 @@ module.exports = {
   },
   dmg: { sign: false },
   win: {
-    icon: "../desktop/icons/icon.ico",
+    icon: "icons/icon.ico",
     target: [{ target: "nsis", arch: ["x64"] }],
   },
   nsis: {
@@ -58,7 +58,7 @@ module.exports = {
     runAfterFinish: false,
   },
   linux: {
-    icon: "../desktop/icons/icon.png",
+    icon: "icons/icon.png",
     category: "Office",
     desktop: { entry: { Name: identity.productName } },
     syncDesktopName: true,

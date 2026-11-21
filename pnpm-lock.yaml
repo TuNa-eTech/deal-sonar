@@ -8,7 +8,7 @@ importers:
 
   .: {}
 
-  apps/desktop-electron:
+  apps/desktop:
     devDependencies:
       '@types/node':
         specifier: ^22.9.0

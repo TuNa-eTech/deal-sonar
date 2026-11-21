@@ -96,13 +96,13 @@ jobs:
           fi
       - name: Package (${{ matrix.name }})
         shell: bash
-        working-directory: apps/desktop-electron
+        working-directory: apps/desktop
         run: |
           pnpm build
           pnpm exec electron-builder ${{ matrix.builder }} --config electron-builder.config.cjs --publish never
       - name: Installed smoke
         shell: bash
-        working-directory: apps/desktop-electron
+        working-directory: apps/desktop
         run: |
           set -e
           f=$(ls release/${{ matrix.artifact }} | head -n1)
@@ -112,12 +112,12 @@ jobs:
         with:
           name: ${{ inputs.production && 'release-desktop-' || '' }}${{ matrix.name }}
           path: |
-            apps/desktop-electron/release/${{ matrix.artifact }}
+            apps/desktop/release/${{ matrix.artifact }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: smoke-${{ matrix.name }}
           path: |
-            apps/desktop-electron/release/smoke/*.json
+            apps/desktop/release/smoke/*.json
           if-no-files-found: warn
           retention-days: 7

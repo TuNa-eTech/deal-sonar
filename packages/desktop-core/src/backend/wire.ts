@@ -1,6 +1,6 @@
 // Wire contract between the Electron shell (main) and this utilityProcess, plus the error types
 // that mirror `CoreError` / `CommandError` (apps/desktop/src/commands/error.rs). The shell's
-// copy of these types lives in `apps/desktop-electron/src/shared/contract.ts`; keep both equal.
+// copy of these types lives in `apps/desktop/src/shared/contract.ts`; keep both equal.
 
 import { StoreError, toStoreError } from "../store/errors";
 import { SecretError } from "../secrets/types";

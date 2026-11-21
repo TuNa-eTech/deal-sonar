@@ -14,8 +14,10 @@
 
 ```text
 apps/
-  desktop-electron/      Electron main, preload, tray, lifecycle and packaging
-  desktop/               Shared React UI, desktop icons and Radar templates
+  desktop/               Electron main, preload, tray and packaging
+    ui/                  React interface
+    icons/               App and tray icons
+    templates/           Radar templates
   extension/             Chrome Manifest V3 extension and native side panel
 packages/
   desktop-core/          SQLite store, rules, AI adapters, pipeline and notifications

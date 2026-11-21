@@ -57,7 +57,7 @@ export const BACKEND_ENTRY_FILE = "main.cjs";
 export interface ResolveResourcesInput {
   isPackaged: boolean;
   resourcesPath: string;
-  /** `apps/desktop-electron` when running unpackaged. */
+  /** `apps/desktop` when running unpackaged. */
   projectDir: string;
   env?: EnvLike;
   platform?: Platform;
@@ -79,12 +79,12 @@ export function resolveResources(input: ResolveResourcesInput): ResourceLayout {
   if (!input.isPackaged) {
     if (env.DEALSONAR_BACKEND_ENTRY?.trim()) backendEntry = resolve(env.DEALSONAR_BACKEND_ENTRY.trim());
     if (env.DEALSONAR_NATIVE_HOST_BIN?.trim()) nativeHostBinary = resolve(env.DEALSONAR_NATIVE_HOST_BIN.trim());
-    const devUi = join(input.projectDir, "..", "desktop", "ui", "dist");
+    const devUi = join(input.projectDir, "ui", "dist");
     if (!existsSync(uiDir) && existsSync(devUi)) uiDir = devUi;
   }
   const trayIcon = input.isPackaged
     ? join(resourcesDir, "icons", "tray.png")
-    : join(input.projectDir, "..", "desktop", "icons", "32x32.png");
+    : join(input.projectDir, "icons", "32x32.png");
   return { resourcesDir, backendEntry, nativeHostBinary, uiDir, trayIcon };
 }
 

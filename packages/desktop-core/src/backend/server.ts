@@ -1,5 +1,5 @@
 // utilityProcess request/reply server. Implements the shell contract documented in
-// apps/desktop-electron/README.md ("Backend handshake"):
+// apps/desktop/README.md ("Backend handshake"):
 //
 //   shell -> backend   { id, command, args }
 //   backend -> shell   { id, ok: true, value } | { id, ok: false, error: { code, message } }

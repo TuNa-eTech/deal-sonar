@@ -9,5 +9,5 @@ dist
 /graft/
 
 # Electron candidate build outputs
-/apps/desktop-electron/stage/
-/apps/desktop-electron/release/
+/apps/desktop/stage/
+/apps/desktop/release/

@@ -28,13 +28,13 @@ rmSync(stage, { recursive: true, force: true });
 mkdirSync(stage, { recursive: true });
 
 // UI
-const uiDist = join(root, "..", "desktop", "ui", "dist");
+const uiDist = join(root, "ui", "dist");
 if (!existsSync(join(uiDist, "index.html"))) fail(`UI build missing: run \`pnpm ui:build\` (${uiDist})`);
 cpSync(uiDist, join(stage, "ui"), { recursive: true });
 
 // Icons
 mkdirSync(join(stage, "icons"), { recursive: true });
-cpSync(join(root, "..", "desktop", "icons", "32x32.png"), join(stage, "icons", "tray.png"));
+cpSync(join(root, "icons", "32x32.png"), join(stage, "icons", "tray.png"));
 
 // Backend
 const backendSrc = process.env.DEALSONAR_BACKEND_BUNDLE_DIR?.trim();

@@ -6,7 +6,7 @@ App desktop là nơi mọi quyết định diễn ra: giữ dữ liệu, chấm 
 
 ## 1. Module
 
-- `apps/desktop-electron` quản lý cửa sổ, khay, tự khởi động và IPC từ preload.
+- `apps/desktop` quản lý cửa sổ, khay, tự khởi động và IPC từ preload.
 - `apps/desktop/ui` chứa giao diện React.
 - `packages/desktop-core` chạy SQLite, pipeline, scheduler, AI và thông báo trong utility process.
 - `packages/native-host` chuyển tiếp Protocol v2 qua Native Messaging và IPC cục bộ.

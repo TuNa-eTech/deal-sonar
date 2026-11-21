@@ -1,5 +1,5 @@
 /**
- * Electron renderer transport. The preload (`apps/desktop-electron/src/preload/index.ts`) exposes
+ * Electron renderer transport. The preload (`apps/desktop/src/preload/index.ts`) exposes
  * `window.dealsonarDesktop`; this module adapts it to the same call/reject/event semantics the UI
  * already gets from Tauri:
  *  - success resolves with the command result,

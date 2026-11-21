@@ -71,7 +71,7 @@ Open item: Linux needs `libsecret-tools` (`secret-tool`) on the machine; if abse
 
 ## Backend <-> shell contract
 
-Implemented as in `apps/desktop-electron/README.md`: `{id,command,args}` -> `{id,ok,value|error}`, pushes `{event,payload}`;
+Implemented as in `apps/desktop/README.md`: `{id,command,args}` -> `{id,ok,value|error}`, pushes `{event,payload}`;
 `backend:ready {protocol:1,version}`, `backend:fatal {code,message}` + exit 1, `backend:shutdown {grace_ms}` (drain in-flight up to grace,
 close IPC + SQLite, reply, exit 0), `backend:toggle_crawl_paused`, `os:notification {lead_id,radar_name,summary}`.
 
