@@ -1,5 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
+import migrationChecksums from "./fixtures/migration-checksums.json";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -22,7 +24,7 @@ import {
   unixDayToYmd,
 } from "../src";
 
-const ORACLE_MIGRATIONS = path.resolve(__dirname, "../../../crates/store/migrations");
+
 
 let tmp: string;
 beforeEach(() => {
@@ -53,11 +55,10 @@ function seedLead(store: Store, leadId = "L1"): void {
 }
 
 describe("migrations (retained schema)", () => {
-  it("are byte-identical to the Rust oracle migrations", () => {
+  it("preserve the checksums of released migrations", () => {
     for (const name of ["0001_init", "0002_durable_feedback", "0003_workflow"]) {
       const ours = fs.readFileSync(path.join(defaultMigrationsDir(), `${name}.sql`));
-      const oracle = fs.readFileSync(path.join(ORACLE_MIGRATIONS, `${name}.sql`));
-      expect(ours.equals(oracle), name).toBe(true);
+      expect(createHash("sha256").update(ours).digest("hex"), name).toBe(migrationChecksums[`${name}.sql` as keyof typeof migrationChecksums]);
     }
   });
 

@@ -1,3 +1,4 @@
+import legacyCommands from "../../../packages/desktop-core/test/fixtures/desktop-commands.json";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -6,20 +7,11 @@ import { BACKEND_COMMANDS, RENDERER_EVENTS, SHELL_COMMANDS } from "../src/shared
 const repo = join(__dirname, "..", "..", "..");
 const read = (rel: string): string => readFileSync(join(repo, rel), "utf8");
 
-/**
- * The Rust shell is the behavior oracle until cutover: the allowlist must equal its
- * `tauri::generate_handler!` list, and cover every command the UI client can send.
- */
 describe("command contract", () => {
-  const rustHandlers = (() => {
-    const src = read("apps/desktop/src/lib.rs");
-    const block = src.slice(src.indexOf("generate_handler!["), src.indexOf("]);", src.indexOf("generate_handler![")));
-    return [...block.matchAll(/commands::([a-z_]+)/g)].map((m) => m[1]!);
-  })();
 
-  it("equals the Tauri invoke_handler set", () => {
+  it("preserves the legacy desktop command names", () => {
     const ours = [...BACKEND_COMMANDS, ...SHELL_COMMANDS].sort();
-    expect(ours).toEqual([...rustHandlers].sort());
+    expect(ours).toEqual(legacyCommands);
     expect(new Set(ours).size).toBe(ours.length);
   });
 
@@ -31,9 +23,9 @@ describe("command contract", () => {
     for (const cmd of used) expect(known.has(cmd), cmd).toBe(true);
   });
 
-  it("covers every push event in TauriEventMap", () => {
+  it("covers every push event in DesktopEventMap", () => {
     const types = read("apps/desktop/ui/src/types/ipc.ts");
-    const body = types.slice(types.indexOf("export interface TauriEventMap"));
+    const body = types.slice(types.indexOf("export interface DesktopEventMap"));
     const events = [...body.slice(0, body.indexOf("}")).matchAll(/"([a-z:-]+)":/g)].map((m) => m[1]!);
     expect([...RENDERER_EVENTS].sort()).toEqual(events.sort());
   });

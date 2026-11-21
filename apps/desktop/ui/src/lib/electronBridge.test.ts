@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, isDesktopRuntime, isTauriRuntime, onDesktopEvent } from "./api";
+import { api, isDesktopRuntime, onDesktopEvent } from "./api";
 import { DesktopCommandError, type DesktopBridge, type DesktopInvokeEnvelope } from "./electronBridge";
 
 function installBridge(reply: (cmd: string, args?: Record<string, unknown>) => DesktopInvokeEnvelope) {
@@ -25,7 +25,6 @@ afterEach(() => {
 describe("Electron transport", () => {
   it("is not selected without the preload bridge (mock backend stays the browser default)", async () => {
     expect(isDesktopRuntime()).toBe(false);
-    expect(isTauriRuntime()).toBe(false);
     const radars = await api.radarList();
     expect(Array.isArray(radars)).toBe(true);
   });
@@ -33,7 +32,6 @@ describe("Electron transport", () => {
   it("sends the exact snake_case command id and payload through the bridge", async () => {
     const { bridge } = installBridge(() => ({ ok: true, value: [] }));
     expect(isDesktopRuntime()).toBe(true);
-    expect(isTauriRuntime()).toBe(false);
     await api.radarStats("r1", 14);
     await api.leadSetStatus("l1", "contacted", { note: "n" });
     expect(bridge.invoke).toHaveBeenNthCalledWith(1, "radar_stats", { radar_id: "r1", days: 14 });

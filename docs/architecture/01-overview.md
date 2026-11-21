@@ -6,7 +6,7 @@ Trạng thái: nháp v0.1 · 2026-11-11
 
 Ba ràng buộc này là của bạn và không được xem xét lại trong tài liệu:
 
-1. **Hai ứng dụng.** Extension Chrome thu dữ liệu; app desktop viết bằng Rust làm mọi việc còn lại.
+1. **Hai ứng dụng.** Extension Chrome thu dữ liệu; app desktop Electron làm mọi việc còn lại.
 2. **Không backend.** Mọi dữ liệu và xử lý nằm trên máy người dùng. App desktop có cơ sở dữ liệu riêng, đóng vai CRM.
 3. **AI qua bridge tới CLI.** App desktop gọi `claude`, `codex`, hoặc `agy` (Antigravity) đã cài trên máy.
 
@@ -30,7 +30,7 @@ Ba ràng buộc này là của bạn và không được xem xét lại trong t�
 │  └────────┬─────────┘                                                  │
 │           │ IPC cục bộ (Unix socket / named pipe)                      │
 │  ┌────────▼──────────────────────────────────────────────┐             │
-│  │ App desktop DealSonar (Rust)                          │             │
+│  │ App desktop DealSonar (Electron)                          │             │
 │  │  ipc · ingest · pipeline · rules · ai-bridge ·        │   spawn     │
 │  │  notify · store (SQLite) · UI                         ├──────────┐  │
 │  └────────┬──────────────────────────────────────────────┘          │  │
@@ -53,46 +53,24 @@ Hai kết nối mạng duy nhất rời máy do DealSonar khởi tạo: tới Te
 | Thành phần | Vị trí | Trách nhiệm | Không làm |
 |---|---|---|---|
 | **Extension** | `apps/extension` | Mở trang group theo lịch, trích bài, đệm và gửi về desktop, báo trạng thái phiên Facebook | Không quyết định bài nào khớp, không gọi AI, không giữ cấu hình radar |
-| **Native host** | `crates/native-host` | Chuyển nguyên văn message giữa stdio và IPC cục bộ | Không diễn giải message ngoài `ping` |
-| **Protocol** | `crates/protocol` | Kiểu message dùng chung; bản sao TypeScript ở `apps/extension/src/protocol.ts` | |
-| **Desktop** | `apps/desktop` | Vỏ ứng dụng, giao diện, khay hệ thống, tự khởi động, cài native host | |
-| **Core** | `crates/core` *(mới)* | Kiểu miền (radar, bài, tin), điều phối chuỗi xử lý, lập lịch | |
-| **Store** | `crates/store` *(mới)* | SQLite, migration, truy vấn, tìm toàn văn | |
-| **Rules** | `crates/rules` *(mới)* | Chuẩn hoá văn bản, lọc trùng, bộ máy chạy bộ luật, bộ trích dựng sẵn | |
-| **AI bridge** | `crates/ai-bridge` *(mới)* | Giao diện provider, adapter cho từng CLI, prompt, kiểm tra đầu ra | |
-| **Notify** | `crates/notify` *(mới)* | Telegram, hộp gửi đi, xuất file, webhook | |
+| **Native host** | `packages/native-host` | Chuyển nguyên văn message giữa stdio và IPC cục bộ | Không diễn giải message ngoài `ping` |
+| **Protocol** | `fixtures/protocol-v2-examples.json` | Fixture dùng để kiểm tra hợp đồng với `apps/extension/src/protocol.ts` | |
+| **Desktop** | `apps/desktop-electron` | Vỏ ứng dụng, giao diện, khay hệ thống, tự khởi động, cài native host | |
+| **Core** | `packages/desktop-core/src/backend` | Kiểu miền (radar, bài, tin), điều phối chuỗi xử lý, lập lịch | |
+| **Store** | `packages/desktop-core/src/store` | SQLite, migration, truy vấn, tìm toàn văn | |
+| **Rules** | `packages/desktop-core/src/rules` | Chuẩn hoá văn bản, lọc trùng, bộ máy chạy bộ luật, bộ trích dựng sẵn | |
+| **AI bridge** | `packages/desktop-core/src/ai` | Giao diện provider, adapter cho từng CLI, prompt, kiểm tra đầu ra | |
+| **Notify** | `packages/desktop-core/src/notify` | Telegram, hộp gửi đi, xuất file, webhook | |
 
 Nguyên tắc phân chia: **extension càng mỏng càng tốt.** Extension là phần khó cập nhật nhất (duyệt cửa hàng, vòng đời service worker) và dễ vỡ nhất (Facebook đổi giao diện). Mọi quyết định có thể chuyển về desktop đều chuyển về desktop, kể cả lịch quét và cấu hình bộ trích.
 
-## 4. Cấu trúc repo đề xuất
+## 4. Cấu trúc repo
 
-Phần đã có trong repo giữ nguyên; phần đánh dấu *(mới)* cần thêm.
-
-```
-apps/
-  desktop/
-    src/                    Vỏ Rust: khởi động, khay hệ thống, lệnh cho UI
-    ui/                     (mới) Giao diện web: React + TypeScript + Vite
-    templates/              (mới) Mẫu radar, mỗi mẫu một file JSON
-  extension/
-    src/
-      background/           Service worker: kết nối native, lập lịch, hàng đợi gửi
-      content/              (mới) Trích bài: tap.ts (MAIN world), extract.ts, dom.ts
-      popup/                Popup trạng thái
-      protocol.ts           Bản sao kiểu message
-crates/
-  protocol/                 Kiểu message dùng chung
-  native-host/              Tiến trình chuyển tiếp
-  core/                     (mới)
-  store/                    (mới)
-  rules/                    (mới)
-  ai-bridge/                (mới)
-  notify/                   (mới)
-docs/                       Bộ tài liệu này
-scripts/                    Cài file khai báo native host khi phát triển, sinh kiểu TS
-```
-
-Kiểu message TypeScript nên được sinh từ Rust (ví dụ bằng `ts-rs`) thay vì chép tay như hiện nay, để hai phía không lệch nhau.
+- `apps/desktop-electron` chạy Electron main, preload và khay hệ thống.
+- `apps/desktop/ui` chứa giao diện React. `apps/extension` chứa Chrome extension.
+- `packages/desktop-core` chạy xử lý dữ liệu cục bộ trong Electron utility process.
+- `packages/native-host` đóng gói tiến trình chuyển tiếp độc lập.
+- `pnpm protocol:verify` kiểm tra fixture Protocol v2.
 
 ## 5. Luồng dữ liệu chính
 
@@ -151,7 +129,7 @@ Nhiều profile Chrome nghĩa là nhiều tài khoản Facebook. Desktop chấp 
 |---|---|---|---|
 | Extension | Manifest V3, TypeScript, Vite | Đã có trong repo | |
 | Kênh extension–desktop | Native Messaging + IPC cục bộ | Không mở cổng mạng, Chrome hỗ trợ chính thức | ADR-002 |
-| Vỏ desktop | Tauri 2 | UI dạng bảng và form dễ làm bằng web; nhân Rust giữ nguyên | ADR-003 |
+| Vỏ desktop | Electron | Giao diện React, preload giới hạn quyền và utility process | ADR-009 |
 | Giao diện | React + TypeScript | Dùng chung công cụ với extension | ADR-003 |
 | Cơ sở dữ liệu | SQLite (`rusqlite`, bundled, WAL, FTS5) | Một file, không cần cài, có tìm toàn văn | ADR-004 |
 | Bất đồng bộ | `tokio` | Chuẩn thực tế | |
@@ -159,7 +137,7 @@ Nhiều profile Chrome nghĩa là nhiều tài khoản Facebook. Desktop chấp 
 | HTTP | `reqwest` (rustls) | Telegram, webhook | |
 | Bí mật | crate `keyring` | Token Telegram nằm trong kho khoá hệ điều hành | |
 | AI | Tiến trình con gọi CLI | Ràng buộc đầu vào | ADR-005 |
-| Bộ luật | DSL khai báo, bộ máy bằng Rust | Không chạy mã do AI sinh | ADR-006 |
+| Bộ luật | DSL khai báo, bộ máy TypeScript | Không chạy mã do AI sinh | ADR-006 |
 
 ## 8. Vấn đề xuyên suốt
 
@@ -177,4 +155,4 @@ Nhiều profile Chrome nghĩa là nhiều tài khoản Facebook. Desktop chấp 
 
 **Mở rộng nền tảng.** Mọi bảng và message mang trường `platform`. Thêm nền tảng mới nghĩa là thêm một bộ trích trong extension và một giá trị `platform`; chuỗi xử lý không đổi.
 
-**Cập nhật.** Desktop tự cập nhật qua cơ chế của Tauri (file tĩnh trên một máy chủ phát hành; đây là hạ tầng phân phối, không phải backend xử lý dữ liệu). Cấu hình bộ trích đi theo bản desktop và được đẩy xuống extension, nên phần lớn thay đổi giao diện của Facebook sửa được mà không phải phát hành lại extension.
+**Cập nhật.** Bộ cài desktop được phân phối qua GitHub Releases. Cấu hình bộ trích đi theo bản desktop và được đẩy xuống extension, nên phần lớn thay đổi giao diện của Facebook sửa được mà không phải phát hành lại extension.

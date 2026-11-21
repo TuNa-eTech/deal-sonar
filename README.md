@@ -1,73 +1,35 @@
 # DealSonar
 
-**DealSonar** is a 100% local-first lead discovery & CRM desktop system for Vietnamese and multilingual Facebook Groups — combining a Manifest V3 Chrome Extension, a stateless Native Messaging relay, and a Rust + Tauri v2 Desktop App with local SQLite FTS5 storage, deterministic Vietnamese rule engines, CLI-based AI extraction (`claude`, `codex`, `agy`), and instant Telegram / Webhook / OS notifications. No cloud backend is required.
+**DealSonar** is a 100% local-first lead discovery & CRM desktop system for Vietnamese and multilingual Facebook Groups — combining a Manifest V3 Chrome Extension, a stateless Native Messaging relay, and a Electron Desktop App with local SQLite FTS5 storage, deterministic Vietnamese rule engines, CLI-based AI extraction (`claude`, `codex`, `agy`), and instant Telegram / Webhook / OS notifications. No cloud backend is required.
 
 ---
 
 ## Architecture Overview
 
-```text
-┌───────────────────────────┐   4-byte LE JSON frames    ┌───────────────────────────┐
-│     Chrome Extension      │ ◄─────── stdio ──────────► │   dealsonar-native-host   │
-│  (MV3: Network + DOM +    │   com.dealsonar.host       │  (Stateless Frame Relay)  │
-│   Safety Rate Limiter)    │                            └─────────────┬─────────────┘
-└───────────────────────────┘                                          │
-                                                           Unix Socket / Named Pipe
-                                                             (0700 / Per-User ACL)
-                                                                       │
-┌──────────────────────────────────────────────────────────────────────▼─────────────┐
-│                        DealSonar Desktop App (`dealsonar`)                         │
-│  ┌──────────────────────────────────────────────────────────────────────────────┐  │
-│  │ Tauri v2 Shell (`apps/desktop`): React 18 UI, System Tray, Single-Instance,  │  │
-│  │ Autostart, Strict CSP, Safe Permalink Opener, 55 IPC Commands & Push Events  │  │
-│  └──────────────────────────────────────┬───────────────────────────────────────┘  │
-│                                         ▼                                          │
-│  ┌──────────────────────────────────────────────────────────────────────────────┐  │
-│  │ `dealsonar-core`: Multi-Profile IPC Server, Pipeline T0–T7, Crawl Scheduler, │  │
-│  │ Streaming Preview, Shadow/Active Ruleset Lifecycle, Ed25519 Plan Limits      │  │
-│  └──────┬──────────────────────┬───────────────────────┬────────────────────────┘  │
-│         ▼                      ▼                       ▼                           │
-│  `dealsonar-store`      `dealsonar-rules`      `dealsonar-ai-bridge`               │
-│  SQLite WAL + FTS5 +    VN Text Folding,       Isolated CLI Subprocesses           │
-│  SimHash + Contacts     Phones, Money, DSL     (`claude` / `codex` / `agy` / mock) │
-│                                                        │                           │
-│                                                        ▼                           │
-│                                                `dealsonar-notify`                  │
-│                                                OS Keychain, Telegram HTML Bot,     │
-│                                                Signed HMAC Webhooks, CSV & XLSX    │
-└────────────────────────────────────────────────────────────────────────────────────┘
-```
+1. The Chrome extension sends Protocol v2 messages to the standalone Native Messaging relay.
+2. The relay forwards frames over a local Unix socket or Windows named pipe.
+3. Electron runs the SQLite store, rules, AI adapters and notifications in a utility process. The React UI calls that process through a sandboxed preload bridge.
 
 ### Repository Layout
 
 ```text
 apps/
-  desktop/               Tauri v2 Rust desktop shell (`dealsonar` binary + `dealsonar_desktop` lib)
-    capabilities/        Minimal Tauri v2 capability permissions (`core`, `notification`, `autostart`)
-    icons/               RGBA PNG, macOS `.icns`, and Windows `.ico` bundle & tray icons
-    src/                 Lifecycle, Vietnamese system tray, logging, URL security, 55 IPC commands
-    templates/           7 built-in Radar JSON templates (BĐS, Tuyển dụng, Dịch vụ, Xe cũ, B2B, ...)
-    tests/               UI <-> Desktop contract suite & real binary-to-binary E2E suite
-    ui/                  React 18 + TypeScript + Vite Vietnamese desktop interface
-  extension/             Chrome Manifest V3 extension (GraphQL/Comet network tap, DOM fallback, native side panel)
-crates/
-  protocol/              Protocol v2 envelopes, 4-byte LE framing, Unix/NamedPipe IPC, Native Host manifest
-  native-host/           `dealsonar-native-host` stdio <-> local IPC relay binary
-  rules/                 Vietnamese normalization, phone/price/area/location extractors & DSL v1 engine
-  store/                 SQLite (WAL + FTS5) storage, migrations, SimHash dedup, CRM leads, jobs & outbox
-  ai-bridge/             Sandboxed CLI adapters (`claude`, `codex`, `agy`), PII redaction & `eval` runner
-  notify/                OS Keyring secret store, Telegram Bot client, HMAC-SHA256 webhooks, CSV/XLSX export
-  core/                  Central `CoreService` orchestrating T0–T7 pipeline, scheduler, licensing & health
-docs/                    Complete product & technical specifications (`docs/README.md`) + golden eval suite
-scripts/                 Developer helpers (`install-native-host-dev.sh`, `verify-protocol-fixtures.mjs`)
+  desktop-electron/      Electron main, preload, tray, lifecycle and packaging
+  desktop/               Shared React UI, desktop icons and Radar templates
+  extension/             Chrome Manifest V3 extension and native side panel
+packages/
+  desktop-core/          SQLite store, rules, AI adapters, pipeline and notifications
+  native-host/           Standalone Native Messaging relay and local IPC
+fixtures/                Protocol v2 examples
+docs/                    Product specs and golden evaluation data
+scripts/                 Developer launch, native helper setup and release tools
 ```
 
 ---
 
 ## Prerequisites & Setup
 
-- **Rust**: Toolchain pinned via [`rust-toolchain.toml`](rust-toolchain.toml) (`1.83.0` compatible)
-- **Node.js**: `>= 22`
+- **Node.js**: 22 or newer for tests. Use Node 24 to build the standalone native helper.
 - **pnpm**: `9.12.3` (`corepack enable`)
 - **Optional AI CLI** (for live AI extraction): Claude Code (`claude`), OpenAI Codex (`codex`), or Antigravity (`agy`)
 
@@ -77,7 +39,6 @@ Install workspace dependencies and build the UI + Extension bundles:
 pnpm install --frozen-lockfile
 pnpm ui:build
 pnpm ext:build
-cargo build --workspace
 ```
 
 ---
@@ -87,19 +48,16 @@ cargo build --workspace
 ### 1. Start the Desktop App
 
 ```bash
-# Build frontend assets and launch the Tauri v2 desktop shell
-pnpm ui:build
 pnpm desktop
 ```
 
-For hot-reload UI development in a browser (backed by deterministic mock state) or alongside Tauri:
+For hot-reload UI development in a browser with mock data:
 
 ```bash
 pnpm ui:dev
 ```
 
-Startup flags supported by the `dealsonar` binary:
-- `--minimized` / `--autostart`: boots silently into the system tray without opening the main window.
+The installed app accepts `--minimized` or `--autostart`. The development launcher uses an isolated candidate profile by default. Release packages use the existing DealSonar data directory.
 - `DEALSONAR_DATA_DIR=/custom/path`: overrides the OS data directory (`~/Library/Application Support/DealSonar` on macOS, `%APPDATA%\DealSonar` on Windows, `~/.local/share/dealsonar` on Linux).
 
 ### 2. Load & Pair the Chrome Extension + Native Messaging Host
@@ -122,8 +80,7 @@ Startup flags supported by the `dealsonar` binary:
 ### 3. Create a Radar from a Codex or Claude chat
 
 Open DealSonar Desktop and pair at least one relevant Facebook group. Use the absolute path to the
-bundled `dealsonar-native-host` binary. For a local build, run `cargo build -p dealsonar-native-host`
-and use the binary in `target/debug/` (`.exe` on Windows).
+bundled `dealsonar-native-host` binary. For a local build, use Node 24 and run `pnpm --filter @dealsonar/native-host build:sea`. The helper is under `packages/native-host/dist-sea/<platform>-<arch>/`.
 
 ```bash
 codex mcp add dealsonar -- "/absolute/path/to/dealsonar-native-host" --mcp
@@ -158,17 +115,15 @@ group names, activity counts and preview summaries. Individual posts stay in the
 | `pnpm ui:test` | Run Vitest unit, flow, template, and XSS/permalink security tests for UI |
 | `pnpm ext:build` | Build Chrome MV3 extension into `apps/extension/dist` |
 | `pnpm ext:test` | Run Vitest extractor, scheduler, budget, and protocol tests for Extension |
-| `pnpm protocol:verify` | Verify cross-language Rust ↔ TypeScript Protocol v2 golden fixtures |
+| `pnpm protocol:verify` | Verify Protocol v2 golden fixtures |
 | `pnpm eval:bds` | Run Golden Evaluation benchmark on Vietnamese Real Estate (`bds.jsonl`) |
-| `pnpm lint` | Run TypeScript typechecks (`extension` + `desktop-ui`), `cargo clippy -D warnings`, and `cargo fmt --check` |
-| `pnpm test` | Run all Extension tests, Desktop UI tests, protocol fixture checks, and `cargo test --workspace` |
+| `pnpm lint` | Typecheck the workspace packages |
+| `pnpm test` | Run the workspace test suites and protocol fixture checks |
 
 ### GitHub Actions CI and releases
 
 `.github/workflows/ci.yml` runs on branch pushes, pull requests, and manual dispatch.
-It builds/typechecks both frontends, runs their Vitest suites and protocol fixture
-checks, then runs the Rust workspace tests on Linux, Windows, macOS Apple Silicon,
-and macOS Intel. Rust formatting and Clippy remain available through `pnpm lint`.
+It builds both frontends, typechecks the workspace, and runs the test suites and protocol fixture checks. The installer workflow packages and smoke-tests Electron on Linux, Windows, macOS Apple Silicon, and macOS Intel.
 
 Push a version tag to run the same CI gates and build a GitHub Release:
 
@@ -206,18 +161,18 @@ automatic `GITHUB_TOKEN`, with `contents: write` restricted to the final publish
 ### Full Verification Checklist
 
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-pnpm --filter @dealsonar/extension typecheck && pnpm --filter @dealsonar/extension test && pnpm --filter @dealsonar/extension build
-pnpm --filter @dealsonar/desktop-ui typecheck && pnpm --filter @dealsonar/desktop-ui test && pnpm --filter @dealsonar/desktop-ui build
+pnpm lint
+pnpm test
+pnpm ext:build
+pnpm ui:build
+pnpm electron:build
 ```
 
 ---
 
 ## Security & Privacy Highlights
 
-- **Strict WebView Isolation**: Content Security Policy blocks all remote scripts, frames, and network origins (`connect-src ipc: http://ipc.localhost`). Post text is rendered exclusively as plain text + `<mark>` slices (`dangerouslySetInnerHTML` is banned by automated tests).
-- **Safe Permalink Opener**: Both UI and Rust WebView navigation/command guards strictly allow opening only `https://www.facebook.com/`, `https://m.facebook.com/`, `https://web.facebook.com/`, and `https://t.me/<bot>` in the OS default browser.
+- **Strict WebView Isolation**: Content Security Policy blocks all remote scripts, frames, and network origins . Post text is rendered exclusively as plain text + `<mark>` slices (`dangerouslySetInnerHTML` is banned by automated tests).
+- **Safe Permalink Opener**: Electron navigation and command guards strictly allow opening only `https://www.facebook.com/`, `https://m.facebook.com/`, `https://web.facebook.com/`, and `https://t.me/<bot>` in the OS default browser.
 - **Zero Plaintext Secrets**: Telegram bot tokens and HMAC webhook secrets are stored in the OS Keychain (`KeyringSecretStore`), never in SQLite or logs. Diagnostic `.zip` bundles scrub tokens, secrets, phone numbers, and post bodies before export.
 - **Data Retention & Logs**: Rotating JSON logs in `<data_dir>/logs/` are automatically pruned after 7 days, and unmatched posts are purged per configurable retention (`unmatched_retention_days`).

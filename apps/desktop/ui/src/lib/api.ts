@@ -1,5 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import type {
   AiProviderId,
   AiUsageStats,
@@ -41,30 +39,16 @@ import type {
   Source,
   SuggestFieldsInput,
   SuggestFieldsResult,
-  TauriEventMap,
+  DesktopEventMap,
   TelegramSetupStatus,
   UpdateRadarInput,
 } from "../types/ipc";
 import { invokeMockCommand, subscribeMockEvent } from "./mockBackend";
 import { invokeElectron, isElectronRuntime, listenElectron } from "./electronBridge";
 
-/**
- * Returns `true` only when running inside a real Tauri v2 WebView window.
- * Browser dev mode (`vite`) and Vitest (`jsdom`) automatically fall back to `mockBackend`.
- */
-export function isTauriRuntime(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
-
-/** True inside either real desktop shell (Tauri or Electron), false for browser dev mode and tests. */
-export function isDesktopRuntime(): boolean {
-  return isTauriRuntime() || isElectronRuntime();
-}
+export const isDesktopRuntime = isElectronRuntime;
 
 async function callCommand<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-  if (isTauriRuntime()) {
-    return invoke<T>(cmd, args);
-  }
   if (isElectronRuntime()) {
     return invokeElectron<T>(cmd, args);
   }
@@ -75,24 +59,18 @@ async function callCommand<T>(cmd: string, args: Record<string, unknown> = {}): 
  * Subscribe to a real-time backend push event (`03-desktop.md §4`):
  * `lead:new`, `lead:updated`, `preview:progress`, `health:changed`, `crawl:finished`, `job:failed`.
  */
-export async function onDesktopEvent<K extends keyof TauriEventMap>(
+export async function onDesktopEvent<K extends keyof DesktopEventMap>(
   event: K,
-  handler: (payload: TauriEventMap[K]) => void
+  handler: (payload: DesktopEventMap[K]) => void
 ): Promise<() => void> {
-  if (isTauriRuntime()) {
-    const unlisten = await listen<TauriEventMap[K]>(event, (ev) => {
-      handler(ev.payload);
-    });
-    return unlisten;
-  }
   if (isElectronRuntime()) {
-    return listenElectron<TauriEventMap[K]>(event, handler);
+    return listenElectron<DesktopEventMap[K]>(event, handler);
   }
   return subscribeMockEvent(event, handler);
 }
 
 /**
- * Complete typed Tauri IPC client matching `03-desktop.md §4` (all snake_case commands).
+ * Complete typed desktop IPC client matching `03-desktop.md §4` (all snake_case commands).
  */
 export const api = {
   backupPickFile: () => callCommand<string | null>("backup_pick_file"),

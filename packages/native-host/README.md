@@ -1,8 +1,6 @@
 # @dealsonar/native-host
 
-Electron-era port of `crates/native-host` plus the transport/provisioning parts of
-`crates/protocol` (`ipc`, `framing`, `native_manifest`, `agent`). The Rust crates stay as the
-behavior oracle until cutover. Protocol v2, framing limits (64 MiB ext->host, 1 MiB host->ext),
+Standalone Native Messaging relay for the Electron app. It preserves Protocol v2, framing limits (64 MiB ext->host, 1 MiB host->ext),
 `desktop_unavailable` replies, 5 s reconnect, `DEALSONAR_IPC_PATH` / `DEALSONAR_DATA_DIR`
 overrides, the pinned extension id and `allowed_origins` merge rules are unchanged.
 

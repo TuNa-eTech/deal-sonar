@@ -150,11 +150,4 @@ describe("store integration", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("leaves the retained migration files untouched (still byte-identical to the Rust oracle)", () => {
-    const ours = path.resolve(__dirname, "../migrations");
-    const oracle = path.resolve(__dirname, "../../../crates/store/migrations");
-    for (const name of ["0001_init.sql", "0002_durable_feedback.sql", "0003_workflow.sql"]) {
-      expect(fs.readFileSync(path.join(ours, name)).equals(fs.readFileSync(path.join(oracle, name))), name).toBe(true);
-    }
-  });
 });

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import legacyCommands from "./fixtures/desktop-commands.json";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -13,7 +14,6 @@ import {
 import { addLead, addPost, addSource, harness, leadWorld } from "./catalog-fixtures";
 
 const TEMPLATES_DIR = path.resolve(__dirname, "../../../apps/desktop/templates");
-const RUST_DISPATCH = path.resolve(__dirname, "../../../apps/desktop/src/commands/dispatch.rs");
 
 const rejection = async (promise: Promise<unknown>): Promise<any> => {
   try {
@@ -44,9 +44,8 @@ describe("command coverage", () => {
     }
   });
 
-  it("matches the dispatch arms of the Rust oracle", () => {
-    const dispatch = fs.readFileSync(RUST_DISPATCH, "utf8");
-    for (const command of CATALOG_COMMANDS) expect(dispatch).toContain(`"${command}"`);
+  it("preserves the legacy catalog command names", () => {
+    for (const command of CATALOG_COMMANDS) expect(legacyCommands).toContain(command);
   });
 });
 

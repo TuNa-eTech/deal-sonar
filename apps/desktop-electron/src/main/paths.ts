@@ -1,7 +1,10 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import identity from "../../config/identity.json";
+import candidateIdentity from "../../config/identity.json";
+import productionIdentity from "../../config/production-identity.json";
+
+const identity = process.env.DEALSONAR_DESKTOP_CHANNEL === "production" ? productionIdentity : candidateIdentity;
 
 export { identity };
 
@@ -25,7 +28,7 @@ export function resolveDataDir(
   if (override) return override;
   if (platform === "darwin") return join(home, "Library", "Application Support", identity.dataDirName);
   if (platform === "win32") return join(env.APPDATA?.trim() || join(home, "AppData", "Roaming"), identity.dataDirName);
-  const xdg = env.XDG_DATA_HOME?.trim();
+  const xdg = identity.channel === "candidate" ? env.XDG_DATA_HOME?.trim() : undefined;
   return join(xdg || join(home, ".local", "share"), identity.linuxDataDirName);
 }
 
@@ -97,7 +100,11 @@ export function buildBackendEnv(
   for (const [k, v] of Object.entries(base)) {
     if (typeof v === "string") env[k] = v;
   }
-  env.DEALSONAR_DATA_DIR = opts.dataDir;
+  if (identity.channel === "candidate" || base.DEALSONAR_DATA_DIR?.trim()) {
+    env.DEALSONAR_DATA_DIR = opts.dataDir;
+  } else {
+    delete env.DEALSONAR_DATA_DIR;
+  }
   env.DEALSONAR_NATIVE_HOST_BIN = opts.nativeHostBinary;
   env.DEALSONAR_SHELL = "electron";
   env.DEALSONAR_APP_VERSION = opts.appVersion;

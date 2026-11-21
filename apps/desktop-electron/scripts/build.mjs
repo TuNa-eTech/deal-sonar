@@ -13,7 +13,12 @@ const common = {
   bundle: true,
   platform: "node",
   format: "cjs",
-  target: "node20", // Electron 33 ships Node 20.18
+  target: "node22",
+  define: {
+    "process.env.DEALSONAR_DESKTOP_CHANNEL": JSON.stringify(
+      process.env.DEALSONAR_DESKTOP_CHANNEL === "production" ? "production" : "candidate",
+    ),
+  },
   external: ["electron"],
   sourcemap: false,
   logLevel: "info",

@@ -14,7 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const fixturesPath = path.join(
   repoRoot,
-  "crates/protocol/tests/fixtures/protocol_v2_examples.json"
+  "fixtures/protocol-v2-examples.json"
 );
 
 const ALL_MESSAGE_TYPES = new Set([

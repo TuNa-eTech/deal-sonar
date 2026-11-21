@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import legacyCommands from "./fixtures/desktop-commands.json";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -25,7 +26,6 @@ import {
 
 import { createDesktopServices } from "../src/backend/services";
 
-const RUST_DISPATCH = path.resolve(__dirname, "../../../apps/desktop/src/commands/dispatch.rs");
 
 let tmp: string;
 beforeEach(() => {
@@ -80,10 +80,8 @@ function fakeRuntime(overrides: Partial<BackendRuntime> = {}): BackendRuntime & 
 }
 
 describe("command surface", () => {
-  it("matches the arms of the Rust dispatcher (minus the shell-owned open_external_url)", () => {
-    const src = fs.readFileSync(RUST_DISPATCH, "utf8");
-    const arms = [...src.matchAll(/^ {8}"([a-z_]+)" =>/gm)].map((m) => m[1]).filter((c) => c !== "open_external_url");
-    expect([...BACKEND_COMMANDS].sort()).toEqual([...new Set(arms)].sort());
+  it("preserves the legacy backend command names", () => {
+    expect([...BACKEND_COMMANDS].sort()).toEqual(legacyCommands.filter((command) => !["open_external_url", "backup_pick_file"].includes(command)));
     expect(BACKEND_COMMANDS).toHaveLength(58);
   });
 

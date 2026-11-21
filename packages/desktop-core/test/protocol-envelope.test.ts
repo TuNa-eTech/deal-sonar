@@ -12,7 +12,7 @@ import {
 } from "../src/services/protocol-envelope";
 import { KNOWN_MESSAGE_TYPES, isExtensionToDesktop } from "../src/services/protocol-types";
 
-const FIXTURES = path.resolve(__dirname, "../../../crates/protocol/tests/fixtures/protocol_v2_examples.json");
+const FIXTURES = path.resolve(__dirname, "../../../fixtures/protocol-v2-examples.json");
 const fixtures = JSON.parse(fs.readFileSync(FIXTURES, "utf8")) as {
   spec_section_6_session: Array<Record<string, any>>;
   additional_catalog_messages: Array<Record<string, any>>;

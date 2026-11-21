@@ -3,9 +3,11 @@
 // candidate can be installed next to a production DealSonar without sharing its profile, login item,
 // tray registration or single-instance lock. Unsigned publisher policy: no Windows certificate, no
 // notarization; macOS is ad-hoc signed (`identity: "-"`).
-const identity = require("./config/identity.json");
+const identity = process.env.DEALSONAR_DESKTOP_CHANNEL === "production"
+  ? require("./config/production-identity.json")
+  : require("./config/identity.json");
 
-const candidateVersion = process.env.DEALSONAR_CANDIDATE_VERSION?.trim();
+const buildVersion = process.env.DEALSONAR_DESKTOP_VERSION?.trim();
 
 /** @type {import("electron-builder").Configuration} */
 module.exports = {
@@ -19,7 +21,10 @@ module.exports = {
   npmRebuild: false,
   nodeGypRebuild: false,
   files: ["dist/**/*", "package.json"],
-  ...(candidateVersion ? { extraMetadata: { version: candidateVersion } } : {}),
+  extraMetadata: {
+    desktopName: `${identity.executableName}.desktop`,
+    ...(buildVersion ? { version: buildVersion } : {}),
+  },
   // Everything the shell executes or serves lives outside ASAR (real executable bit for the native
   // helper, native modules of the backend load without unpacking).
   extraResources: [

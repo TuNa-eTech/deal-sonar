@@ -1,0 +1,857 @@
+{
+  "contact_list": [
+    {
+      "author_ids": [
+        "a3"
+      ],
+      "created_at": 1700000000003,
+      "display_name": "Author a3",
+      "id": "01M7W1PZ4H4KJHWT0DCQP4GKPT",
+      "last_lead_at": 1700000000003,
+      "lead_count": 1,
+      "note": null,
+      "phones": [
+        "+84911111111"
+      ],
+      "updated_at": 1700000000003
+    },
+    {
+      "author_ids": [
+        "a2"
+      ],
+      "created_at": 1700000000002,
+      "display_name": "Author a2",
+      "id": "01M7W1PZ4GQDW78NSN14ADDS7X",
+      "last_lead_at": 1700000000002,
+      "lead_count": 1,
+      "note": null,
+      "phones": [
+        "+84987654321"
+      ],
+      "updated_at": 1700000000002
+    },
+    {
+      "author_ids": [
+        "a1"
+      ],
+      "created_at": 1700000000001,
+      "display_name": "Author a1",
+      "id": "01M7W1PZ4D53ATZA7DP6ZNBNSB",
+      "last_lead_at": 1700000000001,
+      "lead_count": 1,
+      "note": null,
+      "phones": [
+        "+84912345678"
+      ],
+      "updated_at": 1700000000001
+    }
+  ],
+  "contact_search_phone": 0,
+  "ids": {
+    "radar": "01RADAR00000000000000000001",
+    "source": "01M7W1PZ4BQRM02SFA21C0S9HM"
+  },
+  "lead_get_1": {
+    "author_id": "01M7W1PZ4C3T2B9RTWTJTPFMGC",
+    "author_name": "Author a1",
+    "evaluation": {
+      "ai_call_id": null,
+      "author_role": "owner",
+      "decided_by": "ai",
+      "id": "01EVAL000000000000000000001",
+      "intent": "offer",
+      "radar_version": 1,
+      "reason": null,
+      "ruleset_id": null,
+      "score": 0.9,
+      "verdict": "match"
+    },
+    "events": [
+      {
+        "created_at": 1700000000001,
+        "data": {
+          "score": 0.89
+        },
+        "id": "01M7W1PZ4E7XQ0S37TMEBDAZMH",
+        "kind": "created",
+        "lead_id": "01LEAD000000000000000000001"
+      }
+    ],
+    "lead": {
+      "also_seen_in": [],
+      "contact_id": "01M7W1PZ4D53ATZA7DP6ZNBNSB",
+      "created_at": 1700000000001,
+      "evaluation_id": "01EVAL000000000000000000001",
+      "fields": {
+        "area": {
+          "confidence": 1.0,
+          "raw": null,
+          "source": "rule",
+          "value": 40.0
+        },
+        "price": {
+          "confidence": 0.9,
+          "raw": "12",
+          "source": "ai",
+          "value": {
+            "currency": "VND",
+            "max": 12.0,
+            "min": 12.0,
+            "period": null
+          }
+        }
+      },
+      "follow_up_at": null,
+      "id": "01LEAD000000000000000000001",
+      "note": null,
+      "notified_at": null,
+      "post_id": "01POST00000000000000000001",
+      "radar_id": "01RADAR00000000000000000001",
+      "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+      "read_at": null,
+      "score": 0.89,
+      "status": "new",
+      "summary": "Cho thuê căn hộ Cầu Giấy 12 triệu",
+      "tags": [],
+      "updated_at": 1700000000001
+    },
+    "permalink": "https://facebook.com/groups/g1/posts/1",
+    "post_captured_at": 1700000000001,
+    "post_created_at": 1700000000001,
+    "post_text": "Cho thuê căn hộ Cầu Giấy 12 triệu liên hệ 0912345678",
+    "post_text_norm": "cho thuê căn hộ cầu giấy 12 triệu liên hệ 0912345678",
+    "radar_name": "Tìm nhà",
+    "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+    "source_name": "Nhà đất Cầu Giấy"
+  },
+  "lead_list_area_sort_asc": {
+    "items": [
+      {
+        "author_id": "01M7W1PZ4GZNKKGCN5XGE5G8MQ",
+        "author_name": "Author a3",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4H4KJHWT0DCQP4GKPT",
+          "created_at": 1700000000003,
+          "evaluation_id": "01EVAL000000000000000000003",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 20.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "4",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 4.0,
+                "min": 4.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000003",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000003",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.87,
+          "status": "new",
+          "summary": "Thuê phòng trọ Hà Đông",
+          "tags": [],
+          "updated_at": 1700000000003
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/3",
+        "post_created_at": 1700000000003,
+        "post_text": "Thuê phòng trọ Hà Đông liên hệ 0911111111",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      },
+      {
+        "author_id": "01M7W1PZ4C3T2B9RTWTJTPFMGC",
+        "author_name": "Author a1",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4D53ATZA7DP6ZNBNSB",
+          "created_at": 1700000000001,
+          "evaluation_id": "01EVAL000000000000000000001",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 40.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "12",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 12.0,
+                "min": 12.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000001",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000001",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.89,
+          "status": "new",
+          "summary": "Cho thuê căn hộ Cầu Giấy 12 triệu",
+          "tags": [],
+          "updated_at": 1700000000001
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/1",
+        "post_created_at": 1700000000001,
+        "post_text": "Cho thuê căn hộ Cầu Giấy 12 triệu liên hệ 0912345678",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      },
+      {
+        "author_id": "01M7W1PZ4EKSVT5JPG6DA6G105",
+        "author_name": "Author a2",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4GQDW78NSN14ADDS7X",
+          "created_at": 1700000000002,
+          "evaluation_id": "01EVAL000000000000000000002",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 60.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "3000",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 3000.0,
+                "min": 3000.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000002",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000002",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.88,
+          "status": "new",
+          "summary": "Bán nhà Đống Đa 3 tỷ",
+          "tags": [],
+          "updated_at": 1700000000002
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/2",
+        "post_created_at": 1700000000002,
+        "post_text": "Bán nhà Đống Đa 3 tỷ liên hệ 0987654321",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      }
+    ],
+    "next_cursor": null,
+    "total": 3
+  },
+  "lead_list_default": {
+    "items": [
+      {
+        "author_id": "01M7W1PZ4GZNKKGCN5XGE5G8MQ",
+        "author_name": "Author a3",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4H4KJHWT0DCQP4GKPT",
+          "created_at": 1700000000003,
+          "evaluation_id": "01EVAL000000000000000000003",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 20.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "4",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 4.0,
+                "min": 4.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000003",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000003",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.87,
+          "status": "new",
+          "summary": "Thuê phòng trọ Hà Đông",
+          "tags": [],
+          "updated_at": 1700000000003
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/3",
+        "post_created_at": 1700000000003,
+        "post_text": "Thuê phòng trọ Hà Đông liên hệ 0911111111",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      },
+      {
+        "author_id": "01M7W1PZ4EKSVT5JPG6DA6G105",
+        "author_name": "Author a2",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4GQDW78NSN14ADDS7X",
+          "created_at": 1700000000002,
+          "evaluation_id": "01EVAL000000000000000000002",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 60.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "3000",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 3000.0,
+                "min": 3000.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000002",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000002",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.88,
+          "status": "new",
+          "summary": "Bán nhà Đống Đa 3 tỷ",
+          "tags": [],
+          "updated_at": 1700000000002
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/2",
+        "post_created_at": 1700000000002,
+        "post_text": "Bán nhà Đống Đa 3 tỷ liên hệ 0987654321",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      },
+      {
+        "author_id": "01M7W1PZ4C3T2B9RTWTJTPFMGC",
+        "author_name": "Author a1",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4D53ATZA7DP6ZNBNSB",
+          "created_at": 1700000000001,
+          "evaluation_id": "01EVAL000000000000000000001",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 40.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "12",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 12.0,
+                "min": 12.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000001",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000001",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.89,
+          "status": "new",
+          "summary": "Cho thuê căn hộ Cầu Giấy 12 triệu",
+          "tags": [],
+          "updated_at": 1700000000001
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/1",
+        "post_created_at": 1700000000001,
+        "post_text": "Cho thuê căn hộ Cầu Giấy 12 triệu liên hệ 0912345678",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      }
+    ],
+    "next_cursor": null,
+    "total": 3
+  },
+  "lead_list_page_1": {
+    "items": [
+      {
+        "author_id": "01M7W1PZ4GZNKKGCN5XGE5G8MQ",
+        "author_name": "Author a3",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4H4KJHWT0DCQP4GKPT",
+          "created_at": 1700000000003,
+          "evaluation_id": "01EVAL000000000000000000003",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 20.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "4",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 4.0,
+                "min": 4.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000003",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000003",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.87,
+          "status": "new",
+          "summary": "Thuê phòng trọ Hà Đông",
+          "tags": [],
+          "updated_at": 1700000000003
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/3",
+        "post_created_at": 1700000000003,
+        "post_text": "Thuê phòng trọ Hà Đông liên hệ 0911111111",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      },
+      {
+        "author_id": "01M7W1PZ4EKSVT5JPG6DA6G105",
+        "author_name": "Author a2",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4GQDW78NSN14ADDS7X",
+          "created_at": 1700000000002,
+          "evaluation_id": "01EVAL000000000000000000002",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 60.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "3000",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 3000.0,
+                "min": 3000.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000002",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000002",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.88,
+          "status": "new",
+          "summary": "Bán nhà Đống Đa 3 tỷ",
+          "tags": [],
+          "updated_at": 1700000000002
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/2",
+        "post_created_at": 1700000000002,
+        "post_text": "Bán nhà Đống Đa 3 tỷ liên hệ 0987654321",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      }
+    ],
+    "next_cursor": "off:2",
+    "total": 3
+  },
+  "lead_list_price_lte_100": {
+    "items": [
+      {
+        "author_id": "01M7W1PZ4GZNKKGCN5XGE5G8MQ",
+        "author_name": "Author a3",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4H4KJHWT0DCQP4GKPT",
+          "created_at": 1700000000003,
+          "evaluation_id": "01EVAL000000000000000000003",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 20.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "4",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 4.0,
+                "min": 4.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000003",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000003",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.87,
+          "status": "new",
+          "summary": "Thuê phòng trọ Hà Đông",
+          "tags": [],
+          "updated_at": 1700000000003
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/3",
+        "post_created_at": 1700000000003,
+        "post_text": "Thuê phòng trọ Hà Đông liên hệ 0911111111",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      },
+      {
+        "author_id": "01M7W1PZ4C3T2B9RTWTJTPFMGC",
+        "author_name": "Author a1",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4D53ATZA7DP6ZNBNSB",
+          "created_at": 1700000000001,
+          "evaluation_id": "01EVAL000000000000000000001",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 40.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "12",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 12.0,
+                "min": 12.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000001",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000001",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.89,
+          "status": "new",
+          "summary": "Cho thuê căn hộ Cầu Giấy 12 triệu",
+          "tags": [],
+          "updated_at": 1700000000001
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/1",
+        "post_created_at": 1700000000001,
+        "post_text": "Cho thuê căn hộ Cầu Giấy 12 triệu liên hệ 0912345678",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      }
+    ],
+    "next_cursor": null,
+    "total": 2
+  },
+  "lead_list_search_thue": {
+    "items": [
+      {
+        "author_id": "01M7W1PZ4GZNKKGCN5XGE5G8MQ",
+        "author_name": "Author a3",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4H4KJHWT0DCQP4GKPT",
+          "created_at": 1700000000003,
+          "evaluation_id": "01EVAL000000000000000000003",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 20.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "4",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 4.0,
+                "min": 4.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000003",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000003",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.87,
+          "status": "new",
+          "summary": "Thuê phòng trọ Hà Đông",
+          "tags": [],
+          "updated_at": 1700000000003
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/3",
+        "post_created_at": 1700000000003,
+        "post_text": "Thuê phòng trọ Hà Đông liên hệ 0911111111",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      },
+      {
+        "author_id": "01M7W1PZ4C3T2B9RTWTJTPFMGC",
+        "author_name": "Author a1",
+        "lead": {
+          "also_seen_in": [],
+          "contact_id": "01M7W1PZ4D53ATZA7DP6ZNBNSB",
+          "created_at": 1700000000001,
+          "evaluation_id": "01EVAL000000000000000000001",
+          "fields": {
+            "area": {
+              "confidence": 1.0,
+              "raw": null,
+              "source": "rule",
+              "value": 40.0
+            },
+            "price": {
+              "confidence": 0.9,
+              "raw": "12",
+              "source": "ai",
+              "value": {
+                "currency": "VND",
+                "max": 12.0,
+                "min": 12.0,
+                "period": null
+              }
+            }
+          },
+          "follow_up_at": null,
+          "id": "01LEAD000000000000000000001",
+          "note": null,
+          "notified_at": null,
+          "post_id": "01POST00000000000000000001",
+          "radar_id": "01RADAR00000000000000000001",
+          "radar_version_id": "01M7W1PZ4B98M08QRSX27FVA23",
+          "read_at": null,
+          "score": 0.89,
+          "status": "new",
+          "summary": "Cho thuê căn hộ Cầu Giấy 12 triệu",
+          "tags": [],
+          "updated_at": 1700000000001
+        },
+        "permalink": "https://facebook.com/groups/g1/posts/1",
+        "post_created_at": 1700000000001,
+        "post_text": "Cho thuê căn hộ Cầu Giấy 12 triệu liên hệ 0912345678",
+        "radar_name": "Tìm nhà",
+        "source_id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+        "source_name": "Nhà đất Cầu Giấy"
+      }
+    ],
+    "next_cursor": null,
+    "total": 2
+  },
+  "post_search_dong_da": [
+    "01POST00000000000000000002"
+  ],
+  "radar_get": {
+    "candidate_version": null,
+    "current_version": {
+      "created_at": 1700000000000,
+      "description": "Cho thuê căn hộ",
+      "fields": [
+        {
+          "description": "",
+          "key": "price",
+          "label": "Giá",
+          "options": null,
+          "order": 0,
+          "required": false,
+          "show_in_alert": true,
+          "type": "money"
+        },
+        {
+          "description": "",
+          "key": "area",
+          "label": "Diện tích",
+          "options": null,
+          "order": 0,
+          "required": false,
+          "show_in_alert": true,
+          "type": "number"
+        }
+      ],
+      "id": "01M7W1PZ4B98M08QRSX27FVA23",
+      "language_hint": "vi",
+      "match_policy": {
+        "exclude_roles": [
+          "peer"
+        ],
+        "hard_filters": [],
+        "want_intent": "any"
+      },
+      "radar_id": "01RADAR00000000000000000001",
+      "user_profession": null,
+      "version": 1
+    },
+    "radar": {
+      "created_at": 1700000000000,
+      "current_version": 1,
+      "id": "01RADAR00000000000000000001",
+      "name": "Tìm nhà",
+      "notify": {
+        "channel_ids": [],
+        "min_score": 0.6,
+        "mode": "instant",
+        "quiet_hours": null
+      },
+      "status": "draft",
+      "template_id": null,
+      "updated_at": 1700000000000
+    },
+    "source_ids": [
+      "01M7W1PZ4BQRM02SFA21C0S9HM"
+    ]
+  },
+  "radar_stats": {
+    "ai_decided": 3,
+    "ai_failed": 0,
+    "ai_matched": 3,
+    "dedup_rejected": 0,
+    "false_positive_count": 0,
+    "false_positive_rate": 0.0,
+    "leads_notified": 0,
+    "leads_total": 3,
+    "leads_weak_match": 0,
+    "pending_ai": 0,
+    "postfilter_rejected": 0,
+    "prefilter_rejected": 0,
+    "rule_decided": 0,
+    "rule_handled_ratio": 0.0,
+    "rule_matched": 0,
+    "total_evaluated": 3
+  },
+  "source_list": [
+    {
+      "avg_new_posts": 0.0,
+      "created_at": 1700000000000,
+      "external_id": "g1",
+      "followed": true,
+      "id": "01M7W1PZ4BQRM02SFA21C0S9HM",
+      "kind": "group",
+      "last_crawl_at": null,
+      "member_count": 1200,
+      "name": "Nhà đất Cầu Giấy",
+      "platform": "facebook",
+      "posts_last_24h": 3,
+      "priority": 0,
+      "privacy": "public",
+      "profile_id": "profile-1",
+      "state": "ok",
+      "stored_post_count": 3,
+      "url": "https://facebook.com/groups/g1"
+    }
+  ],
+  "table_row_counts": {
+    "ai_calls": 0,
+    "authors": 3,
+    "blocklist": 0,
+    "channels": 1,
+    "contacts": 3,
+    "crawl_runs": 0,
+    "dup_clusters": 0,
+    "evaluations": 3,
+    "feedback": 0,
+    "jobs": 1,
+    "lead_events": 3,
+    "leads": 3,
+    "outbox": 1,
+    "posts": 3,
+    "radar_sources": 1,
+    "radar_versions": 1,
+    "radars": 1,
+    "rulesets": 0,
+    "schema_migrations": 3,
+    "settings": 1,
+    "sources": 1
+  }
+}

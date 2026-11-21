@@ -1,6 +1,6 @@
 # Tài liệu DealSonar
 
-DealSonar là nền tảng "radar tin" chạy hoàn toàn trên máy người dùng: một extension Chrome đọc bài mới trong các group Facebook người dùng đã tham gia, và một ứng dụng desktop (Rust) hiểu bài bằng AI, trích thông tin theo trường người dùng tự định nghĩa, lưu thành bảng tin kiểu CRM và báo qua Telegram. Không có backend.
+DealSonar là nền tảng "radar tin" chạy hoàn toàn trên máy người dùng: một extension Chrome đọc bài mới trong các group Facebook người dùng đã tham gia, và một ứng dụng desktop Electron hiểu bài bằng AI, trích thông tin theo trường người dùng tự định nghĩa, lưu thành bảng tin kiểu CRM và báo qua Telegram. Không có backend.
 
 Bộ tài liệu này mô tả sản phẩm và đặc tả kỹ thuật đủ để bắt đầu xây. Trạng thái chung: **bản nháp v0.1 (2026-11-11), chưa có quyết định nào được chốt** ngoài các ràng buộc bạn đã nêu (2 ứng dụng, không backend, AI qua CLI).
 
@@ -46,7 +46,7 @@ Bộ tài liệu này mô tả sản phẩm và đặc tả kỹ thuật đủ �
 |---|---|---|---|
 | D-1 | Tính tiền thế nào khi AI chạy bằng tài khoản của chính người dùng? | Giá theo gói tính năng, khoá bản quyền ký số, kiểm tra offline | [PRD §9](product/01-prd.md#9-mô-hình-doanh-thu) |
 | D-2 | Telegram: người dùng tự tạo bot hay dùng bot chung? | Tự tạo bot (bot chung cần một máy chủ chuyển tiếp) | [Thông báo §2](specs/07-notifications-export.md#2-telegram) |
-| D-3 | Khung giao diện desktop | Tauri 2 + React/TypeScript | [ADR-003](architecture/02-decisions.md#adr-003-giao-diện-desktop-bằng-tauri-2) |
+| D-3 | Khung giao diện desktop | Electron + React/TypeScript | [ADR-009](architecture/02-decisions.md#adr-009-desktop-chạy-bằng-electron) |
 | D-4 | Thu bài bằng đọc phản hồi mạng hay đọc DOM | Đọc phản hồi mạng là chính, DOM dự phòng; chốt sau spike S1 | [Extension §4](specs/02-extension.md#4-chiến-lược-trích-bài) |
 | D-5 | Phát hành extension qua Chrome Web Store hay cài thủ công | Chưa chốt; đây là rủi ro phân phối lớn nhất | [Rủi ro R-2](delivery/03-risks-compliance.md#2-sổ-rủi-ro) |
 | D-6 | Giữ nội dung bài không khớp bao lâu | 30 ngày rồi xoá nội dung, giữ lại mã băm | [Dữ liệu §5](specs/04-data-model.md#5-lưu-giữ-và-dọn-dẹp) |

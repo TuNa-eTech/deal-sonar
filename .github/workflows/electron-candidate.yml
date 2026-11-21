@@ -1,10 +1,15 @@
 name: electron-candidate
 
-# Builds the Electron CANDIDATE installers and installs/launches each one on its own OS.
+# Builds Electron installers and launches each on its target OS.
 # Produces test artifacts without publishing a release or signing with a production identity.
 on:
   push:
     branches: [migration/electron-integration]
+  workflow_call:
+    inputs:
+      production:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       allow_stub:
@@ -27,10 +32,10 @@ jobs:
           - { name: macos-arm64-dmg, runner: macos-15, builder: "--mac dmg --arm64", artifact: "*.dmg" }
           - { name: macos-x64-dmg, runner: macos-15-intel, builder: "--mac dmg --x64", artifact: "*.dmg" }
           - { name: windows-x64-nsis, runner: windows-2022, builder: "--win nsis --x64", artifact: "*.exe" }
-          - { name: linux-x64-deb, runner: ubuntu-24.04, builder: "--linux deb AppImage --x64", artifact: "*.deb", extra: "--system-install" }
-          - { name: linux-x64-appimage, runner: ubuntu-24.04, builder: "--linux deb AppImage --x64", artifact: "*.AppImage" }
+          - { name: linux-x64-deb, runner: ubuntu-24.04, builder: "--linux deb --x64", artifact: "*.deb", extra: "--system-install" }
+          - { name: linux-x64-appimage, runner: ubuntu-24.04, builder: "--linux AppImage --x64", artifact: "*.AppImage" }
     env:
-      DEALSONAR_CANDIDATE_VERSION: 0.1.0-candidate.${{ github.run_number }}
+      DEALSONAR_DESKTOP_CHANNEL: ${{ inputs.production && 'production' || 'candidate' }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -78,6 +83,17 @@ jobs:
           else
             pnpm --filter @dealsonar/desktop-electron stage
           fi
+      - name: Set desktop version
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$DEALSONAR_DESKTOP_CHANNEL" = production ]; then
+            node scripts/prepare-release.mjs
+            echo "DEALSONAR_DESKTOP_VERSION=${REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "DEALSONAR_DESKTOP_VERSION=0.1.0-candidate.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          fi
       - name: Package (${{ matrix.name }})
         shell: bash
         working-directory: apps/desktop-electron
@@ -94,12 +110,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ${{ matrix.name }}
+          name: ${{ inputs.production && 'release-desktop-' || '' }}${{ matrix.name }}
           path: |
-            apps/desktop-electron/release/*.dmg
-            apps/desktop-electron/release/*.exe
-            apps/desktop-electron/release/*.deb
-            apps/desktop-electron/release/*.AppImage
+            apps/desktop-electron/release/${{ matrix.artifact }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ matrix.name }}
+          path: |
             apps/desktop-electron/release/smoke/*.json
           if-no-files-found: warn
           retention-days: 7

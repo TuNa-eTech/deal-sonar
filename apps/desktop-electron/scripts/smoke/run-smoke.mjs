@@ -17,7 +17,8 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectDir = resolve(here, "..", "..");
-const identity = JSON.parse(readFileSync(join(projectDir, "config", "identity.json"), "utf8"));
+const identityFile = process.env.DEALSONAR_DESKTOP_CHANNEL === "production" ? "production-identity.json" : "identity.json";
+const identity = JSON.parse(readFileSync(join(projectDir, "config", identityFile), "utf8"));
 
 const args = parseArgs(process.argv.slice(2));
 const mode = args.mode ?? "unpacked";
@@ -249,14 +250,18 @@ function appEnv(extra = {}) {
     DEALSONAR_SMOKE_HOLD_MS: "60000",
     DEALSONAR_DISABLE_AUTOSTART_SYNC: "1",
     DEALSONAR_DISABLE_BROWSER_SPAWN: "1",
+    DEALSONAR_CHROME_MANIFEST_PATH: join(dirs.home, "NativeMessagingHosts", "com.dealsonar.host.json"),
     DEALSONAR_IN_MEMORY_SECRETS: "1",
     ELECTRON_ENABLE_LOGGING: "1",
     ...(display ? { DISPLAY: display } : {}),
     ...extra,
   };
+  delete env.DEALSONAR_IPC_PATH;
+  delete env.DEALSONAR_CHROME_REGISTRY_KEY;
   if (platform === "win32") {
     env.APPDATA = join(dirs.home, "AppData", "Roaming");
     env.LOCALAPPDATA = join(dirs.home, "AppData", "Local");
+    env.DEALSONAR_IPC_PATH = `dealsonar-smoke-${process.pid}`;
   }
   for (const k of ["DEALSONAR_LICENSE_KEY", "TELEGRAM_BOT_TOKEN"]) delete env[k];
   return env;

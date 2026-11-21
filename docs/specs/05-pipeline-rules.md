@@ -83,7 +83,7 @@ Radar chưa có bộ luật vẫn chạy được bước 1–3.
 
 ### 6.1 Vai trò
 
-Bộ luật là dữ liệu JSON theo một DSL cố định, do AI sinh ra từ các bài đã có nhãn, và được bộ máy trong `crates/rules` thực thi ([ADR-006](../architecture/02-decisions.md#adr-006-bộ-luật-là-dsl-khai-báo-không-phải-mã-do-ai-sinh)). Nó trả lời yêu cầu trong bản ý tưởng: sau khi AI đã phân tích đủ, các lần sau lọc và phân loại được mà không cần AI.
+Bộ luật là dữ liệu JSON theo một DSL cố định, do AI sinh ra từ các bài đã có nhãn, và được bộ máy trong `packages/desktop-core/src/rules` thực thi ([ADR-006](../architecture/02-decisions.md#adr-006-bộ-luật-là-dsl-khai-báo-không-phải-mã-do-ai-sinh)). Nó trả lời yêu cầu trong bản ý tưởng: sau khi AI đã phân tích đủ, các lần sau lọc và phân loại được mà không cần AI.
 
 Kỳ vọng thực tế: bộ luật giỏi ở hai việc là loại bài rõ ràng không liên quan (thường là phần lớn lưu lượng) và trích các trường có hình dạng cố định (tiền, SĐT, diện tích, địa danh). Bài mơ hồ, mỉa mai, viết tắt lạ, hoặc cần hiểu ngữ cảnh vẫn phải lên AI.
 

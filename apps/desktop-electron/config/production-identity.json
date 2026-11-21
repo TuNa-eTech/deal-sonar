@@ -1,0 +1,9 @@
+{
+  "channel": "production",
+  "appId": "com.dealsonar.desktop",
+  "productName": "DealSonar",
+  "executableName": "dealsonar",
+  "dataDirName": "DealSonar",
+  "linuxDataDirName": "dealsonar",
+  "artifactPrefix": "DealSonar"
+}

@@ -139,3 +139,7 @@ Mỗi mục ghi bối cảnh, quyết định, phương án đã cân nhắc và
 **Quyết định.** Desktop tính và đẩy xuống một **kế hoạch quét** (danh sách nguồn kèm chu kỳ và ngân sách). Extension tự đặt báo thức theo kế hoạch và thực thi, kể cả khi tạm thời không nhận được lệnh mới, miễn là kết nối còn. Extension tự áp dụng các chặn cứng (trần tải mỗi giờ và mỗi ngày, giờ hoạt động, dừng khi phát hiện phiên có vấn đề) để một lỗi ở desktop không thể khiến extension quét quá mức.
 
 **Hệ quả.** Chính sách an toàn được thực thi ở hai lớp. Thay đổi chính sách không cần phát hành lại extension, trừ các chặn cứng.
+
+## ADR-009: Desktop chạy bằng Electron
+
+Thay thế ADR-003. Electron main phụ trách vòng đời và khay hệ thống. Giao diện React gọi các lệnh qua preload giới hạn quyền. Utility process TypeScript sở hữu SQLite và IPC với native host. Bộ cài phát hành dùng đường dẫn dữ liệu và kho thông tin xác thực của ứng dụng trước. Bản candidate dùng hồ sơ riêng để chạy thử.

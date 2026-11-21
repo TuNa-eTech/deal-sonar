@@ -2,31 +2,14 @@
 
 Trạng thái: nháp v0.1 · 2026-11-11
 
-App desktop là nơi mọi quyết định diễn ra: giữ dữ liệu, chấm bài, gọi AI, gửi thông báo, hiển thị giao diện. Viết bằng Rust, vỏ Tauri 2 ([ADR-003](../architecture/02-decisions.md#adr-003-giao-diện-desktop-bằng-tauri-2)).
+App desktop là nơi mọi quyết định diễn ra: giữ dữ liệu, chấm bài, gọi AI, gửi thông báo, hiển thị giao diện. Ứng dụng chạy bằng Electron và TypeScript ([ADR-009](../architecture/02-decisions.md#adr-009-desktop-chạy-bằng-electron)).
 
 ## 1. Module
 
-```
-apps/desktop (vỏ)
-  ├── khởi động, đơn thể, khay hệ thống, tự chạy cùng máy
-  ├── lệnh cho giao diện (Tauri commands) và sự kiện đẩy lên giao diện
-  └── cài file khai báo native host
-
-crates/core
-  ├── domain      kiểu miền: Radar, RadarVersion, Field, Post, Evaluation, Lead…
-  ├── ingest      nhận message từ IPC, kiểm tra, ghi bài
-  ├── pipeline    điều phối các tầng xử lý (xem 05-pipeline-rules.md)
-  ├── scheduler   tính kế hoạch quét, công việc định kỳ
-  ├── jobs        hàng đợi công việc bền trên SQLite
-  └── license     kiểm tra khoá bản quyền và giới hạn gói
-
-crates/store      SQLite: kết nối, migration, kho truy vấn theo từng tập hợp
-crates/rules      chuẩn hoá, băm, lọc trùng, bộ máy bộ luật, bộ trích dựng sẵn
-crates/ai-bridge  provider, adapter CLI, prompt, schema, kiểm tra đầu ra
-crates/notify     Telegram, hộp gửi đi, xuất file, webhook
-```
-
-Quy tắc phụ thuộc: `core` phụ thuộc `store`, `rules`, `ai-bridge`, `notify`. Bốn crate đó không phụ thuộc lẫn nhau và không phụ thuộc `core`. Vỏ desktop chỉ phụ thuộc `core`. Giao diện không chứa nghiệp vụ.
+- `apps/desktop-electron` quản lý cửa sổ, khay, tự khởi động và IPC từ preload.
+- `apps/desktop/ui` chứa giao diện React.
+- `packages/desktop-core` chạy SQLite, pipeline, scheduler, AI và thông báo trong utility process.
+- `packages/native-host` chuyển tiếp Protocol v2 qua Native Messaging và IPC cục bộ.
 
 ## 2. Khởi động và vòng đời
 
@@ -112,7 +95,7 @@ Nguồn không còn radar nào dùng bị bỏ khỏi kế hoạch nhưng không
 
 ## 4. Lệnh cho giao diện
 
-Giao diện gọi nhân qua lệnh Tauri (yêu cầu–trả lời) và nhận sự kiện đẩy. Tên lệnh theo dạng `nhóm_hành_động`.
+Giao diện gọi nhân qua IPC Electron (yêu cầu–trả lời) và nhận sự kiện đẩy. Tên lệnh theo dạng `nhóm_hành_động`.
 
 | Nhóm | Lệnh |
 |---|---|

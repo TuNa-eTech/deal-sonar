@@ -30,7 +30,7 @@ docs/eval/
 
 ## 2. Lược đồ Dữ liệu (`GoldenSample` & `RadarPromptContext`)
 
-Các tệp trong `golden/` tương thích 100% với trình chạy `cargo run -p dealsonar-ai-bridge --bin eval` (`crates/ai-bridge/src/eval.rs`):
+Các tệp trong `golden/` tương thích 100% với trình chạy `node packages/desktop-core/scripts/eval.mjs` (`packages/desktop-core/src/tools/eval.ts`):
 
 - **Mỗi dòng trong `<tên>.jsonl` (`GoldenSample`):**
   - `id` (`string`): Mã định danh duy nhất của mẫu (ví dụ `"bds-001"`).
@@ -93,19 +93,19 @@ Chất lượng phân loại và trích xuất trên đường cơ sở tất đ
 
 ```bash
 # Chạy từng bộ dữ liệu chuẩn (mặc định --provider mock --batch-size 20)
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/bds.jsonl \
   --radar docs/eval/golden/bds.radar.json
 
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/dich-vu.jsonl \
   --radar docs/eval/golden/dich-vu.radar.json
 
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/xe-cu.jsonl \
   --radar docs/eval/golden/xe-cu.radar.json
 
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/multilingual.jsonl \
   --radar docs/eval/golden/multilingual.radar.json
 ```
@@ -113,7 +113,7 @@ cargo run -p dealsonar-ai-bridge --bin eval -- \
 Xuất kết quả định dạng JSON máy đọc (ví dụ ở cỡ lô `40`):
 
 ```bash
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/bds.jsonl \
   --radar docs/eval/golden/bds.radar.json \
   --batch-size 40 \
@@ -126,34 +126,34 @@ cargo run -p dealsonar-ai-bridge --bin eval -- \
 
 ```bash
 # 1. Claude Code CLI — đối chiếu hạng nhanh (Haiku) và hạng thông minh (Sonnet)
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/bds.jsonl \
   --radar docs/eval/golden/bds.radar.json \
   --provider claude --tier fast --batch-size 20
 
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/bds.jsonl \
   --radar docs/eval/golden/bds.radar.json \
   --provider claude --tier smart --batch-size 20
 
 # 2. OpenAI Codex CLI — chạy kiểm chứng ở cả hạng fast và smart
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/bds.jsonl \
   --radar docs/eval/golden/bds.radar.json \
   --provider codex --tier fast --batch-size 20
 
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/bds.jsonl \
   --radar docs/eval/golden/bds.radar.json \
   --provider codex --tier smart --batch-size 20
 
 # 3. Antigravity CLI (agy) — kiểm chứng trích xuất tiếng Việt & đa ngôn ngữ
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/bds.jsonl \
   --radar docs/eval/golden/bds.radar.json \
   --provider agy --tier fast --batch-size 20
 
-cargo run -p dealsonar-ai-bridge --bin eval -- \
+node packages/desktop-core/scripts/eval.mjs \
   --dataset docs/eval/golden/multilingual.jsonl \
   --radar docs/eval/golden/multilingual.radar.json \
   --provider agy --tier smart --batch-size 20
@@ -163,7 +163,7 @@ Bạn cũng có thể chỉ định đích danh tên mô hình qua cờ `--model
 
 ```bash
 for bs in 5 10 20 40; do
-  cargo run -p dealsonar-ai-bridge --bin eval -- \
+  node packages/desktop-core/scripts/eval.mjs \
     --dataset docs/eval/golden/bds.jsonl \
     --radar docs/eval/golden/bds.radar.json \
     --provider claude --tier fast --batch-size "$bs" --json \

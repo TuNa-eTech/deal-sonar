@@ -16,7 +16,7 @@ import { FrameCollector, cleanupTmpDirs, frameOf, testEndpoint, tmpDir, waitFor 
 afterAll(cleanupTmpDirs);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const fixturePath = path.resolve(here, "../../../crates/protocol/tests/fixtures/protocol_v2_examples.json");
+const fixturePath = path.resolve(here, "../../../fixtures/protocol-v2-examples.json");
 const present = fs.existsSync(fixturePath);
 
 const EXT_TO_DESKTOP = new Set(["hello", "posts.push", "crawl.report", "sources.discovered", "session.status", "ping"]);

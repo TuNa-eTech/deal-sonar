@@ -2,7 +2,6 @@
 
 Electron shell for DealSonar (candidate identity). It owns the window, tray, dialogs, notifications,
 autostart, single-instance lock, URL/IPC allowlisting and the lifecycle of the Backend `utilityProcess`.
-The Rust/Tauri shell in `apps/desktop` stays as the behavior oracle until cutover; nothing here edits it.
 
 ## Layout
 
@@ -81,7 +80,7 @@ Smoke runs with a temporary home, data directory and Chromium profile. It uses i
 records: resources outside ASAR, native helper executable, backend handshake, renderer isolation (no `require`/`process`),
 IPC round trip, unknown-command and external-URL rejection, `window.open`/navigation guards, tray, single-instance
 second launch, graceful shutdown (SIGTERM; in-app hold timer on Windows), and for macOS the ad-hoc signature.
-The result is written to `release/smoke/smoke-<platform>-<arch>-<mode>.json`. Stub-backed runs report `backend_kind: "stub"`. The GitHub Actions workflow builds the SQLite backend and the Node 24 native helper on each target by default. Pushes to `migration/electron-integration` trigger the installer matrix.
+The result is written to `release/smoke/smoke-<platform>-<arch>-<mode>.json`. Stub-backed runs report `backend_kind: "stub"`. The GitHub Actions workflow builds the SQLite backend and the Node 24 native helper on each target by default. The workflow can run the installer matrix manually. Tag releases call the same workflow with the production app identity and existing data-directory defaults.
 
 ## Known limits
 
