@@ -40,6 +40,22 @@ use dealsonar_store::models::{
 use dealsonar_store::Store;
 use serde_json::json;
 
+/// A Unix socket under the temp dir, or a uniquely named pipe on Windows (which has no socket files).
+fn test_endpoint(dir: &std::path::Path, name: &str) -> IpcEndpoint {
+    #[cfg(windows)]
+    {
+        let _ = (dir, name);
+        IpcEndpoint::from_path(format!(
+            r"\\.\pipe\dealsonar-test-{}",
+            dealsonar_protocol::new_ulid()
+        ))
+    }
+    #[cfg(not(windows))]
+    {
+        IpcEndpoint::from_path(dir.join(name))
+    }
+}
+
 async fn wait_preview(
     service: &dealsonar_core::CoreService,
     radar_id: &str,
@@ -107,7 +123,7 @@ fn seed_post(store: &Store, source_id: &str, ext_id: &str, text: &str, captured_
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn streaming_preview_crawl_request_and_all_three_quality_warnings() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let endpoint = IpcEndpoint::from_path(tmp.path().join("preview.sock"));
+    let endpoint = test_endpoint(tmp.path(), "preview.sock");
     let store = Store::open_in_memory().expect("store");
     let mock_ai = Arc::new(MockAiProvider::new());
 

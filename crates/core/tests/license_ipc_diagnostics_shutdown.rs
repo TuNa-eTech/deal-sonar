@@ -32,6 +32,22 @@ use dealsonar_store::models::{now_ms, DiscoveredSourceInput};
 use dealsonar_store::Store;
 use zip::ZipArchive;
 
+/// A Unix socket under the temp dir, or a uniquely named pipe on Windows (which has no socket files).
+fn test_endpoint(dir: &std::path::Path, name: &str) -> IpcEndpoint {
+    #[cfg(windows)]
+    {
+        let _ = (dir, name);
+        IpcEndpoint::from_path(format!(
+            r"\\.\pipe\dealsonar-test-{}",
+            dealsonar_protocol::new_ulid()
+        ))
+    }
+    #[cfg(not(windows))]
+    {
+        IpcEndpoint::from_path(dir.join(name))
+    }
+}
+
 async fn recv_host_env(stream: &mut IpcStream) -> Envelope {
     let bytes = tokio::time::timeout(
         Duration::from_secs(3),
@@ -268,7 +284,7 @@ async fn ed25519_license_limits_tamper_rejection_and_downgrade_auto_pause() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn ipc_malformed_frames_extractor_broken_and_checkpoint_pause_resume() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let endpoint = IpcEndpoint::from_path(tmp.path().join("ipc_resilience.sock"));
+    let endpoint = test_endpoint(tmp.path(), "ipc_resilience.sock");
     let manifest_path = tmp
         .path()
         .join("NativeMessagingHosts/com.dealsonar.host.json");

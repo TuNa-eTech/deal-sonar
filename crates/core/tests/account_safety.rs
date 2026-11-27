@@ -15,6 +15,22 @@ use dealsonar_protocol::{
 use dealsonar_store::models::now_ms;
 use zip::ZipArchive;
 
+/// A Unix socket under the temp dir, or a uniquely named pipe on Windows (which has no socket files).
+fn test_endpoint(dir: &std::path::Path, name: &str) -> IpcEndpoint {
+    #[cfg(windows)]
+    {
+        let _ = (dir, name);
+        IpcEndpoint::from_path(format!(
+            r"\\.\pipe\dealsonar-test-{}",
+            dealsonar_protocol::new_ulid()
+        ))
+    }
+    #[cfg(not(windows))]
+    {
+        IpcEndpoint::from_path(dir.join(name))
+    }
+}
+
 async fn recv(stream: &mut IpcStream) -> Envelope {
     let bytes = tokio::time::timeout(
         Duration::from_secs(3),
@@ -48,7 +64,7 @@ async fn session(stream: &mut IpcStream, state: SessionState, detail: Option<&st
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn each_session_problem_is_logged_once_with_the_previous_day_of_page_loads() {
     let tmp = tempfile::tempdir().unwrap();
-    let endpoint = IpcEndpoint::from_path(tmp.path().join("safety.sock"));
+    let endpoint = test_endpoint(tmp.path(), "safety.sock");
     let service = CoreServiceBuilder::open_for_test(CoreConfig {
         data_dir: tmp.path().join("data"),
         ipc_endpoint: Some(endpoint.clone()),

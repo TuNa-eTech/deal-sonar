@@ -32,6 +32,22 @@ use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
+/// A Unix socket under the temp dir, or a uniquely named pipe on Windows (which has no socket files).
+fn test_endpoint(dir: &std::path::Path, name: &str) -> IpcEndpoint {
+    #[cfg(windows)]
+    {
+        let _ = (dir, name);
+        IpcEndpoint::from_path(format!(
+            r"\\.\pipe\dealsonar-test-{}",
+            dealsonar_protocol::new_ulid()
+        ))
+    }
+    #[cfg(not(windows))]
+    {
+        IpcEndpoint::from_path(dir.join(name))
+    }
+}
+
 #[derive(Debug, Clone)]
 struct RecordedTelegramSend {
     chat_id: i64,
@@ -224,7 +240,7 @@ async fn send_ext_env(stream: &mut IpcStream, env: &Envelope) {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn full_e2e_ipc_pipeline_telegram_feedback_and_export() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let endpoint = IpcEndpoint::from_path(tmp.path().join("ipc.sock"));
+    let endpoint = test_endpoint(tmp.path(), "ipc.sock");
     let tg_server = MockTelegramServer::start().await;
 
     let tg_client = TelegramClient::with_config(TelegramClientConfig {
