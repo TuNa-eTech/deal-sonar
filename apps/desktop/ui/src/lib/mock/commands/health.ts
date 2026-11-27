@@ -1,6 +1,6 @@
 // Mock handlers: health and diagnostics.
 
-import type { AiUsageStats, FirstNewsStatus } from "../../../types/ipc";
+import type { AccountSafetyReport, AiUsageStats, FirstNewsStatus } from "../../../types/ipc";
 import type { MockCommandTable } from "./types";
 import { state } from "../store";
 
@@ -11,6 +11,23 @@ export const healthCommands: MockCommandTable = {
 
   crawl_run_list: async () => {
     return structuredClone(state.crawlRuns);
+  },
+
+  account_safety_report: async (args) => {
+    const now = Date.now();
+    return {
+      generated_at: now,
+      app_version: "mock",
+      window_days: Number(args.days ?? 30),
+      crawl_policy: {
+        group_interval_minutes: 15, priority_interval_minutes: 5, hourly_page_load_budget: 60,
+        daily_page_load_budget: 600, active_hours: { from: "07:00", to: "23:00" },
+        max_scroll_steps: 3, max_posts_per_visit: 25, only_when_idle: false,
+      },
+      followed_groups: state.sources.filter((source) => source.followed).length,
+      active_days: [],
+      incidents: [],
+    } satisfies AccountSafetyReport;
   },
 
   first_news_status: async () => {

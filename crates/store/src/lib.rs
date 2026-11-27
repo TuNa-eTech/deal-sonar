@@ -6,6 +6,7 @@ pub mod models;
 pub mod ops;
 pub mod posts;
 pub mod radars;
+pub mod safety;
 pub mod sources;
 
 use std::collections::BTreeMap;
@@ -21,6 +22,7 @@ use thiserror::Error;
 
 pub use models::*;
 pub use journey::JourneySnapshot;
+pub use safety::CrawlDayActivity;
 
 /// Embedded numbered SQL migration definition.
 #[derive(Debug, Clone, Copy)]

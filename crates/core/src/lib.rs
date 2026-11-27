@@ -12,6 +12,7 @@ pub mod ipc_server;
 pub mod license;
 pub mod pipeline;
 pub mod preview_rules;
+pub mod safety;
 pub mod scheduler;
 pub mod service;
 pub mod state;

@@ -447,6 +447,47 @@ export interface HealthStatus {
   checked_at: number;
 }
 
+export type AccountIncidentKind = "checkpoint" | "logged_out" | "rate_limited" | "unknown";
+
+/** A Facebook session problem; scanning was paused when it was recorded. */
+export interface AccountIncident {
+  id: string;
+  kind: AccountIncidentKind;
+  occurred_at: number;
+  detail: string;
+  page_loads_24h: number;
+  page_loads_1h: number;
+  scanning_paused: boolean;
+  resolved_at: number | null;
+}
+
+export interface CrawlDayActivity {
+  date: string;
+  runs: number;
+  page_loads: number;
+  blocked_runs: number;
+}
+
+/** Session incidents and scan activity for the long account-safety observation. */
+export interface AccountSafetyReport {
+  generated_at: number;
+  app_version: string;
+  window_days: number;
+  crawl_policy: {
+    group_interval_minutes: number;
+    priority_interval_minutes: number;
+    hourly_page_load_budget: number;
+    daily_page_load_budget: number;
+    active_hours: { from: string; to: string };
+    max_scroll_steps: number;
+    max_posts_per_visit: number;
+    only_when_idle: boolean;
+  };
+  followed_groups: number;
+  active_days: CrawlDayActivity[];
+  incidents: AccountIncident[];
+}
+
 /** Facts about the path from first launch to the first real lead. */
 export interface FirstNewsStatus {
   /** First app launch, not Radar creation. */
