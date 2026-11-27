@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 mod commands;
+mod compare;
 mod convert;
 mod events;
 mod leads;
@@ -15,6 +16,7 @@ mod ruleset_convert;
 mod system;
 
 pub use commands::*;
+pub use compare::*;
 pub use convert::*;
 pub use events::*;
 pub use leads::*;

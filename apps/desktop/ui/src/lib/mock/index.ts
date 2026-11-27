@@ -1,5 +1,6 @@
 // Mock Tauri command dispatcher used in browser dev mode and Vitest.
 
+import { compareCommands } from "./commands/compare";
 import { contactCommands } from "./commands/contacts";
 import { dataCommands } from "./commands/data";
 import { healthCommands } from "./commands/health";
@@ -16,6 +17,7 @@ import { state } from "./store";
 const MOCK_COMMANDS: MockCommandTable = {
   ...templateCommands,
   ...radarCommands,
+  ...compareCommands,
   ...sourceCommands,
   ...leadCommands,
   ...postCommands,

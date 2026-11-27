@@ -155,6 +155,17 @@ Chủ xe muốn giữ bộ trường đang dùng nhưng đổi tuyến, nhóm ng
 
 Danh sách chặn riêng của radar gốc (`blocklist.radar_id`) không được sao chép; chặn áp dụng cho mọi radar vẫn có hiệu lực.
 
+### So sánh hai định nghĩa
+
+Khi đổi tiêu chí, khách cần thấy bài nào xuất hiện hoặc biến mất. Thao tác "So sánh" chấm **một tập bài chung** bằng hai phiên bản radar (cùng radar khác phiên bản, biến thể với radar gốc, hoặc hai radar khác hẳn nhau như "tìm xe" và "tìm hàng" trên cùng một group).
+
+- **Đầu vào:** hai định nghĩa (radar + số phiên bản, mặc định phiên bản đang dùng) và tập bài: các group đã chọn (tối đa 50 bài gần nhất) hoặc danh sách bài cụ thể. Không chọn thì dùng các group hai radar cùng theo dõi.
+- **Bản ghi:** mỗi lần so sánh lưu ID phiên bản và nội dung định nghĩa hai bên, danh sách ID bài đã dùng, các group, và kết quả từng bài. Nội dung bài không được lưu kèm; nó theo thời hạn giữ bài như bình thường.
+- **Phân loại từng bài:** mới khớp (chỉ B khớp), hết khớp (chỉ A khớp), vẫn khớp nhưng đổi trường trích (chỉ xét các trường có ở cả hai định nghĩa, so giá trị chuẩn hoá), vẫn khớp không đổi, không khớp ở cả hai, và chưa so sánh được (một bên chưa chấm xong, ví dụ lỗi AI).
+- **Lý do từng bài:** lý do của mỗi bên (khớp bao nhiêu phần trăm, hoặc bị loại vì sao) kèm gợi ý điểm khác nhau giữa hai định nghĩa (mô tả, chiều cần tìm, lọc người cùng nghề, điều kiện lọc cứng) và giá trị trường trước/sau.
+- **Không có tác dụng phụ:** so sánh chạy như xem thử (§5): không tạo tin, liên hệ hay thông báo, không đổi trạng thái hay phiên bản radar nào. Kết quả chấm tạm nằm ở một phạm vi riêng nên không đè lên kết quả xem thử hay kết quả chạy thật của radar, và bị xoá ngay sau khi đọc. Phần duy nhất ghi thêm là nhật ký gọi AI và bản ghi so sánh (giữ 20 bản gần nhất).
+- Kết quả do AI chấm nên có thể lệch nhẹ giữa các lần chạy.
+
 ## 5. Xem thử
 
 Mục đích: cho người dùng thấy radar làm gì trên bài thật trước khi nó bắt đầu làm phiền họ, và thu nhãn đầu tiên.

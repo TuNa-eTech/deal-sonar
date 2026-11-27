@@ -39,8 +39,10 @@ use crate::pipeline::{
 };
 use crate::state::{CoreRuntime, InflightAiGuard};
 
+mod compare;
 mod preview;
 mod rulesets;
 
+pub use compare::*;
 pub use preview::*;
 pub use rulesets::*;

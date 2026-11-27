@@ -11,6 +11,7 @@ import type {
   Ruleset,
 } from "../types/ipc";
 import { FunnelChart } from "../components/FunnelChart";
+import { RadarCompareDialog } from "../components/RadarCompareDialog";
 import { RadarVariantDialog } from "../components/RadarVariantDialog";
 import { Badge, Button, Card, Input } from "../components/ui";
 
@@ -39,6 +40,7 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [variantOf, setVariantOf] = useState<string | null>(null);
+  const [compareFrom, setCompareFrom] = useState<string | null>(null);
 
   useEffect(() => {
     if (!radars.some(r => r.id === selectedId)) {
@@ -179,6 +181,14 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
         />
       )}
 
+      {compareFrom && (
+        <RadarCompareDialog
+          radars={radars}
+          initialLeftId={compareFrom}
+          onClose={() => setCompareFrom(null)}
+        />
+      )}
+
       {errorMsg && (
         <div className="health-banner danger" style={{ borderRadius: 6, marginBottom: 12 }}>
           <span>{errorMsg}</span>
@@ -269,6 +279,9 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
                     </Button>
                     <Button size="sm" onClick={() => setVariantOf(r.id)}>
                       Tạo biến thể
+                    </Button>
+                    <Button size="sm" onClick={() => setCompareFrom(r.id)}>
+                      So sánh
                     </Button>
                     <Button
                       size="sm"

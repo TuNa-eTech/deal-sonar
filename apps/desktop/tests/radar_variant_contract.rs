@@ -77,3 +77,43 @@ async fn variant_commands_round_trip_through_the_ui_contract() {
         .iter()
         .any(|r| r["id"] == variant["radar"]["id"] && r["variant_of"] == json!(original_id)));
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn compare_commands_are_wired_to_the_ui_contract() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let data_dir = tmp.path().join("data");
+    let cfg = CoreConfig {
+        data_dir: data_dir.clone(),
+        spawn_background_workers: false,
+        ..CoreConfig::default()
+    };
+    let core = Arc::new(
+        dealsonar_core::CoreServiceBuilder::open_for_test(cfg)
+            .expect("open_for_test")
+            .start()
+            .expect("start core"),
+    );
+    let state = DesktopState::from_core(core, data_dir, tmp.path().join("dealsonar-native-host"));
+
+    let list = invoke_command_json(&state, "radar_compare_list", json!({}))
+        .await
+        .expect("radar_compare_list");
+    assert_eq!(list, json!([]));
+
+    // Argument shapes parse; the unknown radar is reported rather than rejected as malformed.
+    let missing = invoke_command_json(
+        &state,
+        "radar_compare_run",
+        json!({ "input": {
+            "left": { "radar_id": "nope" },
+            "right": { "radar_id": "nope", "version": 2 },
+            "source_ids": ["s"]
+        }}),
+    )
+    .await
+    .expect_err("unknown radar");
+    assert!(format!("{missing:?}").contains("radar"), "{missing:?}");
+    invoke_command_json(&state, "radar_compare_get", json!({ "id": "nope" }))
+        .await
+        .expect_err("unknown comparison");
+}

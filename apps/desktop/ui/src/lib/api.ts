@@ -29,6 +29,9 @@ import type {
   PreviewStartInput,
   ProbeResult,
   Radar,
+  RadarCompareInput,
+  RadarComparison,
+  RadarComparisonSummary,
   RadarDetail,
   RadarStatus,
   RadarTemplate,
@@ -96,6 +99,10 @@ export const api = {
     callCommand<RadarVariantDraft>("radar_variant_prepare", { source_radar_id }),
   radarCreateVariant: (input: CreateRadarVariantInput) =>
     callCommand<RadarDetail>("radar_create_variant", { input }),
+  radarCompareRun: (input: RadarCompareInput) =>
+    callCommand<RadarComparison>("radar_compare_run", { input }),
+  radarCompareGet: (id: string) => callCommand<RadarComparison>("radar_compare_get", { id }),
+  radarCompareList: () => callCommand<RadarComparisonSummary[]>("radar_compare_list"),
   radarUpdate: (input: UpdateRadarInput) =>
     callCommand<RadarUpdateResult>("radar_update", { input }),
   radarSuggestFields: (input: SuggestFieldsInput) =>

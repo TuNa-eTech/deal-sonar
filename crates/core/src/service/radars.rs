@@ -483,6 +483,21 @@ impl CoreService {
         Ok(detail.radar)
     }
 
+    /// Evaluate two saved radar definitions on one shared set of posts and report which posts
+    /// appear, disappear or change extracted fields. Creates no leads and sends nothing.
+    pub async fn radar_compare_run(&self, input: RadarCompareInput) -> CoreResult<RadarComparison> {
+        self.ensure_not_shutting_down()?;
+        run_radar_comparison(&self.rt, input).await
+    }
+
+    pub fn radar_compare_get(&self, id: &str) -> CoreResult<RadarComparison> {
+        get_radar_comparison(&self.rt, id)
+    }
+
+    pub fn radar_compare_list(&self) -> CoreResult<Vec<RadarComparisonSummary>> {
+        list_radar_comparisons(&self.rt)
+    }
+
     pub async fn radar_preview_start(
         &self,
         input: PreviewStartInput,

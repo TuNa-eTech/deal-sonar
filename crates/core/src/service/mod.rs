@@ -54,20 +54,22 @@ use crate::dto::{
     FacebookSessionState, FeedbackLabel, FunnelStats, HardFilter, HealthStatus, LeadCrmPatch,
     LeadDetail, LeadEvent, LeadExportInput, LeadExportResult, LeadFeedbackInput,
     LeadFeedbackResult, LeadFilterQuery, LeadListResponse, LeadStatus, LicenseStatus, ModelTierMap,
-    Post, PrefilterHintDto, PreviewRunState, PreviewStartInput, ProbeResult, Radar, RadarDetail,
-    RadarNotifyConfig, RadarNotifyPatch, RadarStatus, RadarTemplate, RadarUpdateResult,
-    RadarVariantDraft, RejectReason, RejectedEvaluation, Ruleset, RulesetBody,
-    RulesetCompileResult, Settings, SettingsPatch, Source, SourceCrawlNowResult, SourceState,
-    SuggestFieldsInput, SuggestFieldsResult, TelegramSetupStatus, TelegramTestResult,
-    UpdateRadarInput, WantIntent, WhenMissing,
+    Post, PrefilterHintDto, PreviewRunState, PreviewStartInput, ProbeResult, Radar,
+    RadarCompareInput, RadarComparison, RadarComparisonSummary, RadarDetail, RadarNotifyConfig,
+    RadarNotifyPatch, RadarStatus, RadarTemplate, RadarUpdateResult, RadarVariantDraft,
+    RejectReason, RejectedEvaluation, Ruleset, RulesetBody, RulesetCompileResult, Settings,
+    SettingsPatch, Source, SourceCrawlNowResult, SourceState, SuggestFieldsInput,
+    SuggestFieldsResult, TelegramSetupStatus, TelegramTestResult, UpdateRadarInput, WantIntent,
+    WhenMissing,
 };
 use crate::error::{CoreError, CoreResult};
 use crate::ipc_server::{push_crawl_request, spawn_ipc_server};
 use crate::license::{enforce_plan_limits_on_store, LicenseVerifier, LICENSE_TOKEN_SETTING_KEY};
 use crate::pipeline::{lead_detail_to_lead_dto, load_lead_dto, run_silent_backfill_24h};
 use crate::preview_rules::{
-    cancel_radar_preview, get_radar_preview, handle_negative_feedback_on_rule_eval,
-    run_compile_ruleset_for_version, save_user_ruleset, start_radar_preview,
+    cancel_radar_preview, get_radar_comparison, get_radar_preview,
+    handle_negative_feedback_on_rule_eval, list_radar_comparisons, run_compile_ruleset_for_version,
+    run_radar_comparison, save_user_ruleset, start_radar_preview,
 };
 use crate::state::{
     AiRuntimeHealth, CoreConfig, CoreRuntime, IncidentTracker, InflightAiGuard, IpcHub,

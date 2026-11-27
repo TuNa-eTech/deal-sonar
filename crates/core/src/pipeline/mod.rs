@@ -66,15 +66,27 @@ pub enum EvalMode {
     BackfillSilent,
     /// Interactive preview (`is_preview = true`, T2 skipped, no leads or notifications).
     Preview,
+    /// Radar comparison: behaves like `Preview` (no leads, no notifications, no background
+    /// jobs) but keeps its evaluations in their own scratch scope.
+    Compare,
 }
 
 impl EvalMode {
     pub fn is_preview(&self) -> bool {
-        matches!(self, Self::Preview)
+        matches!(self, Self::Preview | Self::Compare)
     }
 
     pub fn is_silent_or_preview(&self) -> bool {
-        matches!(self, Self::BackfillSilent | Self::Preview)
+        matches!(self, Self::BackfillSilent | Self::Preview | Self::Compare)
+    }
+
+    /// `evaluations.is_preview` value rows of this mode are stored under.
+    pub fn eval_scope(&self) -> i64 {
+        match self {
+            Self::Compare => dealsonar_store::models::COMPARE_EVAL_SCOPE,
+            Self::Preview => 1,
+            Self::Live { .. } | Self::BackfillSilent => 0,
+        }
     }
 
     pub fn repost_after_72h(&self) -> bool {

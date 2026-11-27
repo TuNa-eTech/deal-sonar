@@ -107,6 +107,22 @@ impl Store {
         }
     }
 
+    /// Fetch non-purged posts (text still stored) by ID, in the order of `post_ids`.
+    pub fn list_posts_by_ids(&self, post_ids: &[String]) -> Result<Vec<PostRecord>, StoreError> {
+        if post_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let conn = self.lock_conn()?;
+        let mut stmt = conn.prepare("SELECT * FROM posts WHERE id = ?1 AND text IS NOT NULL")?;
+        let mut out = Vec::with_capacity(post_ids.len());
+        for id in post_ids {
+            if let Some(post) = stmt.query_row(params![id], map_post_row).optional()? {
+                out.push(post);
+            }
+        }
+        Ok(out)
+    }
+
     /// List recent non-purged posts across `source_ids` (used for preview up to 50 posts).
     pub fn list_recent_posts_for_sources(
         &self,

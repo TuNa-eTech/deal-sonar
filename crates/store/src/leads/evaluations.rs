@@ -12,6 +12,17 @@ impl Store {
         &self,
         input: &EvaluationUpsertInput,
     ) -> Result<EvaluationRecord, StoreError> {
+        self.upsert_evaluation_in_scope(input, i64::from(input.is_preview))
+    }
+
+    /// Upsert an evaluation row in an explicit `is_preview` scope: `0` live, `1` preview,
+    /// [`COMPARE_EVAL_SCOPE`] radar comparison. Comparison rows are scratch data that never
+    /// collide with a radar's live or preview evaluations.
+    pub fn upsert_evaluation_in_scope(
+        &self,
+        input: &EvaluationUpsertInput,
+        scope: i64,
+    ) -> Result<EvaluationRecord, StoreError> {
         if !matches!(input.state.as_str(), "pending_ai" | "done" | "ai_failed") {
             return Err(StoreError::InvalidArgument(format!(
                 "invalid evaluation state '{}'",
@@ -25,7 +36,7 @@ impl Store {
             .as_ref()
             .map(serde_json::to_string)
             .transpose()?;
-        let is_preview_int = i64::from(input.is_preview);
+        let is_preview_int = scope;
 
         let conn = self.lock_conn()?;
         conn.execute(
@@ -118,7 +129,7 @@ impl Store {
 
         let mut groups = Vec::with_capacity(group_keys.len());
         for (rvid, is_preview_int, oldest_created_at) in group_keys {
-            let items = list_pending_ai_items_conn(&conn, &rvid, is_preview_int != 0, 500)?;
+            let items = list_pending_ai_items_conn(&conn, &rvid, is_preview_int, 500)?;
             let count = items.len();
             groups.push(PendingAiGroup {
                 radar_version_id: rvid,
@@ -138,8 +149,18 @@ impl Store {
         is_preview: bool,
         limit: usize,
     ) -> Result<Vec<PendingAiEvaluationItem>, StoreError> {
+        self.list_pending_ai_in_scope(radar_version_id, i64::from(is_preview), limit)
+    }
+
+    /// Like [`Self::list_pending_ai_for_version`] for an explicit evaluation scope.
+    pub fn list_pending_ai_in_scope(
+        &self,
+        radar_version_id: &str,
+        scope: i64,
+        limit: usize,
+    ) -> Result<Vec<PendingAiEvaluationItem>, StoreError> {
         let conn = self.lock_conn()?;
-        list_pending_ai_items_conn(&conn, radar_version_id, is_preview, limit)
+        list_pending_ai_items_conn(&conn, radar_version_id, scope, limit)
     }
 
     /// Mark an evaluation `done` and store final verdict, extracted fields, and provenance.
@@ -258,10 +279,39 @@ impl Store {
         Ok(deleted)
     }
 
+    /// Delete every comparison scratch evaluation, optionally only for `radar_version_id`.
+    pub fn cleanup_compare_evaluations(
+        &self,
+        radar_version_id: Option<&str>,
+    ) -> Result<usize, StoreError> {
+        let conn = self.lock_conn()?;
+        let deleted = match radar_version_id {
+            Some(rvid) => conn.execute(
+                "DELETE FROM evaluations WHERE is_preview = ?1 AND radar_version_id = ?2",
+                params![COMPARE_EVAL_SCOPE, rvid],
+            )?,
+            None => conn.execute(
+                "DELETE FROM evaluations WHERE is_preview = ?1",
+                params![COMPARE_EVAL_SCOPE],
+            )?,
+        };
+        Ok(deleted)
+    }
+
     /// List preview evaluations joined with post details for `radar_preview_get`.
     pub fn list_preview_evaluations(
         &self,
         radar_version_id: &str,
+    ) -> Result<Vec<PendingAiEvaluationItem>, StoreError> {
+        self.list_evaluations_in_scope(radar_version_id, 1)
+    }
+
+    /// List evaluations of one scope (`1` preview, [`COMPARE_EVAL_SCOPE`] comparison) joined
+    /// with post details.
+    pub fn list_evaluations_in_scope(
+        &self,
+        radar_version_id: &str,
+        scope: i64,
     ) -> Result<Vec<PendingAiEvaluationItem>, StoreError> {
         let conn = self.lock_conn()?;
         let mut stmt = conn.prepare(
@@ -277,11 +327,11 @@ impl Store {
              JOIN posts p ON p.id = e.post_id
              JOIN sources s ON s.id = p.source_id
              LEFT JOIN authors a ON a.id = p.author_id
-             WHERE e.radar_version_id = ?1 AND e.is_preview = 1
+             WHERE e.radar_version_id = ?1 AND e.is_preview = ?2
              ORDER BY COALESCE(e.score, 0.0) DESC, e.created_at DESC",
         )?;
         let rows = stmt
-            .query_map(params![radar_version_id], map_joined_eval_post_row)?
+            .query_map(params![radar_version_id, scope], map_joined_eval_post_row)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
@@ -316,7 +366,7 @@ impl Store {
 pub(super) fn list_pending_ai_items_conn(
     conn: &Connection,
     radar_version_id: &str,
-    is_preview: bool,
+    scope: i64,
     limit: usize,
 ) -> Result<Vec<PendingAiEvaluationItem>, StoreError> {
     let limit = limit.clamp(1, 1000) as i64;
@@ -341,7 +391,7 @@ pub(super) fn list_pending_ai_items_conn(
     )?;
     let rows = stmt
         .query_map(
-            params![radar_version_id, i64::from(is_preview), limit],
+            params![radar_version_id, scope, limit],
             map_joined_eval_post_row,
         )?
         .collect::<Result<Vec<_>, _>>()?;

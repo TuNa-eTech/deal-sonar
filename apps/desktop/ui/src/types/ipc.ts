@@ -813,3 +813,122 @@ export interface TauriEventMap {
   "crawl:finished": CrawlRun;
   "job:failed": JobFailedEvent;
 }
+
+// --- Radar variant comparison ---
+
+/** One side of a comparison: a saved radar version (`version` omitted = current version). */
+export interface RadarCompareSide {
+  radar_id: string;
+  version?: number | null;
+}
+
+/** Two definitions plus one shared set of posts: explicit `post_ids` or the recent posts of `source_ids`. */
+export interface RadarCompareInput {
+  left: RadarCompareSide;
+  right: RadarCompareSide;
+  source_ids?: string[] | null;
+  post_ids?: string[] | null;
+  max_posts?: number | null;
+}
+
+/** The exact definition a side was evaluated with. */
+export interface CompareDefinition {
+  radar_id: string;
+  radar_name: string;
+  version_id: string;
+  version: number;
+  description: string;
+  user_profession: string | null;
+  fields: FieldDef[];
+  match_policy: MatchPolicy;
+}
+
+export type CompareChange =
+  | "newly_matched"
+  | "no_longer_matched"
+  | "fields_changed"
+  | "still_matched"
+  | "still_unmatched"
+  | "not_compared";
+
+export interface CompareVerdict {
+  state: string;
+  verdict: "match" | "no_match" | null;
+  score: number | null;
+  decided_by: string | null;
+  reject_reason: string | null;
+  reason: string | null;
+  summary: string | null;
+  intent: string | null;
+  author_role: string | null;
+  fields: Record<string, ExtractedField>;
+}
+
+export interface CompareFieldChange {
+  key: string;
+  label: string;
+  before: ExtractedField | null;
+  after: ExtractedField | null;
+}
+
+export interface CompareItem {
+  post_id: string;
+  change: CompareChange;
+  /** Why the post moved (or stayed), from both sides' own reasons. */
+  reason: string;
+  left: CompareVerdict;
+  right: CompareVerdict;
+  field_changes: CompareFieldChange[];
+  source_name: string;
+  author_name: string;
+  permalink: string;
+  post_text: string | null;
+  post_created_at: number | null;
+}
+
+export interface CompareCounts {
+  total: number;
+  newly_matched: number;
+  no_longer_matched: number;
+  fields_changed: number;
+  still_matched: number;
+  still_unmatched: number;
+  not_compared: number;
+  left_matches: number;
+  right_matches: number;
+}
+
+export interface DefinitionDiff {
+  same_version: boolean;
+  description_changed: boolean;
+  user_profession_changed: boolean;
+  want_intent_changed: boolean;
+  exclude_roles_changed: boolean;
+  hard_filters_changed: boolean;
+  fields_only_left: string[];
+  fields_only_right: string[];
+  fields_changed: string[];
+}
+
+export interface RadarComparison {
+  id: string;
+  created_at: number;
+  left: CompareDefinition;
+  right: CompareDefinition;
+  source_ids: string[];
+  post_ids: string[];
+  skipped_post_ids: string[];
+  counts: CompareCounts;
+  definition_diff: DefinitionDiff;
+  items: CompareItem[];
+}
+
+export interface RadarComparisonSummary {
+  id: string;
+  created_at: number;
+  left_radar_name: string;
+  left_version: number;
+  right_radar_name: string;
+  right_version: number;
+  post_count: number;
+}

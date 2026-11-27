@@ -190,7 +190,7 @@ CREATE TABLE evaluations (
   fields           TEXT CHECK (fields IS NULL OR json_valid(fields)),
   ruleset_id       TEXT REFERENCES rulesets(id),
   ai_call_id       TEXT REFERENCES ai_calls(id),
-  is_preview       INTEGER NOT NULL DEFAULT 0,
+  is_preview       INTEGER NOT NULL DEFAULT 0,  -- 0 chạy thật, 1 xem thử, 2 so sánh radar (tạm, xoá ngay sau khi đọc)
   created_at       INTEGER NOT NULL,
   decided_at       INTEGER,
   UNIQUE (post_id, radar_version_id, is_preview)
