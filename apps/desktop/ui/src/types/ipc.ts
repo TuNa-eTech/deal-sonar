@@ -424,6 +424,15 @@ export type FacebookSessionState = "ok" | "logged_out" | "checkpoint" | "rate_li
 export type AiProviderId = "claude_cli" | "codex_cli" | "agy_cli";
 export type AiHealthState = "ok" | "not_configured" | "error" | "rate_limited" | "daily_cap_reached";
 
+export interface ExtensionCompat {
+  state: "extension_outdated" | "protocol_mismatch";
+  extension_version: string | null;
+  desktop_version: string;
+  min_extension_version: string;
+  message: string;
+  action: string;
+}
+
 export interface HealthStatus {
   automatic_scanning?: boolean | null;
   next_crawl_at?: number | null;
@@ -431,6 +440,8 @@ export interface HealthStatus {
   runtime_checked_at?: number | null;
   extension_connected: boolean;
   extension_version: string | null;
+  /** Present only when Chrome and Desktop were updated out of step (guidance is Vietnamese). */
+  extension_compat?: ExtensionCompat | null;
   facebook_session: FacebookSessionState;
   crawl_paused: boolean;
   crawl_pause_reason: "manual" | "checkpoint_awaiting_resume" | "rate_limited" | "logged_out" | null;

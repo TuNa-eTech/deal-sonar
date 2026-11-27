@@ -1,0 +1,66 @@
+{
+  "$comment": "Single source of truth for what DealSonar commits to distribute to customers. Edited by the project owner; read by scripts/release-manifest.mjs, scripts/extension-identity.mjs and scripts/distribution-evidence.mjs. See docs/delivery/04-distribution.md.",
+  "decision": {
+    "status": "proposed",
+    "decided_by": null,
+    "decided_on": null,
+    "note": "Proposed by engineering. Becomes binding when the project owner sets status to \"confirmed\" and fills decided_by / decided_on."
+  },
+  "extension": {
+    "key_derived_id": "hkmjpcenjjebhpjicnbpmogidfcbmbjn",
+    "web_store": {
+      "status": "not_published",
+      "visibility": "unlisted",
+      "item_id": null,
+      "listing_url": null,
+      "published_version": null
+    }
+  },
+  "platforms": [
+    {
+      "id": "windows-x64",
+      "label": "Windows 10 22H2 / Windows 11, x64",
+      "target": "x86_64-pc-windows-msvc",
+      "artifact_suffix": ".exe",
+      "committed": true,
+      "browsers": ["chrome"],
+      "requires": ["authenticode_signature"]
+    },
+    {
+      "id": "macos-arm64",
+      "label": "macOS 13 or later, Apple Silicon",
+      "target": "aarch64-apple-darwin",
+      "artifact_suffix": ".dmg",
+      "committed": true,
+      "browsers": ["chrome"],
+      "requires": ["developer_id_signature", "notarization"]
+    },
+    {
+      "id": "macos-x64",
+      "label": "macOS 13 or later, Intel",
+      "target": "x86_64-apple-darwin",
+      "artifact_suffix": ".dmg",
+      "committed": true,
+      "browsers": ["chrome"],
+      "requires": ["developer_id_signature", "notarization"]
+    },
+    {
+      "id": "linux-x64-deb",
+      "label": "Ubuntu/Debian x64 (.deb)",
+      "target": "x86_64-unknown-linux-gnu",
+      "artifact_suffix": ".deb",
+      "committed": false,
+      "browsers": ["chrome"],
+      "requires": []
+    },
+    {
+      "id": "linux-x64-appimage",
+      "label": "Linux x64 (AppImage)",
+      "target": "x86_64-unknown-linux-gnu",
+      "artifact_suffix": ".AppImage",
+      "committed": false,
+      "browsers": ["chrome"],
+      "requires": []
+    }
+  ]
+}

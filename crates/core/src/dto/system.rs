@@ -114,6 +114,57 @@ pub struct FloodRadarInfo {
     pub leads_last_hour: usize,
 }
 
+/// Why the extension and the Desktop app cannot be expected to work together.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtensionCompatState {
+    /// The extension is older than the oldest release this Desktop supports.
+    ExtensionOutdated,
+    /// The extension spoke a different wire protocol and was rejected; one side is out of date.
+    ProtocolMismatch,
+}
+
+/// Guidance shown to the user when Chrome and Desktop were updated out of step. Pairing data and
+/// all Desktop data are untouched; the fix is always to update or re-check one side.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtensionCompat {
+    pub state: ExtensionCompatState,
+    pub extension_version: Option<String>,
+    pub desktop_version: String,
+    pub min_extension_version: String,
+    pub message: String,
+    pub action: String,
+}
+
+impl ExtensionCompat {
+    pub fn outdated_extension(extension_version: &str) -> Self {
+        let min = dealsonar_protocol::compat::MIN_EXTENSION_VERSION;
+        Self {
+            state: ExtensionCompatState::ExtensionOutdated,
+            extension_version: Some(extension_version.to_string()),
+            desktop_version: crate::DESKTOP_VERSION.to_string(),
+            min_extension_version: min.to_string(),
+            message: format!(
+                "Tiện ích Chrome (v{extension_version}) cũ hơn mức ứng dụng cần (từ v{min}), nên một số tính năng có thể không chạy đúng."
+            ),
+            action: "Mở chrome://extensions và bấm Cập nhật (hoặc cài lại tiện ích từ liên kết cài đặt), rồi quay lại đây bấm Kiểm tra lại. Radar, tin và cài đặt trên máy được giữ nguyên.".to_string(),
+        }
+    }
+
+    pub fn protocol_mismatch(detail: &str) -> Self {
+        Self {
+            state: ExtensionCompatState::ProtocolMismatch,
+            extension_version: None,
+            desktop_version: crate::DESKTOP_VERSION.to_string(),
+            min_extension_version: dealsonar_protocol::compat::MIN_EXTENSION_VERSION.to_string(),
+            message: format!(
+                "Tiện ích Chrome và ứng dụng DealSonar không khớp phiên bản giao thức ({detail}). Thường do chỉ một bên vừa được cập nhật."
+            ),
+            action: "Cập nhật cả hai lên cùng bản phát hành: tải bộ cài mới cho ứng dụng và cập nhật tiện ích ở chrome://extensions, rồi bấm Kiểm tra lại. Radar, tin và cài đặt trên máy được giữ nguyên; không cần ghép nối lại từ đầu.".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HealthStatus {
     pub automatic_scanning: Option<bool>,
@@ -122,6 +173,9 @@ pub struct HealthStatus {
     pub runtime_checked_at: Option<i64>,
     pub extension_connected: bool,
     pub extension_version: Option<String>,
+    /// Present only when the extension and Desktop versions need the user's attention.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_compat: Option<ExtensionCompat>,
     pub facebook_session: FacebookSessionState,
     pub crawl_paused: bool,
     pub crawl_pause_reason: Option<CrawlPauseReason>,

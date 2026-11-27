@@ -195,6 +195,7 @@ mod tests {
             last_crawl_at: None,
             runtime_checked_at: None,
             extension_connected: true,
+            extension_compat: None,
             extension_version: Some("0.1.0".to_string()),
             facebook_session: FacebookSessionState::Ok,
             crawl_paused: false,

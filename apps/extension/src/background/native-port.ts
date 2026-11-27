@@ -167,6 +167,7 @@ async function handleRawPortMessage(raw: unknown): Promise<void> {
       const updated = await storage.update((state) => {
         state.connection.desktop_available = false;
         state.connection.last_error = parsed.message;
+        state.connection.compat = "protocol_mismatch";
         return state;
       });
       abortActiveCrawlIfRunning();

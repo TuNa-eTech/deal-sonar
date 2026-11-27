@@ -3,6 +3,7 @@ import type {HealthStatus, Radar, Source} from "../types/ipc";
 import {formatRelativeTime,formatExactTime} from "../lib/format";
 import { Button } from "./ui";
 export function operationState(health:HealthStatus|null):{label:string;detail:string;tone:string} {
+ if(health?.extension_compat)return {label:"Cần cập nhật Chrome hoặc ứng dụng",detail:`${health.extension_compat.message} ${health.extension_compat.action}`,tone:health.extension_compat.state==="protocol_mismatch"?"danger":"warning"};
  if(!health?.extension_connected)return {label:"Chờ Chrome",detail:"Mở Chrome có tiện ích DealSonar để nhận bài mới.",tone:"warning"};
  if(health.facebook_session!=="ok")return {label:"Cần kiểm tra Facebook",detail:"Đăng nhập hoặc hoàn thành xác minh trong Chrome.",tone:"danger"};
  if(health.crawl_paused)return {label:"Đã tạm dừng thu thập",detail:"Kiểm tra lý do dừng và tiếp tục trong Kết nối hoặc tiện ích Chrome.",tone:"warning"};

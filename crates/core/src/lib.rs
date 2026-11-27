@@ -19,8 +19,17 @@ pub mod state;
 pub mod templates;
 pub mod workers;
 
+/// Release version reported to the extension, diagnostics and the UI: the tag set by the release
+/// workflow (`DEALSONAR_VERSION`), or the crate version for development builds.
+pub const DESKTOP_VERSION: &str = match option_env!("DEALSONAR_VERSION") {
+    Some(v) => v,
+    None => env!("CARGO_PKG_VERSION"),
+};
+
 pub use dto::CoreEvent;
 pub use error::{CoreError, CoreResult};
 pub use license::{LicensePayload, LicenseSigner, LicenseVerifier};
-pub use service::{CoreService, CoreServiceBuilder};
+pub use service::{
+    CoreService, CoreServiceBuilder, DEFAULT_CHROME_EXTENSION_ID, KNOWN_CHROME_EXTENSION_IDS,
+};
 pub use state::{CoreConfig, OsNotification, OsNotificationHook};

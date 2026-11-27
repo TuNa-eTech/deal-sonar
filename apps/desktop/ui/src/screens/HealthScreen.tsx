@@ -137,6 +137,11 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               ? `Đang kết nối (v${health.extension_version ?? "0.2.0"})`
               : "Mất kết nối, cần mở Chrome / bấm Thử lại trong popup tiện ích"}
           </div>
+          {health?.extension_compat && (
+            <div className="field-hint" role="status" style={{ marginTop: 6 }}>
+              {health.extension_compat.message} {health.extension_compat.action}
+            </div>
+          )}
           {!health?.extension_connected && (
             <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
               <Input

@@ -2,6 +2,7 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { buildDesktopConfig } from "./release-config.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const tag = process.env.GITHUB_REF_NAME ?? "";
@@ -36,15 +37,7 @@ if (target) {
     resolve(root, `target/${target}/release/dealsonar-native-host${extension}`),
     resolve(desktop, `binaries/dealsonar-native-host-${target}${extension}`),
   );
-  const config = {
-    version,
-    bundle: {
-      externalBin: ["binaries/dealsonar-native-host"],
-      createUpdaterArtifacts: false,
-      macOS: { signingIdentity: "-" },
-      windows: { certificateThumbprint: null, signCommand: null },
-    },
-  };
+  const config = buildDesktopConfig(version);
   writeFileSync(resolve(desktop, "release.conf.json"), `${JSON.stringify(config, null, 2)}\n`);
 }
 console.log(`Prepared DealSonar ${version}${target ? ` for ${target}` : ""}`);
