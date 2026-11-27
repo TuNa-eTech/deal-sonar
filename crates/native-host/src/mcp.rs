@@ -208,7 +208,8 @@ fn tool_definitions() -> Value {
                             "value": { "description": "Criterion in the field's units. Use a number for numeric comparisons, an array for between or in, or null for is_empty." },
                             "when_missing": { "enum": ["pass", "fail"], "default": "pass", "description": "Use fail when the user requires this information to be present." }
                         }
-                    } }
+                    } },
+                    "condition": { "type": "object", "description": "Optional alternatives and exceptions, ANDed with hard_filters. Exactly one of: {\"all\": [..]} every child holds, {\"any\": [..]} at least one holds, {\"not\": {..}} exception, or a single hard filter object {field, op, value, when_missing}. when_missing decides a condition's own result when the field is absent, before `not` is applied. Every field must be a key in fields." }
                 }
             }
         },

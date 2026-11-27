@@ -9,6 +9,7 @@ import type {
   Channel,
   HealthStatus,
   HardFilter,
+  FilterExpr,
   RadarNotifyConfig,
   FieldDef,
   LicenseStatus,
@@ -61,6 +62,8 @@ export function useRadarWizard({
   const [channels,setChannels]=useState<Channel[]>([]);
   const [notify,setNotify]=useState<RadarNotifyConfig>(restored?.notify ?? editRadar?.radar.notify ?? {mode:initialTemplate?.notify_mode ?? "instant",inherit_channels:false,channel_ids:[],min_score:0.6,quiet_hours:null,lead_ttl_hours:initialTemplate?.lead_ttl_hours ?? null});
   const [hardFilters,setHardFilters]=useState<HardFilter[]>(restored?.hardFilters ?? version?.match_policy.hard_filters ?? initialTemplate?.match_policy.hard_filters ?? []);
+  // Biểu thức nhóm (all/any/not) chưa có trình soạn thảo trong wizard: giữ nguyên khi lưu để không mất.
+  const [condition,setCondition]=useState<FilterExpr|null>(version?.match_policy.condition ?? initialTemplate?.match_policy.condition ?? null);
   const [showFields,setShowFields]=useState(false);
   const [templatesOpen,setTemplatesOpen]=useState(!initialTemplate&&!editRadar&&!restored);
   const [answers,setAnswers]=useState<Record<number,string>>({});
@@ -150,7 +153,7 @@ export function useRadarWizard({
   const previewRunning = previewState?.status === "crawling" || previewState?.status === "evaluating";
   const previewBusy = previewLoading || previewRunning;
   const evaluatedSignature=useRef<string|null>(null);
-  const definitionSignature=JSON.stringify([description,userProfession,fields,wantIntent,excludePeers,hardFilters,selectedSourceIds]);
+  const definitionSignature=JSON.stringify([description,userProfession,fields,wantIntent,excludePeers,hardFilters,condition,selectedSourceIds]);
   useEffect(()=>{
     if(!previewBusy&&evaluatedSignature.current!==null&&evaluatedSignature.current!==definitionSignature){
       activePreviewId.current = null;
@@ -169,6 +172,7 @@ export function useRadarWizard({
 
   const selectTemplate = (tpl: RadarTemplate) => {
     setHardFilters(structuredClone(tpl.match_policy.hard_filters));
+    setCondition(structuredClone(tpl.match_policy.condition ?? null));
     setMode("template");
     setTemplatesOpen(false);
     setSelectedTemplate(tpl);
@@ -358,6 +362,7 @@ export function useRadarWizard({
     want_intent: wantIntent,
     exclude_roles: excludePeers ? ["peer"] : [],
     hard_filters: hardFilters,
+    ...(condition ? { condition } : {}),
   });
 
   const getPreviewPlan = (): RadarPreviewPlan => ({
@@ -373,7 +378,8 @@ export function useRadarWizard({
     activePreviewId.current = null;
     evaluatedSignature.current = JSON.stringify([
       description, userProfession, previewFields, plan.matchPolicy.want_intent,
-      plan.matchPolicy.exclude_roles.includes("peer"), plan.matchPolicy.hard_filters, plan.sourceIds,
+      plan.matchPolicy.exclude_roles.includes("peer"), plan.matchPolicy.hard_filters,
+      plan.matchPolicy.condition ?? null, plan.sourceIds,
     ]);
     setPreviewState(null);
     setPreviewSyncError(null);
@@ -438,7 +444,7 @@ export function useRadarWizard({
     const savedSignature = JSON.stringify([
       version.description, version.user_profession ?? "", version.fields,
       version.match_policy.want_intent, version.match_policy.exclude_roles.includes("peer"),
-      version.match_policy.hard_filters, editRadar.radar.source_ids,
+      version.match_policy.hard_filters, version.match_policy.condition ?? null, editRadar.radar.source_ids,
     ]);
     if (editRadar.radar.status !== "draft" || savedSignature !== definitionSignature) {
       void startPreviewRun();
@@ -734,6 +740,7 @@ export function useRadarWizard({
     setNotify,
     hardFilters,
     setHardFilters,
+    condition,
     showFields,
     setShowFields,
     templatesOpen,

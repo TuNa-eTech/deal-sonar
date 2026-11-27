@@ -49,11 +49,22 @@ Phần quyết định cách chấm bài nằm trong **phiên bản radar**, b�
     "exclude_roles": ["peer"],          // loại người cùng nghề
     "hard_filters": [                   // điều kiện trên trường đã trích; không đạt thì không báo
       {"field": "price", "op": "lte", "value": 15000000, "when_missing": "pass"}
-    ]
+    ],
+    "condition": {                      // tuỳ chọn: nhánh thay thế và ngoại lệ, AND với hard_filters
+      "all": [
+        {"any": [
+          {"field": "district", "op": "eq", "value": "Cầu Giấy", "when_missing": "fail"},
+          {"field": "district", "op": "eq", "value": "Đống Đa",  "when_missing": "fail"}
+        ]},
+        {"not": {"field": "note", "op": "contains", "value": "ở ghép", "when_missing": "fail"}}
+      ]
+    }
   },
   "user_profession": "môi giới bất động sản"  // để AI nhận ra người cùng nghề
 }
 ```
+
+**Nhóm điều kiện và ngoại lệ.** `condition` là một biểu thức: `{"all": [...]}` (tất cả), `{"any": [...]}` (ít nhất một), `{"not": {...}}` (ngoại lệ) hoặc một điều kiện đơn giống phần tử của `hard_filters`. Bài đạt khi đạt mọi điều kiện trong `hard_filters` và đạt `condition`. Radar cũ không có `condition` nên cho kết quả đúng như danh sách AND trước đây. `when_missing` quyết định kết quả của chính điều kiện đơn đó khi bài thiếu trường (`pass` = đạt, `fail` = không đạt), tính trước khi `not` đảo ngược. Muốn loại bài có `note` chứa "ở ghép" mà vẫn giữ bài không có `note`, đặt `when_missing: "fail"` cho điều kiện bên trong `not`. Khi lưu hoặc xem thử, hệ thống từ chối trường không có trong `fields`, nhóm rỗng, giá trị sai dạng, lồng quá 8 cấp hoặc quá 64 nút, và báo đường dẫn cụ thể (ví dụ `condition.any[1].not`). Xem thử và xử lý bài mới dùng chung một hàm đánh giá.
 
 **Vì sao tách phiên bản.** Sửa mô tả hoặc trường làm thay đổi ý nghĩa của kết quả. Mỗi đánh giá và mỗi bộ luật gắn với một phiên bản cụ thể, nên tin cũ không bị diễn giải lại theo định nghĩa mới, và bộ luật cũ tự động hết hiệu lực khi radar đổi.
 

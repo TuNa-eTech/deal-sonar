@@ -66,6 +66,7 @@ pub async fn start_radar_preview(
         created_at: base_ver.created_at,
     };
 
+    validate_store_match_policy(&effective_ver.match_policy, &effective_ver.fields)?;
     let effective_ver = rt.store.radar_preview_snapshot(&effective_ver)?;
 
     let source_ids = input

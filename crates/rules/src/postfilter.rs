@@ -6,6 +6,7 @@ use crate::extractors::{
     extract_date_vi, extract_gazetteer, extract_vn_area, extract_vn_money, extract_vn_phone,
     parse_standalone_number,
 };
+use crate::filter_expr::FilterExpr;
 use crate::normalize::fold_text;
 use crate::types::{
     ExtractedField, ExtractedFields, FieldDef, FieldType, FilterOp, HardFilter, LocationValue,
@@ -324,6 +325,32 @@ pub fn evaluate_hard_filters(
         .all(|filter| evaluate_single_filter(filter, extracted_fields))
 }
 
+/// Evaluate a [`FilterExpr`] (`all` / `any` / `not` over hard filters). Empty `all` is `true` and
+/// empty `any` is `false`; validation rejects empty groups before they can be saved.
+pub fn evaluate_filter_expr(expr: &FilterExpr, extracted_fields: &ExtractedFields) -> bool {
+    match expr {
+        FilterExpr::Filter(f) => evaluate_single_filter(f, extracted_fields),
+        FilterExpr::All(items) => items
+            .iter()
+            .all(|e| evaluate_filter_expr(e, extracted_fields)),
+        FilterExpr::Any(items) => items
+            .iter()
+            .any(|e| evaluate_filter_expr(e, extracted_fields)),
+        FilterExpr::Not(inner) => !evaluate_filter_expr(inner, extracted_fields),
+    }
+}
+
+/// Single entry point used by both the live pipeline and radar preview: a post passes when every
+/// legacy `hard_filters` entry holds AND the optional `condition` expression holds.
+pub fn evaluate_match_filters(
+    hard_filters: &[HardFilter],
+    condition: Option<&FilterExpr>,
+    extracted_fields: &ExtractedFields,
+) -> bool {
+    evaluate_hard_filters(hard_filters, extracted_fields)
+        && condition.is_none_or(|expr| evaluate_filter_expr(expr, extracted_fields))
+}
+
 /// Evaluate a single [`HardFilter`] against `extracted_fields`.
 pub fn evaluate_single_filter(filter: &HardFilter, extracted_fields: &ExtractedFields) -> bool {
     let field_val_opt = extracted_fields
@@ -451,7 +478,7 @@ where
     false
 }
 
-fn is_iso_date_str(s: &str) -> bool {
+pub(crate) fn is_iso_date_str(s: &str) -> bool {
     let b = s.as_bytes();
     b.len() == 10
         && b[4] == b'-'
@@ -471,7 +498,7 @@ fn extract_numeric_bounds(v: &Value) -> Option<(f64, f64)> {
     Some((min_v, max_v))
 }
 
-fn value_as_f64(v: &Value) -> Option<f64> {
+pub(crate) fn value_as_f64(v: &Value) -> Option<f64> {
     match v {
         Value::Number(n) => n.as_f64(),
         Value::String(s) => s.trim().parse::<f64>().ok(),

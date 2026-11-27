@@ -79,6 +79,18 @@ impl CoreService {
             }
         }
 
+        if input.fields.is_some() || input.match_policy.is_some() {
+            let next_fields: Vec<_> = match &input.fields {
+                Some(fs) => fs.iter().map(field_def_to_store).collect(),
+                None => existing.current_version.fields.clone(),
+            };
+            let next_policy = match &input.match_policy {
+                Some(mp) => match_policy_to_store(mp),
+                None => existing.current_version.match_policy.clone(),
+            };
+            validate_store_match_policy(&next_policy, &next_fields)?;
+        }
+
         // Case A: User is confirming an existing candidate version without additional field/description edits
         let no_def_edits = input.description.is_none()
             && input.user_profession.is_none()
@@ -542,6 +554,8 @@ pub(super) fn persist_radar_draft(
     }
 
     let store_fields: Vec<_> = input.fields.iter().map(field_def_to_store).collect();
+    let store_policy = match_policy_to_store(&input.match_policy);
+    validate_store_match_policy(&store_policy, &store_fields)?;
     let rw = rt.store.radar_create_draft(&StoreCreateRadarDraftInput {
         id,
         name: input.name.trim().to_string(),
@@ -550,7 +564,7 @@ pub(super) fn persist_radar_draft(
         language_hint: input.language_hint.or_else(|| Some("vi".to_string())),
         user_profession: input.user_profession,
         fields: store_fields,
-        match_policy: match_policy_to_store(&input.match_policy),
+        match_policy: store_policy,
         source_ids: input.source_ids,
         notify: notify_to_store(&base_notify),
         now_ms: now,

@@ -254,6 +254,7 @@ pub fn match_policy_to_store(mp: &MatchPolicy) -> dealsonar_store::models::Match
                 when_missing: hf.when_missing.as_str().to_string(),
             })
             .collect(),
+        condition: mp.condition.as_ref().map(|c| c.to_value()),
         extra: BTreeMap::new(),
     }
 }
@@ -276,7 +277,23 @@ pub fn match_policy_from_store(mp: &dealsonar_store::models::MatchPolicy) -> Mat
                 when_missing: WhenMissing::from_db(&hf.when_missing),
             })
             .collect(),
+        // A stored expression that no longer parses is dropped from the DTO only; the pipeline
+        // (`condition_store_to_rules`) fails closed instead of ignoring it.
+        condition: mp
+            .condition
+            .as_ref()
+            .and_then(|v| dealsonar_rules::FilterExpr::from_value(v, "condition").ok()),
     }
+}
+
+/// Parse the stored `condition` JSON for evaluation. `Err` means the stored value is malformed.
+pub fn condition_store_to_rules(
+    mp: &dealsonar_store::models::MatchPolicy,
+) -> Result<Option<dealsonar_rules::FilterExpr>, dealsonar_rules::FilterExprError> {
+    mp.condition
+        .as_ref()
+        .map(|v| dealsonar_rules::FilterExpr::from_value(v, "condition"))
+        .transpose()
 }
 
 pub fn hard_filters_store_to_rules(
@@ -431,4 +448,27 @@ pub fn extracted_fields_store_to_notify(
             )
         })
         .collect()
+}
+
+/// Reject a match policy whose `hard_filters` / `condition` reference unknown fields, use malformed
+/// values, or whose stored `condition` cannot be parsed. Shared by save, update, preview and the
+/// agent so all entry points accept exactly the same definitions.
+pub fn validate_store_match_policy(
+    mp: &dealsonar_store::models::MatchPolicy,
+    fields: &[dealsonar_store::models::FieldDef],
+) -> crate::error::CoreResult<()> {
+    let rules_fields: Vec<dealsonar_rules::FieldDef> =
+        fields.iter().map(field_def_store_to_rules).collect();
+    let invalid =
+        |e: dealsonar_rules::FilterExprError| crate::error::CoreError::Validation(e.to_string());
+    dealsonar_rules::validate_hard_filters(
+        &hard_filters_store_to_rules(&mp.hard_filters),
+        &rules_fields,
+    )
+    .map_err(invalid)?;
+    if let Some(expr) = condition_store_to_rules(mp).map_err(invalid)? {
+        dealsonar_rules::validate_filter_expr(&expr, &rules_fields, "condition")
+            .map_err(invalid)?;
+    }
+    Ok(())
 }

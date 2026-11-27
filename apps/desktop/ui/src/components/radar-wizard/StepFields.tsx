@@ -2,6 +2,7 @@
 
 import React from "react";
 import { parseFieldValue } from "../../lib/fieldValues";
+import { describeCondition } from "../../lib/versionDiff";
 import { FIELD_TYPE_LABELS, slugifyFieldKey } from "../../lib/format";
 import type { HardFilter, FieldType } from "../../types/ipc";
 import type { RadarWizardModel } from "./useRadarWizard";
@@ -12,6 +13,7 @@ export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     license,
     hardFilters,
     setHardFilters,
+    condition,
     showFields,
     setShowFields,
     answers,
@@ -70,6 +72,10 @@ export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
           Loại bài chào bán của người cùng nghề
         </label>
         <h4>Điều kiện bắt buộc</h4>
+        {condition && <p className="field-hint" data-testid="radar-condition">
+          Điều kiện nhóm (tất cả / ít nhất một / ngoại lệ), áp dụng cùng các điều kiện bên dưới:{" "}
+          {describeCondition(condition, new Map(fields.map(candidate => [candidate.key, candidate.label])))}
+        </p>}
         {hardFilters.map((filter, index) => {
           const field = fields.find(candidate => candidate.key === filter.field);
           const update = (patch: Partial<HardFilter>) => setHardFilters(items =>

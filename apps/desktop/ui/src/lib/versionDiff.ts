@@ -1,4 +1,4 @@
-import type {AuthorRole,FilterOperator,HardFilter,RadarVersion,WantIntent} from "../types/ipc";
+import type {AuthorRole,FilterExpr,FilterOperator,HardFilter,RadarVersion,WantIntent} from "../types/ipc";
 
 const INTENT:Record<WantIntent,string>={demand:"người đang cần mua/tìm",supply:"người đang bán/cung cấp",any:"cả hai phía"};
 const ROLE:Record<AuthorRole,string>={end_user:"người dùng cuối",peer:"đồng nghiệp/môi giới",unknown:"không rõ"};
@@ -16,6 +16,14 @@ const show=(v:unknown):string=>{
 export function describeFilter(f:HardFilter,labels:Map<string,string>):string{
  const name=labels.get(f.field)??f.field;const value=show(f.value);
  return `${name} ${OP[f.op]??f.op}${value?` ${value}`:""}`.trim();
+}
+
+/** Câu mô tả biểu thức nhóm, ví dụ "(Giá ≤ 5.000.000 VÀ (Quận = Cầu Giấy HOẶC Quận = Đống Đa) VÀ KHÔNG (Vai trò = môi giới))". */
+export function describeCondition(e:FilterExpr,labels:Map<string,string>):string{
+ if("all" in e)return `(${e.all.map(x=>describeCondition(x,labels)).join(" VÀ ")})`;
+ if("any" in e)return `(${e.any.map(x=>describeCondition(x,labels)).join(" HOẶC ")})`;
+ if("not" in e)return `KHÔNG ${describeCondition(e.not,labels)}`;
+ return describeFilter(e,labels);
 }
 
 const filterKey=(f:HardFilter)=>JSON.stringify([f.field,f.op,f.value??null,f.when_missing]);
@@ -55,6 +63,12 @@ export function describeChanges(prev:RadarVersion,next:RadarVersion):string[]{
   else out.push(`Thêm điều kiện: ${describeFilter(n,labels)}`);
  }
  for(const o of removed)if(!used.has(o))out.push(`Bỏ điều kiện: ${describeFilter(o,labels)}`);
+ const ca=a.condition??null,cb=b.condition??null;
+ if(JSON.stringify(ca)!==JSON.stringify(cb)){
+  if(!ca&&cb)out.push(`Thêm điều kiện nhóm: ${describeCondition(cb,labels)}`);
+  else if(ca&&!cb)out.push(`Bỏ điều kiện nhóm: ${describeCondition(ca,labels)}`);
+  else if(ca&&cb)out.push(`Điều kiện nhóm: ${describeCondition(ca,labels)} → ${describeCondition(cb,labels)}`);
+ }
  return out;
 }
 

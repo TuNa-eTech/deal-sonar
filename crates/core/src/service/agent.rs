@@ -131,6 +131,9 @@ struct PrepareInput {
     want_intent: WantIntent,
     #[serde(default)]
     hard_filters: Vec<HardFilter>,
+    /// Optional `all`/`any`/`not` expression ANDed with `hard_filters`.
+    #[serde(default)]
+    condition: Option<dealsonar_rules::FilterExpr>,
     #[serde(default = "exclude_peers_by_default")]
     exclude_peers: bool,
 }
@@ -194,6 +197,7 @@ async fn prepare_radar(rt: &Arc<CoreRuntime>, input: PrepareInput) -> CoreResult
                 vec![]
             },
             hard_filters: input.hard_filters,
+            condition: input.condition,
         },
         source_ids,
         notify: None,

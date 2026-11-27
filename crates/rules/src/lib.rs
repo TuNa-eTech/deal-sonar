@@ -16,6 +16,7 @@
 
 pub mod engine;
 pub mod extractors;
+pub mod filter_expr;
 pub mod gate;
 pub mod normalize;
 pub mod postfilter;
@@ -37,6 +38,10 @@ pub use extractors::{
     DEFAULT_MONEY_WINDOW, MAX_REGEX_BOUNDED_REPEAT, MAX_REGEX_PATTERN_LEN,
     REGEX_COMPILED_SIZE_LIMIT,
 };
+pub use filter_expr::{
+    validate_filter_expr, validate_hard_filter, validate_hard_filters, FilterExpr, FilterExprError,
+    MAX_FILTER_EXPR_DEPTH, MAX_FILTER_EXPR_NODES,
+};
 pub use gate::{
     evaluate_gate, evaluate_gate_with_fields, GateReport, LabeledSample,
     GATE_MAX_FALSE_NEGATIVE_RATE, GATE_MIN_ACCEPT_PRECISION, GATE_MIN_FIELD_ACCURACY,
@@ -49,10 +54,11 @@ pub use normalize::{
     LANG_DETECT_MIN_CHARS, NEAR_DUP_MAX_HAMMING, NEAR_DUP_MIN_CHARS, REPOST_ALLOW_AFTER_MS,
 };
 pub use postfilter::{
-    classify_lead_tier, compare_field_value, evaluate_hard_filters, evaluate_single_filter,
-    postprocess_fields, renormalize_extracted_field, renormalize_field, should_override_peer,
-    values_equivalent, verify_evidence, LeadDisposition, PeerSignals, PostprocessFieldsResult,
-    RenormalizeResult, MISSING_REQUIRED_EVIDENCE_PENALTY,
+    classify_lead_tier, compare_field_value, evaluate_filter_expr, evaluate_hard_filters,
+    evaluate_match_filters, evaluate_single_filter, postprocess_fields,
+    renormalize_extracted_field, renormalize_field, should_override_peer, values_equivalent,
+    verify_evidence, LeadDisposition, PeerSignals, PostprocessFieldsResult, RenormalizeResult,
+    MISSING_REQUIRED_EVIDENCE_PENALTY,
 };
 pub use prefilter::{
     is_too_short, is_url_only, kw_contains_folded, matches_blocklist, matches_blocklist_keyword,

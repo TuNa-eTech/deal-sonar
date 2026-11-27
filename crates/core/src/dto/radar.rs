@@ -237,6 +237,9 @@ pub struct MatchPolicy {
     pub exclude_roles: Vec<AuthorRole>,
     #[serde(default)]
     pub hard_filters: Vec<HardFilter>,
+    /// Optional `all`/`any`/`not` expression ANDed with `hard_filters` (see `dealsonar_rules::FilterExpr`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<dealsonar_rules::FilterExpr>,
 }
 
 impl Default for MatchPolicy {
@@ -245,6 +248,7 @@ impl Default for MatchPolicy {
             want_intent: WantIntent::Any,
             exclude_roles: vec![AuthorRole::Peer],
             hard_filters: Vec::new(),
+            condition: None,
         }
     }
 }

@@ -57,10 +57,24 @@ export interface HardFilter {
   when_missing: "pass" | "fail";
 }
 
+/**
+ * Điều kiện nhóm: `all` (tất cả), `any` (ít nhất một), `not` (ngoại lệ) hoặc một điều kiện đơn.
+ * `when_missing` của từng điều kiện đơn quyết định kết quả của nó khi bài thiếu trường,
+ * trước khi `not` đảo ngược.
+ */
+export type FilterExpr =
+  | HardFilter
+  | { all: FilterExpr[] }
+  | { any: FilterExpr[] }
+  | { not: FilterExpr };
+
 export interface MatchPolicy {
   want_intent: WantIntent;
   exclude_roles: AuthorRole[];
+  /** Danh sách điều kiện luôn ghép bằng AND. */
   hard_filters: HardFilter[];
+  /** Biểu thức nhóm tùy chọn, ghép AND với `hard_filters`. Bản cũ không có khóa này. */
+  condition?: FilterExpr | null;
 }
 
 export interface QuietHours {
