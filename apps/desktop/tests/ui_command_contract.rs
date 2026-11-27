@@ -110,6 +110,22 @@ async fn spawn_mock_telegram_server() -> (String, tokio::task::JoinHandle<()>) {
     (format!("http://{addr}"), handle)
 }
 
+/// A Unix socket under `dir`, or a uniquely named pipe on Windows (which has no socket files).
+fn test_endpoint(dir: &std::path::Path, name: &str) -> IpcEndpoint {
+    #[cfg(windows)]
+    {
+        let _ = (dir, name);
+        IpcEndpoint::from_path(format!(
+            r"\\.\pipe\dealsonar-test-{}",
+            dealsonar_protocol::new_ulid()
+        ))
+    }
+    #[cfg(not(windows))]
+    {
+        IpcEndpoint::from_path(dir.join(name))
+    }
+}
+
 async fn recv_ipc_env(stream: &mut IpcStream) -> Envelope {
     let bytes = tokio::time::timeout(
         Duration::from_secs(3),
@@ -140,7 +156,7 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
         .tempdir_in("/tmp")
         .unwrap_or_else(|_| tempfile::tempdir().expect("tempdir"));
     let data_dir = tmp.path().join("data");
-    let ipc_sock = IpcEndpoint::from_path(tmp.path().join("ipc.sock"));
+    let ipc_sock = test_endpoint(tmp.path(), "ipc.sock");
     let manifest_path = tmp.path().join("com.dealsonar.host.json");
     let bin_v1 = tmp.path().join("bin-v1").join("dealsonar-native-host");
     let bin_v2 = tmp.path().join("bin-v2").join("dealsonar-native-host");

@@ -1,8 +1,8 @@
 //! True Binary-to-Binary Full-Stack E2E Test (`03-desktop.md §2–4`, `01-protocol.md`).
 //!
 //! Spawns the real compiled `dealsonar-native-host` executable over OS `stdin`/`stdout` pipes
-//! connected via `DEALSONAR_IPC_PATH` Unix socket to `DesktopState` / `CoreService`, exchanges
-//! real 4-byte little-endian length-prefixed Protocol v2 frames (`hello` -> `sources.discovered` ->
+//! connected via `DEALSONAR_IPC_PATH` (Unix socket, or a named pipe on Windows) to `DesktopState` /
+//! `CoreService`, exchanges real 4-byte little-endian length-prefixed Protocol v2 frames (`hello` -> `sources.discovered` ->
 //! `posts.push` -> `crawl.report`), and verifies the Desktop command layer (`lead_list`, `lead_get`,
 //! `health_get`, `crawl_run_list`, `lead_export`) returns the processed CRM leads and health state.
 
@@ -22,6 +22,22 @@ use dealsonar_protocol::{
 };
 use serde_json::json;
 use tokio::process::{ChildStdin, ChildStdout, Command};
+
+/// A Unix socket under `dir`, or a uniquely named pipe on Windows (which has no socket files).
+fn test_endpoint(dir: &std::path::Path, name: &str) -> IpcEndpoint {
+    #[cfg(windows)]
+    {
+        let _ = (dir, name);
+        IpcEndpoint::from_path(format!(
+            r"\\.\pipe\dealsonar-test-{}",
+            dealsonar_protocol::new_ulid()
+        ))
+    }
+    #[cfg(not(windows))]
+    {
+        IpcEndpoint::from_path(dir.join(name))
+    }
+}
 
 fn ensure_native_host_binary() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -82,13 +98,12 @@ async fn real_native_host_binary_stdio_to_desktop_commands_e2e() {
         .tempdir_in("/tmp")
         .unwrap_or_else(|_| tempfile::tempdir().expect("tempdir"));
     let data_dir = tmp.path().join("data");
-    let sock_path = tmp.path().join("dealsonar.sock");
-    let ipc_endpoint = IpcEndpoint::from_path(&sock_path);
+    let ipc_endpoint = test_endpoint(tmp.path(), "dealsonar.sock");
 
     let cfg = CoreConfig {
         data_dir: data_dir.clone(),
         logs_dir: Some(data_dir.join("logs")),
-        ipc_endpoint: Some(ipc_endpoint),
+        ipc_endpoint: Some(ipc_endpoint.clone()),
         native_host_binary_path: Some(native_host_bin.clone()),
         chrome_manifest_path: Some(tmp.path().join("com.dealsonar.host.json")),
         batch_trigger_count: 1,
@@ -101,7 +116,7 @@ async fn real_native_host_binary_stdio_to_desktop_commands_e2e() {
 
     // Spawn the REAL `dealsonar-native-host` binary with stdio pipes & `DEALSONAR_IPC_PATH`
     let mut child = Command::new(&native_host_bin)
-        .env("DEALSONAR_IPC_PATH", &sock_path)
+        .env("DEALSONAR_IPC_PATH", ipc_endpoint.as_path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
