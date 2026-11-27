@@ -11,6 +11,7 @@ import type {
   Ruleset,
 } from "../types/ipc";
 import { FunnelChart } from "../components/FunnelChart";
+import { RadarVariantDialog } from "../components/RadarVariantDialog";
 import { Badge, Button, Card, Input } from "../components/ui";
 
 interface RadarsScreenProps {
@@ -37,6 +38,7 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
   const [rejectKws, setRejectKws] = useState<string>("");
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [variantOf, setVariantOf] = useState<string | null>(null);
 
   useEffect(() => {
     if (!radars.some(r => r.id === selectedId)) {
@@ -160,6 +162,23 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
         </Button>
       </div>
 
+      {variantOf && (
+        <RadarVariantDialog
+          sourceRadarId={variantOf}
+          license={license}
+          onClose={() => setVariantOf(null)}
+          onCreated={(created) => {
+            setVariantOf(null);
+            setErrorMsg(null);
+            setSelectedId(created.radar.id);
+            setStatusMsg(
+              `Đã tạo biến thể “${created.radar.name}” ở trạng thái bản nháp, chưa gửi thông báo. Chọn nguồn, xem thử rồi bật khi sẵn sàng.`
+            );
+            onChanged();
+          }}
+        />
+      )}
+
       {errorMsg && (
         <div className="health-banner danger" style={{ borderRadius: 6, marginBottom: 12 }}>
           <span>{errorMsg}</span>
@@ -198,6 +217,11 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
               >
                 <td>
                   <button type="button" className="radar-name-button" aria-pressed={selectedId === r.id} onClick={() => setSelectedId(r.id)}>{r.name}</button>
+                  {r.variant_of && (
+                    <div className="field-hint">
+                      Biến thể của {radars.find((o) => o.id === r.variant_of)?.name ?? "Radar gốc đã lưu trữ"}
+                    </div>
+                  )}
                 </td>
                 <td>
                   <span
@@ -242,6 +266,9 @@ export const RadarsScreen: React.FC<RadarsScreenProps> = ({
                     >
                       {r.status === "active" ? "Tạm dừng" : r.status === "draft"
                         ? (r.source_ids.length ? "Xem kết quả" : "Chọn nguồn") : "Chạy lại"}
+                    </Button>
+                    <Button size="sm" onClick={() => setVariantOf(r.id)}>
+                      Tạo biến thể
                     </Button>
                     <Button
                       size="sm"

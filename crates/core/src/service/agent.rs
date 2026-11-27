@@ -226,7 +226,7 @@ async fn prepare_radar(rt: &Arc<CoreRuntime>, input: PrepareInput) -> CoreResult
         return preview_summary(rt, &existing, true).await;
     }
     validate_sources(rt, &draft.source_ids)?;
-    let (saved, _) = persist_radar_draft(rt, draft, Some(id))?;
+    let (saved, _) = persist_radar_draft(rt, draft, Some(id), None)?;
     rt.emit(crate::dto::CoreEvent::RadarDraftCreated(
         saved.radar.id.clone(),
     ));

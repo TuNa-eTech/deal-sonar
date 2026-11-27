@@ -60,6 +60,20 @@ pub struct CreateRadarDraftInput {
     pub notify: Option<RadarNotifyPatch>,
 }
 
+/// Copy of an existing radar that the user can review and edit before saving it as a variant.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RadarVariantDraft {
+    pub source_radar_id: String,
+    pub source_radar_name: String,
+    pub input: CreateRadarDraftInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CreateRadarVariantInput {
+    pub source_radar_id: String,
+    pub input: CreateRadarDraftInput,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct UpdateRadarInput {
     pub id: String,

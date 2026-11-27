@@ -86,6 +86,8 @@ export interface Radar {
   current_version: number;
   source_ids: string[];
   notify: RadarNotifyConfig;
+  /** Radar this one was copied from. Provenance only; the two radars are independent. */
+  variant_of?: string | null;
   created_at: number;
   updated_at: number;
   // Operational summary fields for Radar list & Inbox
@@ -630,6 +632,18 @@ export interface CreateRadarDraftInput {
   match_policy: MatchPolicy;
   source_ids: string[];
   notify?: Partial<RadarNotifyConfig>;
+}
+
+/** Editable copy of an existing radar, proposed before it is saved as a variant. */
+export interface RadarVariantDraft {
+  source_radar_id: string;
+  source_radar_name: string;
+  input: CreateRadarDraftInput;
+}
+
+export interface CreateRadarVariantInput {
+  source_radar_id: string;
+  input: CreateRadarDraftInput;
 }
 
 export interface UpdateRadarInput {

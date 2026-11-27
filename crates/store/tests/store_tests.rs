@@ -442,7 +442,16 @@ fn source_post_list_filters_and_pages_in_publication_order() {
     let other = seed_source(&store, "g2", "Group Mỹ Đình", true);
 
     let insert = |source_id: &str, id: &str, created_at, captured_at| {
-        let mut post = make_post(source_id, id, "author", "Nguyễn Văn A", id, id, 0, captured_at);
+        let mut post = make_post(
+            source_id,
+            id,
+            "author",
+            "Nguyễn Văn A",
+            id,
+            id,
+            0,
+            captured_at,
+        );
         post.id = Some(id.to_string());
         post.created_at = created_at;
         store.insert_post(&post).unwrap();
@@ -2133,21 +2142,6 @@ fn durable_feedback_migrates_rejection_labels_and_survives_preview_cleanup() {
     let backups = tmp.path().join("backups");
     let store = Store::open_with_migrations(&db, &backups, &MIGRATIONS[..1]).unwrap();
     let source = seed_source(&store, "feedback-migration", "Migration", true);
-    let radar = store
-        .radar_create_draft(&CreateRadarDraftInput {
-            id: None,
-            name: "Migration".into(),
-            template_id: None,
-            description: "Radar".into(),
-            language_hint: None,
-            user_profession: None,
-            fields: sample_bds_fields(),
-            match_policy: MatchPolicy::default(),
-            notify: NotifyConfig::default(),
-            source_ids: vec![source.clone()],
-            now_ms: BASE_TS,
-        })
-        .unwrap();
     let (post, _) = store
         .insert_post(&make_post(
             &source,
@@ -2161,20 +2155,23 @@ fn durable_feedback_migrates_rejection_labels_and_survives_preview_cleanup() {
         ))
         .unwrap();
     drop(store);
+    // The radar is written with plain SQL: this database only has schema v1, which predates
+    // columns the current `radar_create_draft` writes.
+    let version_id = "old-version".to_string();
     let conn = rusqlite::Connection::open(&db).unwrap();
+    conn.execute("INSERT INTO radars (id,name,status,current_version,notify,created_at,updated_at) VALUES ('old-radar','Migration','draft',1,'{}',?1,?1)", rusqlite::params![BASE_TS]).unwrap();
+    conn.execute("INSERT INTO radar_versions (id,radar_id,version,description,fields,match_policy,created_at) VALUES (?1,'old-radar',1,'Radar','[]','{}',?2)", rusqlite::params![version_id, BASE_TS]).unwrap();
     conn.execute("INSERT INTO evaluations (id,post_id,radar_version_id,state,verdict,is_preview,created_at) VALUES ('old-eval',?1,?2,'done','no_match',1,?3)",
-        rusqlite::params![post.id, radar.current_version.id, BASE_TS]).unwrap();
+        rusqlite::params![post.id, version_id, BASE_TS]).unwrap();
     conn.execute("INSERT INTO feedback (id,evaluation_id,radar_version_id,post_id,label,post_text,origin,created_at) VALUES ('old-feedback','old-eval',?1,?2,'correct','Snapshot','preview',?3)",
-        rusqlite::params![radar.current_version.id, post.id, BASE_TS]).unwrap();
+        rusqlite::params![version_id, post.id, BASE_TS]).unwrap();
     drop(conn);
     let store = Store::open(&db, &backups).unwrap();
     assert_eq!(
         store.list_schema_migrations().unwrap().len(),
         dealsonar_store::LATEST_SCHEMA_VERSION as usize
     );
-    let examples = store
-        .get_prompt_feedback_examples(&radar.current_version.id, 8)
-        .unwrap();
+    let examples = store.get_prompt_feedback_examples(&version_id, 8).unwrap();
     assert_eq!(examples.len(), 1);
     assert!(
         !examples[0].expected_match,
@@ -2182,19 +2179,15 @@ fn durable_feedback_migrates_rejection_labels_and_survives_preview_cleanup() {
     );
     assert_eq!(
         store
-            .cleanup_preview_evaluations(Some(&radar.current_version.id), None)
+            .cleanup_preview_evaluations(Some(&version_id), None)
             .unwrap(),
         1
     );
     assert_eq!(
-        store
-            .get_prompt_feedback_examples(&radar.current_version.id, 8)
-            .unwrap(),
+        store.get_prompt_feedback_examples(&version_id, 8).unwrap(),
         examples
     );
-    let dataset = store
-        .get_labeled_dataset(&radar.current_version.id)
-        .unwrap();
+    let dataset = store.get_labeled_dataset(&version_id).unwrap();
     assert_eq!(dataset.len(), 1);
     assert!(!dataset[0].is_match);
     assert!(
@@ -2359,11 +2352,70 @@ fn radar_channel_scope_preserves_legacy_and_honors_explicit_local_selection() {
     let legacy = NotifyConfig::default();
     assert!(legacy.sends_to_channel("telegram"));
 
-    let local = NotifyConfig { inherit_channels: Some(false), ..legacy.clone() };
+    let local = NotifyConfig {
+        inherit_channels: Some(false),
+        ..legacy.clone()
+    };
     assert!(!local.sends_to_channel("telegram"));
     assert!(!local.sends_to_channel("webhook"));
 
-    let selected = NotifyConfig { channel_ids: vec!["telegram".into()], ..local };
+    let selected = NotifyConfig {
+        channel_ids: vec!["telegram".into()],
+        ..local
+    };
     assert!(selected.sends_to_channel("telegram"));
     assert!(!selected.sends_to_channel("webhook"));
+}
+
+#[test]
+fn radar_variant_draft_links_to_parent_without_touching_it() {
+    let store = Store::open_in_memory().unwrap();
+    let input = |name: &str| CreateRadarDraftInput {
+        id: None,
+        name: name.to_string(),
+        template_id: None,
+        description: "Khách cần thuê căn hộ Cầu Giấy".to_string(),
+        language_hint: Some("vi".to_string()),
+        user_profession: None,
+        fields: sample_bds_fields(),
+        match_policy: MatchPolicy::default(),
+        notify: NotifyConfig::default(),
+        source_ids: Vec::new(),
+        now_ms: BASE_TS,
+    };
+
+    let parent = store.radar_create_draft(&input("Gốc")).unwrap();
+    assert_eq!(parent.radar.variant_of, None);
+
+    let variant = store
+        .radar_create_variant_draft(&parent.radar.id, &input("Biến thể"))
+        .unwrap();
+    assert_eq!(
+        variant.radar.variant_of.as_deref(),
+        Some(parent.radar.id.as_str())
+    );
+    assert_eq!(variant.radar.status, "draft");
+    assert_eq!(variant.radar.current_version, 1);
+    assert_ne!(variant.radar.id, parent.radar.id);
+    assert_ne!(variant.current_version.id, parent.current_version.id);
+
+    // The link survives a reload and the parent is unchanged.
+    let reloaded = store.radar_get(&variant.radar.id).unwrap().unwrap();
+    assert_eq!(reloaded.radar.variant_of, variant.radar.variant_of);
+    assert_eq!(store.radar_get(&parent.radar.id).unwrap().unwrap(), parent);
+    assert_eq!(store.radar_versions(&parent.radar.id).unwrap().len(), 1);
+
+    // An unknown parent is rejected and nothing is written.
+    let before = store.radar_list(true, BASE_TS).unwrap().len();
+    let err = store
+        .radar_create_variant_draft("missing-radar", &input("Mồ côi"))
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        StoreError::NotFound {
+            entity: "radar",
+            ..
+        }
+    ));
+    assert_eq!(store.radar_list(true, BASE_TS).unwrap().len(), before);
 }

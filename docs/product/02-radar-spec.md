@@ -142,6 +142,19 @@ Mọi radar đều có, người dùng không xoá được:
 
 Sửa định nghĩa của radar đang chạy: tạo phiên bản mới, tự chạy xem thử trên 50 bài gần nhất, radar tiếp tục dùng phiên bản cũ cho tới khi người dùng xác nhận.
 
+### Biến thể
+
+Chủ xe muốn giữ bộ trường đang dùng nhưng đổi tuyến, nhóm nguồn hoặc kênh nhận tin thì **tạo biến thể** từ radar hiện có (thao tác "Tạo biến thể" trên danh sách radar).
+
+1. App đề xuất một bản sao từ phiên bản đang chạy của radar gốc: tên (thêm "(biến thể)"), mô tả, trường, `match_policy`, `user_profession`, nguồn và cấu hình `notify`. Phiên bản ứng viên chưa xác nhận không được sao chép.
+2. Người dùng xem và chỉnh bản sao (tên, mô tả, nhóm nguồn, kênh báo, chế độ báo, hạn sống, ngưỡng điểm) rồi mới lưu. Bấm huỷ thì không ghi gì.
+3. Biến thể là **radar độc lập**: có ID riêng, `current_version = 1` với phiên bản riêng, và luôn bắt đầu ở `draft` nên chưa chấm bài và chưa gửi thông báo. Muốn chạy phải xem thử và bật như radar mới. Biến thể ghi `variant_of` = ID radar gốc, chỉ để hiển thị nguồn gốc; không có quan hệ nào khác.
+4. Tin cũ, lịch sử chấm (`evaluations`) và nhãn phản hồi vẫn gắn với radar gốc và phiên bản của nó; biến thể bắt đầu với lịch sử trống. Vì vậy ví dụ phản hồi của radar gốc không lọt vào prompt của biến thể.
+5. Bật, sửa, tạm dừng và lưu trữ biến thể không ảnh hưởng radar gốc, và ngược lại. Lưu trữ radar gốc không làm biến thể mất liên kết dữ liệu.
+6. Giới hạn gói tính như radar tạo mới (§8): số trường kiểm khi lưu bản sao, số radar đang chạy kiểm khi bật, số group được theo dõi kiểm khi chọn nguồn.
+
+Danh sách chặn riêng của radar gốc (`blocklist.radar_id`) không được sao chép; chặn áp dụng cho mọi radar vẫn có hiệu lực.
+
 ## 5. Xem thử
 
 Mục đích: cho người dùng thấy radar làm gì trên bài thật trước khi nó bắt đầu làm phiền họ, và thu nhãn đầu tiên.

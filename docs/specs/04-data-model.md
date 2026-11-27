@@ -132,6 +132,7 @@ CREATE TABLE radars (
   template_id     TEXT,
   current_version INTEGER NOT NULL DEFAULT 1,
   notify          TEXT NOT NULL CHECK (json_valid(notify)),
+  variant_of      TEXT REFERENCES radars(id) ON DELETE SET NULL,  -- radar gốc nếu tạo bằng "Tạo biến thể"; chỉ để truy nguồn gốc
   created_at      INTEGER NOT NULL,
   updated_at      INTEGER NOT NULL
 );

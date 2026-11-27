@@ -14,6 +14,9 @@ pub struct RadarRecord {
     pub template_id: Option<String>,
     pub current_version: i32,
     pub notify: NotifyConfig,
+    /// Radar this one was created from as a variant; `None` for radars created from scratch.
+    #[serde(default)]
+    pub variant_of: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
