@@ -103,3 +103,63 @@ describe("Radar goal interpretation", () => {
     expect(within(dialog).getAllByText(/Chưa kết nối ổn định/).length).toBeGreaterThan(0);
   });
 });
+
+describe("Radar goal interpretation together with condition groups", () => {
+  it("keeps the interpretation and the condition group through a preview", async () => {
+    const user = userEvent.setup();
+    const [templates, sources, license] = await Promise.all([api.templateList(), api.sourceList(), api.licenseGet()]);
+    const template = templates[0]!;
+    const price = template.fields.find(field => field.type === "money") ?? template.fields[0]!;
+    const condition = { any: [{ field: price.key, op: "lte" as const, value: 8_000_000, when_missing: "fail" as const }] };
+    const draft = await api.radarCreateDraft({
+      name: "Nháp có nhóm điều kiện", description: "Tìm người cần thuê căn hộ", template_id: null,
+      user_profession: null, fields: template.fields, source_ids: [sources[0]!.id],
+      match_policy: {
+        want_intent: "demand", exclude_roles: [], hard_filters: [], condition,
+        assumptions: ["Chỉ tính dưới 8 triệu"],
+      },
+    });
+    const start = vi.spyOn(api, "radarPreviewStart").mockResolvedValue({
+      preview_id: "p2", radar_id: draft.radar.id, radar_version: 1, status: "evaluating",
+      total_posts: 3, evaluated_posts: 0, items: [], warnings: [], error: null,
+    });
+    await act(async () => {
+      render(<RadarWizard templates={templates} sources={sources} license={license}
+        editRadar={draft} onClose={vi.fn()} onSaved={vi.fn()} />);
+    });
+    const dialog = screen.getByRole("dialog", { name: "Trình tạo và sửa Radar" });
+    expect(within(dialog).getByLabelText("Giả định 1")).toHaveValue("Chỉ tính dưới 8 triệu");
+    expect(within(dialog).getByTestId("condition-summary")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Chạy xem thử" }));
+    await waitFor(() => expect(start).toHaveBeenCalled());
+    expect(start.mock.calls[0]![0].match_policy).toMatchObject({
+      want_intent: "demand", condition, assumptions: ["Chỉ tính dưới 8 triệu"],
+    });
+    const saved = (await api.radarGet(draft.radar.id)).current_version_data.match_policy;
+    expect(saved.condition).toEqual(condition);
+    expect(saved.assumptions).toEqual(["Chỉ tính dưới 8 triệu"]);
+  });
+
+  it("drops a condition group that referred to the old fields when the goal is read again", async () => {
+    const user = userEvent.setup();
+    const [templates, sources, license] = await Promise.all([api.templateList(), api.sourceList(), api.licenseGet()]);
+    const template = templates[0]!;
+    const draft = await api.radarCreateDraft({
+      name: "Nháp", description: "Tìm người cần thuê căn hộ ở Cầu Giấy", template_id: null,
+      user_profession: null, fields: template.fields, source_ids: [sources[0]!.id],
+      match_policy: {
+        want_intent: "demand", exclude_roles: [], hard_filters: [],
+        condition: { any: [{ field: template.fields[0]!.key, op: "eq", value: "x", when_missing: "fail" }] },
+      },
+    });
+    await act(async () => {
+      render(<RadarWizard templates={templates} sources={sources} license={license}
+        editRadar={draft} onClose={vi.fn()} onSaved={vi.fn()} />);
+    });
+    const dialog = screen.getByRole("dialog", { name: "Trình tạo và sửa Radar" });
+    expect(within(dialog).getByTestId("condition-summary")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cập nhật tiêu chí" }));
+    await waitFor(() => expect(within(dialog).queryByTestId("condition-summary")).not.toBeInTheDocument());
+  });
+});

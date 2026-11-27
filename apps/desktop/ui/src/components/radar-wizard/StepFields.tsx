@@ -7,12 +7,15 @@ import type { HardFilter, FieldType } from "../../types/ipc";
 import type { RadarWizardModel } from "./useRadarWizard";
 import { INTENT_LABELS } from "./constants";
 import { Button, Card, Input, Select } from "../ui";
+import { ConditionEditor } from "./ConditionEditor";
 
 export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
   const {
     license,
     hardFilters,
     setHardFilters,
+    condition,
+    setCondition,
     showFields,
     setShowFields,
     answers,
@@ -172,6 +175,7 @@ export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
         })}
         <Button size="sm" onClick={() => setHardFilters(items =>
           [...items,{ field: fields[0]!.key, op: "eq", value: null, when_missing: "fail" }])}>+ Điều kiện bắt buộc</Button>
+        <ConditionEditor condition={condition} fields={fields} onChange={setCondition} onError={message => setErrorMsg(message)} />
       </div>}
       <div className="radar-field-disclosure">
         <Button aria-expanded={showFields} onClick={() => setShowFields(value => !value)}>

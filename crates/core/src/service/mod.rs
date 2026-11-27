@@ -44,7 +44,7 @@ use tokio::task::JoinHandle;
 use crate::diagnostics::create_diagnostic_bundle;
 use crate::dto::{
     extracted_fields_store_to_notify, field_def_from_ai, field_def_from_store,
-    field_def_store_to_notify, field_def_to_store, filter_op_to_store, match_policy_to_store,
+    field_def_store_to_notify, field_def_to_store, filter_op_to_store, match_policy_to_store, validate_store_match_policy,
     notify_from_store, notify_to_store, radar_version_from_store, ruleset_record_to_dto,
     AiDailyUsageRow, AiProviderId, AiUsageStats, BlocklistEntry, BlocklistKind,
     BlocklistRemoveResult, Channel, ChannelConfig, ChannelRemoveResult, ChromeConnectOptions,

@@ -73,6 +73,7 @@ fn draft_from(
             exclude_roles: result.exclude_roles.clone(),
             hard_filters: result.hard_filters.clone(),
             assumptions: result.assumptions.clone(),
+            condition: None,
         },
         source_ids: source_ids.to_vec(),
         notify: None,
@@ -203,6 +204,7 @@ async fn manual_edits_survive_closing_and_reopening_a_draft() {
         exclude_roles: vec![],
         hard_filters: vec![],
         assumptions: vec!["Chỉ tính Tân Phú, không tính Tân Bình.".into()],
+        condition: None,
     };
     core.radar_update(UpdateRadarInput {
         id: id.clone(),

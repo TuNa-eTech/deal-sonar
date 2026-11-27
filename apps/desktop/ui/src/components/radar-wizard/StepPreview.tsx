@@ -7,6 +7,7 @@ import { formatExtractedFieldValue } from "../../lib/format";
 import { renderHighlightedPostText } from "../../lib/security";
 import type { RadarWizardModel } from "./useRadarWizard";
 import { Badge, Button, Card, Input, Select } from "../ui";
+import { FilterTraceView } from "./FilterTraceView";
 
 export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
   const {
@@ -16,6 +17,7 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     notify,
     setNotify,
     hardFilters,
+    condition,
     readyAck,
     setReadyAck,
     previewTab,
@@ -42,6 +44,7 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     handlePreviewFeedback,
     matchedPreviewItems,
     unmatchedPreviewItems,
+    missedPostIds,
   } = w;
 
   const channelScope = (notify.inherit_channels ?? (notify.channel_ids.length === 0))
@@ -155,7 +158,7 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
       <details className="radar-preview-settings">
         <summary>Cài đặt khi bật Radar</summary>
       <OperationStatus health={health}/>
-      <Card className="notification-setup"><h3>Khi bật radar này</h3><p>{selectedSourceIds.length} nhóm, {fields.length} thông tin, {hardFilters.length} điều kiện bắt buộc. {editRadar?`Đang chỉnh radar “${editRadar.radar.name}”; chỉ áp dụng khi bấm nút cuối.`:"Bản nháp chưa tự thu thập bài."}</p>
+      <Card className="notification-setup"><h3>Khi bật radar này</h3><p>{selectedSourceIds.length} nhóm, {fields.length} thông tin, {hardFilters.length} điều kiện bắt buộc{condition?", có nhóm điều kiện":""}. {editRadar?`Đang chỉnh radar “${editRadar.radar.name}”; chỉ áp dụng khi bấm nút cuối.`:"Bản nháp chưa tự thu thập bài."}</p>
         <label>Chế độ thông báo<Select value={notify.mode} onChange={e=>setNotify(n=>({...n,mode:e.target.value as "instant"|"digest"}))}><option value="instant">Báo ngay</option><option value="digest">Gửi gộp</option></Select></label>
         <label>Tin còn giá trị trong<Select aria-label="Tin còn giá trị trong" value={notify.lead_ttl_hours ?? ""} onChange={e=>setNotify(n=>({...n,lead_ttl_hours:e.target.value?Number(e.target.value):null}))}>{lifetimeOptions(notify.lead_ttl_hours).map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</Select></label>
         <p className="field-hint">Tin hết hạn rời hàng chờ «Chưa xử lý» và dừng gửi thông báo. Xem lại tại «Tin hết hạn».</p>
@@ -194,6 +197,26 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
           Tôi hiểu Radar sẽ hoạt động ở chế độ giới hạn cho đến khi Chrome sẵn sàng quét.
         </label>
       )}
+      {missedPostIds.length > 0 && <section className="missed-recheck" aria-label="Kiểm tra bài từng bị bỏ sót">
+        <strong>Bài bạn đánh dấu «Đáng lẽ phải khớp» ({missedPostIds.length})</strong>
+        <ul>
+          {missedPostIds.map(id => {
+            const item = previewState?.items.find(i => i.post_id === id);
+            return <li key={id} data-testid="missed-recheck-item">
+              {!item
+                ? <span className="field-hint">Chưa có kết quả cho bài này trong lần xem thử hiện tại.</span>
+                : <>
+                    <Badge tone={item.verdict === "match" ? "success" : undefined}>
+                      {item.verdict === "match" ? "✓ Giờ đã khớp" : "✕ Vẫn bị loại"}
+                    </Badge>{" "}
+                    <span>{item.summary}</span>
+                    {item.verdict !== "match" && <div className="field-hint">Lý do loại: {item.reason}</div>}
+                    {item.filter_trace && <FilterTraceView trace={item.filter_trace} fields={fields} />}
+                  </>}
+            </li>;
+          })}
+        </ul>
+      </section>}
       <div className="section-tabs"><Button variant={previewTab==="match" ? "primary" : "default"} onClick={()=>setPreviewTab("match")}>Khớp ({matchedPreviewItems.length})</Button><Button variant={previewTab==="no_match" ? "primary" : "default"} onClick={()=>setPreviewTab("no_match")}>Bị loại ({unmatchedPreviewItems.length})</Button></div>
       <div className="preview-columns">
         {/* Column 1: KHỚP */}
@@ -228,6 +251,7 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
                   <div className="field-hint" style={{ marginBottom: 6 }}>
                     Lý do: {it.reason}
                   </div>
+                  {it.filter_trace && <FilterTraceView trace={it.filter_trace} fields={fields} />}
 
                   <div
                     style={{
@@ -299,6 +323,7 @@ export const StepPreview: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
                 <div className="field-hint" style={{ marginBottom: 6 }}>
                   Lý do loại: {it.reason}
                 </div>
+                {it.filter_trace && <FilterTraceView trace={it.filter_trace} fields={fields} />}
                 <div className="post-plain-text" style={{ fontSize: 12.5, padding: 9 }}>
                   {renderHighlightedPostText(it.post_text, [])}
                 </div>

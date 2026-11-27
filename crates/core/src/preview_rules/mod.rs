@@ -25,7 +25,8 @@ use serde_json::json;
 use crate::dto::{
     dto_ruleset_body_to_rules, extracted_field_ai_to_rules, extracted_field_from_store,
     extracted_field_store_to_rules, field_def_store_to_rules, field_def_to_store,
-    match_policy_to_store, ruleset_record_to_dto,
+    filter_trace_for_version, match_policy_to_store, ruleset_record_to_dto,
+    validate_store_match_policy,
 };
 use crate::dto::{
     AuthorRole, CoreEvent, DecidedBy, PostIntent, PreviewItem, PreviewProgressEvent,

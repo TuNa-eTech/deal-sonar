@@ -69,6 +69,7 @@ fn make_minimal_draft(name: &str, field_count: usize) -> CreateRadarDraftInput {
             exclude_roles: vec![AuthorRole::Peer],
             hard_filters: Vec::new(),
             assumptions: Vec::new(),
+            condition: None,
         },
         source_ids: Vec::new(),
         notify: None,
@@ -686,6 +687,7 @@ async fn diagnostic_zip_redaction_os_notify_data_lifecycle_and_graceful_shutdown
                 exclude_roles: vec![AuthorRole::Peer],
                 hard_filters: Vec::new(),
                 assumptions: Vec::new(),
+                condition: None,
             },
             source_ids: vec![src_rec.id.clone()],
             notify: Some(dealsonar_core::dto::RadarNotifyPatch {
