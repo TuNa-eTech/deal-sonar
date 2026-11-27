@@ -2469,7 +2469,7 @@ fn test_journey_snapshot_separates_collection_matching_ai_and_delivery() {
             radar_id: radar.radar.id.clone(),
             radar_version_id: radar.current_version.id.clone(),
             post_id: ids[3].0.clone(),
-            evaluation_id: matched.id,
+            evaluation_id: matched.id.clone(),
             contact_id: None,
             status: "new".to_string(),
             score: 0.9,
@@ -2517,7 +2517,24 @@ fn test_journey_snapshot_separates_collection_matching_ai_and_delivery() {
         .unwrap();
     enqueue(BASE_TS + 80_000);
 
+    // The only notified lead is marked wrong by the user; trial-preview feedback never counts.
+    let before_feedback = store.journey_snapshot().unwrap();
+    assert_eq!(before_feedback.leads_notified, 1);
+    assert_eq!(before_feedback.leads_flagged_wrong, 0);
+    store
+        .record_feedback(&RecordFeedbackInput {
+            evaluation_id: matched.id.clone(),
+            label: "irrelevant".to_string(),
+            corrected_fields: None,
+            post_text: None,
+            origin: "app".to_string(),
+            now_ms: BASE_TS + 90_000,
+        })
+        .unwrap();
+
     let snapshot = store.journey_snapshot().unwrap();
+    assert_eq!(snapshot.leads_notified, 1);
+    assert_eq!(snapshot.leads_flagged_wrong, 1);
     assert_eq!(snapshot.active_radars, 1);
     assert_eq!(snapshot.active_sources, 1);
     assert_eq!(

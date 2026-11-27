@@ -22,7 +22,7 @@ function status(patch: Partial<FirstNewsStatus> = {}): FirstNewsStatus {
     first_post_captured_at: null, first_lead_at: null, first_delivery_at: null,
     active_radars: 1, active_sources: 1, posts_captured: 0, last_post_captured_at: null,
     evaluated_match: 0, evaluated_no_match: 0, waiting_ai: 0, last_evaluated_at: null,
-    leads_total: 0, last_lead_at: null, delivery_pending: 0, delivery_failed: 0,
+    leads_total: 0, last_lead_at: null, leads_notified: 0, leads_flagged_wrong: 0, delivery_pending: 0, delivery_failed: 0,
     last_delivery_at: null, last_delivery_error: null, checked_at: NOW, ...patch,
   };
 }
@@ -102,6 +102,22 @@ describe("why no news yet", () => {
     expect(steps.find(step => step.id === "first_delivery")!.at).toBeNull();
     expect(formatDuration(20 * MINUTE)).toBe("20 phút");
     expect(formatDuration(75 * MINUTE)).toBe("1 giờ 15 phút");
+  });
+
+  it("copies counts and times, with no post text, for the pilot owner", async () => {
+    const user = userEvent.setup();
+    const h = await health();
+    const value = status({ leads_notified: 10, leads_flagged_wrong: 1, installed_at: NOW - 5 * MINUTE });
+    vi.spyOn(api, "firstNewsStatus").mockResolvedValue(value);
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: write }, configurable: true });
+    render(<NewsFlowStatus health={h} />);
+    await user.click(await screen.findByRole("button", { name: "Sao chép số liệu pilot (JSON)" }));
+    const copied = JSON.parse(write.mock.calls[0]![0] as string);
+    expect(copied.schema).toBe(1);
+    expect(copied.first_news).toMatchObject({ leads_notified: 10, leads_flagged_wrong: 1, installed_at: value.installed_at });
+    expect(copied.ai_usage).toHaveProperty("total_calls");
+    expect(copied.first_news).not.toHaveProperty("post_text");
   });
 
   it("renders the four situations separately with last success and next action", async () => {

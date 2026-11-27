@@ -19,6 +19,7 @@ export function NewsFlowStatus({
 }) {
   const [status, setStatus] = useState<FirstNewsStatus | null>(null);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -32,6 +33,30 @@ export function NewsFlowStatus({
   useEffect(() => {
     void load();
   }, [load, health?.checked_at]);
+
+  // Counts and times only: no post text, group names or account identity. For the pilot owner.
+  const copyPilotSnapshot = async () => {
+    if (!status) return;
+    try {
+      const usage = await api.aiUsageGet(30);
+      const snapshot = {
+        schema: 1,
+        taken_on: new Date().toISOString().slice(0, 10),
+        first_news: status,
+        ai_usage: {
+          total_calls: usage.total_calls,
+          total_items: usage.total_items,
+          total_input_tokens: usage.total_input_tokens,
+          total_output_tokens: usage.total_output_tokens,
+          total_cost_usd: usage.total_cost_usd,
+        },
+      };
+      await navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2));
+      setCopied(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   if (error) return <p role="alert">{error}</p>;
   if (!status) return <p role="status">Đang kiểm tra vì sao chưa có tin…</p>;
@@ -74,6 +99,9 @@ export function NewsFlowStatus({
           <p className="field-hint">
             Thời gian cài là lần đầu mở DealSonar, tách riêng với lúc tạo Radar.
           </p>
+          <Button size="sm" onClick={() => void copyPilotSnapshot()}>
+            {copied ? "Đã sao chép" : "Sao chép số liệu pilot (JSON)"}
+          </Button>
           <ol className="news-flow-journey">
             {steps.map((step) => (
               <li key={step.id} data-step={step.id} data-reached={step.at != null}>

@@ -58,6 +58,8 @@ export const healthCommands: MockCommandTable = {
       last_evaluated_at: max(leadTimes),
       leads_total: state.leads.length,
       last_lead_at: max(leadTimes),
+      leads_notified: state.leads.filter((lead) => lead.notified_at).length,
+      leads_flagged_wrong: 0,
       delivery_pending: state.health.outbox_pending,
       delivery_failed: state.health.outbox_failed,
       last_delivery_at: max(state.leads.filter((lead) => lead.notified_at).map((lead) => lead.notified_at!)),

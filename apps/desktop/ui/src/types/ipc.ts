@@ -511,6 +511,8 @@ export interface FirstNewsStatus {
   last_evaluated_at: number | null;
   leads_total: number;
   last_lead_at: number | null;
+  leads_notified: number;
+  leads_flagged_wrong: number;
   delivery_pending: number;
   delivery_failed: number;
   last_delivery_at: number | null;
