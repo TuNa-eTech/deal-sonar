@@ -5,6 +5,7 @@ pub mod models;
 pub mod ops;
 pub mod posts;
 pub mod radars;
+pub mod soak;
 pub mod sources;
 
 use std::collections::BTreeMap;

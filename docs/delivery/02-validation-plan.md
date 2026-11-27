@@ -118,6 +118,8 @@ Chạy thật trong 7 ngày trên ba cấu hình: 5 group vắng; 10 group trung
 | Số lần chạm giới hạn hạn mức của gói AI rẻ nhất có CLI | 0 lần trong 7 ngày ở cấu hình trung bình |
 | Người dùng thử có nhận thấy gói AI của họ bị ảnh hưởng khi dùng cho việc khác không | Không ai báo |
 
+**Đo thế nào.** Công cụ báo cáo, quy trình ghi gián đoạn và các định nghĩa nằm ở [Quy trình đo chạy dài ngày](04-soak-runbook.md). Ngoài bảng trên, lần chạy 7 ngày còn phải ghi, cho từng cấu hình: số bài thu, số cặp bài–Radar cần chấm, số lần gọi AI và số tin gửi; trung vị thời gian từ lúc đăng đến lúc gửi tin (đạt khi dưới 10 phút); tỉ lệ bài duy nhất cần AI trên bài duy nhất đã thu sau khi bộ luật hoạt động, kèm lượng AI theo từng Radar; và, sau mỗi gián đoạn (máy ngủ, mất phiên Chrome, hết hạn mức AI, lỗi kênh báo), đối soát bài chậm, sót, trùng và tiến độ sau phục hồi.
+
 **Nếu không đạt:** đẩy việc sinh bộ luật lên sớm hơn (ít mẫu hơn, cổng lỏng hơn ở chế độ chỉ lọc sơ bộ); hạ trần bài mỗi ngày mặc định; cân nhắc provider mô hình tại máy cho tầng `Fast`.
 
 ### 4.3 Người dùng có sẵn lòng trả không
