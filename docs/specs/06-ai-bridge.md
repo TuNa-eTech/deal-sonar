@@ -333,7 +333,7 @@ Vì AI chạy bằng gói của người dùng, "chi phí" có hai nghĩa: phầ
 
 ## 8. Đo chất lượng
 
-Bộ đánh giá ngoại tuyến (`node packages/desktop-core/scripts/eval.mjs`) chạy một provider trên tập chuẩn có nhãn và in:
+Bộ đánh giá ngoại tuyến (`cargo run -p dealsonar-ai-bridge --bin eval`) chạy một provider trên tập chuẩn có nhãn và in:
 
 - Độ chính xác và độ phủ của quyết định khớp.
 - Độ chính xác từng trường (khớp chính xác sau chuẩn hoá) và tỉ lệ `raw` không có trong bài.

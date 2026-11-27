@@ -2,9 +2,7 @@
   "name": "dealsonar",
   "private": true,
   "packageManager": "pnpm@9.12.3",
-  "engines": {
-    "node": ">=22"
-  },
+  "engines": { "node": ">=22" },
   "scripts": {
     "ext:dev": "pnpm --filter @dealsonar/extension dev",
     "ext:build": "pnpm --filter @dealsonar/extension build",
@@ -14,16 +12,13 @@
     "ui:build": "pnpm --filter @dealsonar/desktop-ui build",
     "ui:typecheck": "pnpm --filter @dealsonar/desktop-ui typecheck",
     "ui:test": "pnpm --filter @dealsonar/desktop-ui test",
-    "electron:build": "pnpm --filter @dealsonar/desktop-electron build",
-    "electron:typecheck": "pnpm --filter @dealsonar/desktop-electron typecheck",
-    "electron:test": "pnpm --filter @dealsonar/desktop-electron test",
-    "electron:start": "pnpm desktop",
-    "electron:stage": "pnpm --filter @dealsonar/desktop-electron stage",
-    "electron:smoke": "pnpm --filter @dealsonar/desktop-electron smoke:unpacked",
     "protocol:verify": "node scripts/verify-protocol-fixtures.mjs",
-    "test": "pnpm -r test && pnpm protocol:verify",
-    "lint": "pnpm -r typecheck",
-    "eval:bds": "node packages/desktop-core/scripts/eval.mjs --dataset docs/eval/golden/bds.jsonl --radar docs/eval/golden/bds.radar.json",
-    "desktop": "node scripts/start-desktop.mjs"
+    "rust:check": "cargo check --workspace",
+    "rust:test": "cargo test --workspace",
+    "rust:lint": "cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check",
+    "test": "pnpm ext:test && pnpm ui:test && pnpm protocol:verify && cargo test --workspace",
+    "lint": "pnpm ext:typecheck && pnpm ui:typecheck && pnpm rust:lint",
+    "eval:bds": "cargo run -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/golden/bds.jsonl --radar docs/eval/golden/bds.radar.json",
+    "desktop": "pnpm ui:build && pnpm ext:build && cargo build -p dealsonar-native-host && cargo run -p dealsonar-desktop"
   }
 }

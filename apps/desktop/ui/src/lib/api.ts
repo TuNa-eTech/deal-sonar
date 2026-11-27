@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type {
   AiProviderId,
   AiUsageStats,
@@ -39,18 +41,23 @@ import type {
   Source,
   SuggestFieldsInput,
   SuggestFieldsResult,
-  DesktopEventMap,
+  TauriEventMap,
   TelegramSetupStatus,
   UpdateRadarInput,
 } from "../types/ipc";
 import { invokeMockCommand, subscribeMockEvent } from "./mockBackend";
-import { invokeElectron, isElectronRuntime, listenElectron } from "./electronBridge";
 
-export const isDesktopRuntime = isElectronRuntime;
+/**
+ * Returns `true` only when running inside a real Tauri v2 WebView window.
+ * Browser dev mode (`vite`) and Vitest (`jsdom`) automatically fall back to `mockBackend`.
+ */
+export function isTauriRuntime(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
 
 async function callCommand<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-  if (isElectronRuntime()) {
-    return invokeElectron<T>(cmd, args);
+  if (isTauriRuntime()) {
+    return invoke<T>(cmd, args);
   }
   return invokeMockCommand<T>(cmd, args);
 }
@@ -59,18 +66,21 @@ async function callCommand<T>(cmd: string, args: Record<string, unknown> = {}): 
  * Subscribe to a real-time backend push event (`03-desktop.md §4`):
  * `lead:new`, `lead:updated`, `preview:progress`, `health:changed`, `crawl:finished`, `job:failed`.
  */
-export async function onDesktopEvent<K extends keyof DesktopEventMap>(
+export async function onDesktopEvent<K extends keyof TauriEventMap>(
   event: K,
-  handler: (payload: DesktopEventMap[K]) => void
+  handler: (payload: TauriEventMap[K]) => void
 ): Promise<() => void> {
-  if (isElectronRuntime()) {
-    return listenElectron<DesktopEventMap[K]>(event, handler);
+  if (isTauriRuntime()) {
+    const unlisten = await listen<TauriEventMap[K]>(event, (ev) => {
+      handler(ev.payload);
+    });
+    return unlisten;
   }
   return subscribeMockEvent(event, handler);
 }
 
 /**
- * Complete typed desktop IPC client matching `03-desktop.md §4` (all snake_case commands).
+ * Complete typed Tauri IPC client matching `03-desktop.md §4` (all snake_case commands).
  */
 export const api = {
   backupPickFile: () => callCommand<string | null>("backup_pick_file"),

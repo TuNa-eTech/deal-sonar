@@ -2,7 +2,7 @@
 
 Trạng thái: nháp v0.1 · 2026-11-11 · Phiên bản giao thức mô tả ở đây: **2**
 
-Protocol v2 dùng chung giữa extension và native host. Các ví dụ kiểm thử nằm trong [fixture Protocol v2](../../fixtures/protocol-v2-examples.json).
+Repo hiện có giao thức v1 chỉ gồm `ping`/`pong` ([crates/protocol/src/lib.rs](../../crates/protocol/src/lib.rs)). Tài liệu này định nghĩa v2.
 
 ## 1. Tầng vận chuyển
 

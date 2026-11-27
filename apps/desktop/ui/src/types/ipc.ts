@@ -789,7 +789,7 @@ export interface JobFailedEvent {
   failed_at: number;
 }
 
-export interface DesktopEventMap {
+export interface TauriEventMap {
   "lead:new": Lead;
   "lead:reminder": Lead;
   "lead:updated": Lead;

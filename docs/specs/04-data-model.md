@@ -387,7 +387,7 @@ Công việc `purge_expired` chạy hằng ngày.
 
 ## 6. Migration
 
-- File SQL đánh số trong `packages/desktop-core/migrations/NNNN_tên.sql`, chạy trong giao dịch, ghi vào `schema_migrations`.
+- File SQL đánh số trong `crates/store/migrations/NNNN_tên.sql`, chạy trong giao dịch, ghi vào `schema_migrations`.
 - Chỉ đi tới; không có migration lùi. Trước mỗi migration thay đổi cấu trúc bảng có dữ liệu, app sao lưu file vào `backups/`.
 - App từ chối mở cơ sở dữ liệu có phiên bản lược đồ mới hơn nó biết, và hướng dẫn người dùng cập nhật app.
 

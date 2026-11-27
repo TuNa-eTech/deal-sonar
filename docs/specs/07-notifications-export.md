@@ -108,7 +108,7 @@ Tin "mất kết nối" không gửi khi máy vừa thức dậy sau ngủ, và 
 
 ## 4. Thông báo hệ điều hành
 
-Electron main hiển thị thông báo qua API của hệ điều hành. Nội dung: tên radar và `summary`. Bấm vào thì mở chi tiết tin trong app. Tự tắt khi Telegram đã cấu hình và người dùng không bật riêng.
+Dùng plugin thông báo của Tauri. Nội dung: tên radar và `summary`. Bấm vào thì mở chi tiết tin trong app. Tự tắt khi Telegram đã cấu hình và người dùng không bật riêng.
 
 ## 5. Xuất file
 
