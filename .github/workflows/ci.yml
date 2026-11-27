@@ -30,6 +30,7 @@ jobs:
       - run: pnpm protocol:verify
       - run: pnpm study:h5:test
       - run: pnpm study:test
+      - run: pnpm dist:verify
 
   rust:
     name: Rust (${{ matrix.os }})

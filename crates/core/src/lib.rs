@@ -22,5 +22,7 @@ pub mod workers;
 pub use dto::CoreEvent;
 pub use error::{CoreError, CoreResult};
 pub use license::{LicensePayload, LicenseSigner, LicenseVerifier};
-pub use service::{CoreService, CoreServiceBuilder};
+pub use service::{
+    CoreService, CoreServiceBuilder, DEFAULT_CHROME_EXTENSION_ID, KNOWN_CHROME_EXTENSION_IDS,
+};
 pub use state::{CoreConfig, OsNotification, OsNotificationHook};
