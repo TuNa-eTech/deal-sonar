@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use dealsonar_ai_bridge::MockAiProvider;
 use dealsonar_core::dto::{
-    AuthorRole, CreateRadarDraftInput, FieldDef, FieldType, HardFilter, MatchPolicy, PostIntent,
-    PreviewStartInput, UpdateRadarInput, WantIntent, WhenMissing,
+    filter_trace_for_version, AuthorRole, CreateRadarDraftInput, FieldDef, FieldType, HardFilter,
+    MatchPolicy, PostIntent, PreviewStartInput, UpdateRadarInput, WantIntent, WhenMissing,
 };
 use dealsonar_core::pipeline::{
     finalize_candidate_evaluation, ingest_raw_post, CandidateDecision, EvalMode, IngestPostOutcome,
@@ -393,6 +393,7 @@ async fn preview_and_live_pipeline_decide_identically_on_the_same_extraction() {
             .collect();
 
         let mut decisions = Vec::new();
+        let mut traces = Vec::new();
         for mode in [
             EvalMode::Preview,
             EvalMode::Live {
@@ -450,8 +451,20 @@ async fn preview_and_live_pipeline_decide_identically_on_the_same_extraction() {
             )
             .expect("finalize");
             decisions.push((finalized.verdict.clone(), finalized.reject_reason.clone()));
+            // The explanation shown in preview is built from the same stored fields and agrees with
+            // the decision; missing fields are flagged.
+            let trace = filter_trace_for_version(&version.match_policy, finalized.fields.as_ref())
+                .expect("radar has filters");
+            assert_eq!(trace.passed, *expect_pass, "{post_id}: trace vs decision");
+            traces.push(trace);
         }
 
+        assert_eq!(traces[0], traces[1], "{post_id}: same trace in both modes");
+        if *post_id == "missing_district" {
+            let cond = traces[0].children.last().expect("condition trace");
+            let any = &cond.children[1];
+            assert!(any.children.iter().all(|c| c.missing && !c.passed));
+        }
         assert_eq!(
             decisions[0], decisions[1],
             "{post_id}: preview and live must agree"

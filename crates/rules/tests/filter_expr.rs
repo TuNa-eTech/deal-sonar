@@ -257,3 +257,54 @@ fn validation_rejects_unknown_fields_empty_groups_and_bad_values() {
         })
     );
 }
+
+#[test]
+fn trace_reports_passed_failed_and_missing_branches_consistently_with_evaluation() {
+    let expr = sample_condition();
+    let legacy =
+        vec![serde_json::from_value::<HardFilter>(leaf("price", "gte", json!(1), "pass")).unwrap()];
+    let samples = [
+        post(&[("price", json!(4_000_000)), ("district", json!("Cầu Giấy"))]),
+        post(&[("price", json!(4_000_000)), ("district", json!("Đống Đa"))]),
+        post(&[("price", json!(4_000_000)), ("district", json!("Hà Đông"))]),
+        post(&[("price", json!(4_000_000))]),
+        post(&[("price", json!(9_000_000)), ("district", json!("Cầu Giấy"))]),
+        post(&[
+            ("price", json!(4_000_000)),
+            ("district", json!("Cầu Giấy")),
+            ("role", json!("môi giới")),
+        ]),
+        post(&[]),
+    ];
+    for fields in &samples {
+        let trace = trace_match_filters(&legacy, Some(&expr), fields).unwrap();
+        assert_eq!(
+            trace.passed,
+            evaluate_match_filters(&legacy, Some(&expr), fields)
+        );
+        let cond_only = trace_filter_expr(&expr, fields);
+        assert_eq!(cond_only.passed, evaluate_filter_expr(&expr, fields));
+    }
+
+    // Second branch passes, first fails: both are visible in the `any` group.
+    let dong_da = trace_filter_expr(&expr, &samples[1]);
+    let any = &dong_da.children[1];
+    assert_eq!(any.kind, FilterTraceKind::Any);
+    assert!(any.passed);
+    assert!(!any.children[0].passed && any.children[1].passed);
+    assert!(!any.children[0].missing);
+
+    // Missing district: every branch is flagged missing; missing role under `not` is kept.
+    let no_district = trace_filter_expr(&expr, &samples[3]);
+    let any = &no_district.children[1];
+    assert!(!any.passed && any.children.iter().all(|c| c.missing && !c.passed));
+    let not = &no_district.children[2];
+    assert_eq!(not.kind, FilterTraceKind::Not);
+    assert!(not.passed && not.children[0].missing);
+
+    // Exception hit: `not` group fails.
+    let broker = trace_filter_expr(&expr, &samples[5]);
+    assert!(!broker.children[2].passed && broker.children[2].children[0].passed);
+
+    assert!(trace_match_filters(&[], None, &samples[0]).is_none());
+}

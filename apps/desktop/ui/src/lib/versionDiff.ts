@@ -8,6 +8,7 @@ const clip=(s:string,n=40)=>s.length>n?`${s.slice(0,n-1)}…`:s;
 const show=(v:unknown):string=>{
  if(v===undefined||v===null||v==="")return "";
  if(Array.isArray(v))return v.map(show).join(" – ");
+ if(typeof v==="boolean")return v?"Có":"Không";
  if(typeof v==="object")return clip(JSON.stringify(v));
  return typeof v==="number"?v.toLocaleString("vi-VN"):String(v);
 };

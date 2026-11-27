@@ -64,6 +64,8 @@ export function useRadarWizard({
   const [hardFilters,setHardFilters]=useState<HardFilter[]>(restored?.hardFilters ?? version?.match_policy.hard_filters ?? initialTemplate?.match_policy.hard_filters ?? []);
   // Biểu thức nhóm (all/any/not) chưa có trình soạn thảo trong wizard: giữ nguyên khi lưu để không mất.
   const [condition,setCondition]=useState<FilterExpr|null>(version?.match_policy.condition ?? initialTemplate?.match_policy.condition ?? null);
+  // Bài người dùng đánh dấu «Đáng lẽ phải khớp»: giữ lại qua các lần chạy lại để kiểm tra sau khi sửa điều kiện.
+  const [missedPostIds,setMissedPostIds]=useState<string[]>([]);
   const [showFields,setShowFields]=useState(false);
   const [templatesOpen,setTemplatesOpen]=useState(!initialTemplate&&!editRadar&&!restored);
   const [answers,setAnswers]=useState<Record<number,string>>({});
@@ -593,6 +595,9 @@ export function useRadarWizard({
       label,
       origin: "preview",
     });
+    setMissedPostIds((ids) => label === "missed"
+      ? (ids.includes(item.post_id) ? ids : [...ids, item.post_id])
+      : ids.filter((id) => id !== item.post_id));
     setPreviewState((prev) =>
       prev
         ? {
@@ -705,6 +710,11 @@ export function useRadarWizard({
     return followedSet.size;
   }, [sources, selectedSourceIds]);
 
+  useEffect(() => {
+    const labelled = (previewState?.items ?? []).filter((i) => i.feedback_label === "missed").map((i) => i.post_id);
+    if (labelled.length) setMissedPostIds((ids) => [...new Set([...ids, ...labelled])]);
+  }, [previewState]);
+
   const matchedPreviewItems = useMemo(
     () =>
       (previewState?.items ?? [])
@@ -741,6 +751,8 @@ export function useRadarWizard({
     hardFilters,
     setHardFilters,
     condition,
+    setCondition,
+    missedPostIds,
     showFields,
     setShowFields,
     templatesOpen,

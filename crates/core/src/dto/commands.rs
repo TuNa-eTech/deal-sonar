@@ -131,6 +131,10 @@ pub struct PreviewItem {
     pub post_text: String,
     pub post_created_at: Option<i64>,
     pub feedback_label: Option<FeedbackLabel>,
+    /// How the radar's filters judged this post: passed/failed branches and missing fields.
+    /// `None` when the radar has no `hard_filters` or `condition`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filter_trace: Option<dealsonar_rules::FilterTrace>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

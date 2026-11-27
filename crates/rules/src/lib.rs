@@ -39,7 +39,8 @@ pub use extractors::{
     REGEX_COMPILED_SIZE_LIMIT,
 };
 pub use filter_expr::{
-    validate_filter_expr, validate_hard_filter, validate_hard_filters, FilterExpr, FilterExprError,
+    trace_filter_expr, trace_match_filters, validate_filter_expr, validate_hard_filter,
+    validate_hard_filters, FilterExpr, FilterExprError, FilterTrace, FilterTraceKind,
     MAX_FILTER_EXPR_DEPTH, MAX_FILTER_EXPR_NODES,
 };
 pub use gate::{

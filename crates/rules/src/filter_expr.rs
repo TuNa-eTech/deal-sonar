@@ -312,3 +312,120 @@ fn validate_node(
         FilterExpr::Not(inner) => validate_node(inner, fields, &format!("{path}.not"), depth + 1),
     }
 }
+
+/// Kind of node in a [`FilterTrace`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FilterTraceKind {
+    All,
+    Any,
+    Not,
+    Filter,
+}
+
+/// Explanation of how one post was judged by a filter expression: which branches passed, which
+/// failed, and which leaf conditions lacked their field. `passed` always equals the decision made
+/// by [`crate::evaluate_filter_expr`] / [`crate::evaluate_match_filters`] on the same fields.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FilterTrace {
+    pub kind: FilterTraceKind,
+    pub passed: bool,
+    /// Children of `all` / `any` / `not` (all of them are evaluated, no short-circuit).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<FilterTrace>,
+    /// Leaf only: field key, operator, target value and missing-field policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub op: Option<FilterOp>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when_missing: Option<crate::types::WhenMissing>,
+    /// Leaf only: the post has no (non-null) value for `field`, so `when_missing` decided the result.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub missing: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+fn group_trace(kind: FilterTraceKind, passed: bool, children: Vec<FilterTrace>) -> FilterTrace {
+    FilterTrace {
+        kind,
+        passed,
+        children,
+        field: None,
+        op: None,
+        value: None,
+        when_missing: None,
+        missing: false,
+    }
+}
+
+fn leaf_trace(filter: &HardFilter, fields: &crate::types::ExtractedFields) -> FilterTrace {
+    let present = fields
+        .get(&filter.field)
+        .is_some_and(|ef| !ef.value.is_null());
+    FilterTrace {
+        kind: FilterTraceKind::Filter,
+        passed: crate::postfilter::evaluate_single_filter(filter, fields),
+        children: Vec::new(),
+        field: Some(filter.field.clone()),
+        op: Some(filter.op),
+        value: Some(filter.value.clone()),
+        when_missing: Some(filter.when_missing),
+        missing: !present && filter.op != FilterOp::IsEmpty,
+    }
+}
+
+/// Trace an expression against extracted fields.
+pub fn trace_filter_expr(expr: &FilterExpr, fields: &crate::types::ExtractedFields) -> FilterTrace {
+    match expr {
+        FilterExpr::Filter(f) => leaf_trace(f, fields),
+        FilterExpr::All(items) => {
+            let children: Vec<_> = items.iter().map(|e| trace_filter_expr(e, fields)).collect();
+            group_trace(
+                FilterTraceKind::All,
+                children.iter().all(|c| c.passed),
+                children,
+            )
+        }
+        FilterExpr::Any(items) => {
+            let children: Vec<_> = items.iter().map(|e| trace_filter_expr(e, fields)).collect();
+            group_trace(
+                FilterTraceKind::Any,
+                children.iter().any(|c| c.passed),
+                children,
+            )
+        }
+        FilterExpr::Not(inner) => {
+            let child = trace_filter_expr(inner, fields);
+            group_trace(FilterTraceKind::Not, !child.passed, vec![child])
+        }
+    }
+}
+
+/// Trace the full match policy (legacy `hard_filters` ANDed with `condition`). `None` when the
+/// policy has no filters at all. `passed` equals [`crate::evaluate_match_filters`].
+pub fn trace_match_filters(
+    hard_filters: &[HardFilter],
+    condition: Option<&FilterExpr>,
+    fields: &crate::types::ExtractedFields,
+) -> Option<FilterTrace> {
+    let mut children: Vec<FilterTrace> =
+        hard_filters.iter().map(|f| leaf_trace(f, fields)).collect();
+    if let Some(expr) = condition {
+        children.push(trace_filter_expr(expr, fields));
+    }
+    match children.len() {
+        0 => None,
+        1 if hard_filters.is_empty() => children.pop(),
+        _ => Some(group_trace(
+            FilterTraceKind::All,
+            children.iter().all(|c| c.passed),
+            children,
+        )),
+    }
+}

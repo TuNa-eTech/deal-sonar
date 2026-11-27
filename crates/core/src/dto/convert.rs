@@ -472,3 +472,24 @@ pub fn validate_store_match_policy(
     }
     Ok(())
 }
+
+/// Explain how a version's filters judged a post, from the (post-processed) fields stored on its
+/// evaluation. Uses the same functions as the pipeline decision so the trace never disagrees with it.
+pub fn filter_trace_for_version(
+    mp: &dealsonar_store::models::MatchPolicy,
+    fields: Option<&BTreeMap<String, dealsonar_store::models::ExtractedField>>,
+) -> Option<dealsonar_rules::FilterTrace> {
+    let condition = condition_store_to_rules(mp).ok()?;
+    let extracted: dealsonar_rules::ExtractedFields = fields
+        .map(|m| {
+            m.iter()
+                .filter_map(|(k, v)| extracted_field_store_to_rules(v).map(|f| (k.clone(), f)))
+                .collect()
+        })
+        .unwrap_or_default();
+    dealsonar_rules::trace_match_filters(
+        &hard_filters_store_to_rules(&mp.hard_filters),
+        condition.as_ref(),
+        &extracted,
+    )
+}

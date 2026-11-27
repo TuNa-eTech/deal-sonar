@@ -2,11 +2,11 @@
 
 import React from "react";
 import { parseFieldValue } from "../../lib/fieldValues";
-import { describeCondition } from "../../lib/versionDiff";
 import { FIELD_TYPE_LABELS, slugifyFieldKey } from "../../lib/format";
 import type { HardFilter, FieldType } from "../../types/ipc";
 import type { RadarWizardModel } from "./useRadarWizard";
 import { Button, Card, Input, Select } from "../ui";
+import { ConditionEditor } from "./ConditionEditor";
 
 export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
   const {
@@ -14,6 +14,7 @@ export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     hardFilters,
     setHardFilters,
     condition,
+    setCondition,
     showFields,
     setShowFields,
     answers,
@@ -72,10 +73,6 @@ export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
           Loại bài chào bán của người cùng nghề
         </label>
         <h4>Điều kiện bắt buộc</h4>
-        {condition && <p className="field-hint" data-testid="radar-condition">
-          Điều kiện nhóm (tất cả / ít nhất một / ngoại lệ), áp dụng cùng các điều kiện bên dưới:{" "}
-          {describeCondition(condition, new Map(fields.map(candidate => [candidate.key, candidate.label])))}
-        </p>}
         {hardFilters.map((filter, index) => {
           const field = fields.find(candidate => candidate.key === filter.field);
           const update = (patch: Partial<HardFilter>) => setHardFilters(items =>
@@ -131,6 +128,7 @@ export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
         })}
         <Button size="sm" onClick={() => setHardFilters(items =>
           [...items,{ field: fields[0]!.key, op: "eq", value: null, when_missing: "fail" }])}>+ Điều kiện bắt buộc</Button>
+        <ConditionEditor condition={condition} fields={fields} onChange={setCondition} onError={message => setErrorMsg(message)} />
       </div>}
       <div className="radar-field-disclosure">
         <Button aria-expanded={showFields} onClick={() => setShowFields(value => !value)}>

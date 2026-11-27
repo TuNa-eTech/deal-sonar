@@ -320,7 +320,7 @@ pub(super) async fn evaluate_preview_posts(
         let new_items: Vec<PreviewItem> = all_preview
             .iter()
             .filter(|it| done_immediately.iter().any(|id| id == &it.evaluation.id))
-            .map(preview_eval_item_to_dto)
+            .map(|it| preview_eval_item_to_dto(it, effective_ver))
             .collect();
         state.evaluated_posts += new_items.len();
         state.items.extend(new_items.clone());
@@ -512,7 +512,7 @@ pub(super) async fn evaluate_preview_posts(
                     let chunk_items: Vec<PreviewItem> = all_preview
                         .iter()
                         .filter(|it| chunk_eval_ids.iter().any(|id| id == &it.evaluation.id))
-                        .map(preview_eval_item_to_dto)
+                        .map(|it| preview_eval_item_to_dto(it, effective_ver))
                         .collect();
 
                     state.evaluated_posts += chunk_items.len();
@@ -608,7 +608,7 @@ pub fn get_radar_preview(
     let items: Vec<PreviewItem> = rows
         .iter()
         .filter(|r| r.evaluation.state == "done")
-        .map(preview_eval_item_to_dto)
+        .map(|it| preview_eval_item_to_dto(it, ver))
         .collect();
     let warnings = compute_preview_warnings(&items, ver);
     let mut source_ids = rw.source_ids.clone();
@@ -657,7 +657,10 @@ pub(super) fn save_preview_state(rt: &CoreRuntime, state: &PreviewRunState) {
         .insert(state.preview_id.clone(), state.clone());
 }
 
-pub(super) fn preview_eval_item_to_dto(item: &PendingAiEvaluationItem) -> PreviewItem {
+pub(super) fn preview_eval_item_to_dto(
+    item: &PendingAiEvaluationItem,
+    ver: &RadarVersionRecord,
+) -> PreviewItem {
     let fields = item
         .evaluation
         .fields
@@ -693,6 +696,7 @@ pub(super) fn preview_eval_item_to_dto(item: &PendingAiEvaluationItem) -> Previe
         post_text: item.post.text.clone().unwrap_or_default(),
         post_created_at: item.post.created_at,
         feedback_label: None,
+        filter_trace: filter_trace_for_version(&ver.match_policy, item.evaluation.fields.as_ref()),
     }
 }
 
