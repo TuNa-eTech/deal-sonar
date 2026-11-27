@@ -174,6 +174,33 @@ for bs in 5 10 20 40; do
 done
 ```
 
+### 5.3. Nghiên cứu lặp có báo cáo máy đọc được (`--repeat`, `--out`)
+
+Trình chạy `eval` có thêm hai cờ phục vụ [issue #11](https://github.com/TuNa-eTech/deal-sonar/issues/11):
+
+```bash
+cargo run -p dealsonar-ai-bridge --bin eval -- \
+  --dataset docs/eval/holdout/bds-tim-nguoi-thue.jsonl \
+  --radar docs/eval/holdout/bds-tim-nguoi-thue.radar.json \
+  --provider claude --model haiku --batch-size 20 \
+  --repeat 3 --out /tmp/study/bds-tim-nguoi-thue.json
+```
+
+- `--repeat <n>` chạy trọn bộ `n` lượt rồi đo **ổn định** (tỉ lệ bài đổi quyết định khớp, ngưỡng ≤ 3%).
+- `--out <file>` ghi bản ghi nghiên cứu: provider, phiên bản CLI, model do CLI báo cáo, `radar_version_id`, dấu vân tay tập bài, cỡ lô, từng lượt (tử số/mẫu số mọi cổng, số lời gọi, token, chi phí nếu CLI báo, từng quyết định theo bài, từng lỗi kèm văn bản đã ẩn danh) và kết quả ổn định. Nếu một lượt giữa chừng bị chặn (hạn mức, quá thời gian), các lượt đã xong vẫn được ghi kèm trường `aborted`.
+- Vì `--tier` chỉ có tác dụng khi có `--model`, nghiên cứu nên luôn chỉ định `--model` để kết quả tái lập được.
+
+Quy trình đầy đủ trên tập holdout ([`holdout/`](./holdout/README.md)) và sinh báo cáo Markdown:
+
+```bash
+cargo build -p dealsonar-ai-bridge --bin eval
+node scripts/eval-study.mjs plan                                   # số lời gọi tối thiểu, không gọi AI
+node scripts/eval-study.mjs run --provider claude --model haiku    # 3 Radar × 3 lượt, bỏ qua tệp đã có
+node scripts/eval-study.mjs report                                 # docs/eval/reports/real-cli-holdout-v1/REPORT.md
+```
+
+Kết quả hiện có và việc khắc phục đi kèm: [`reports/real-cli-holdout-v1/REPORT.md`](./reports/real-cli-holdout-v1/REPORT.md), [`REMEDIATION.md`](./reports/real-cli-holdout-v1/REMEDIATION.md). Lệnh `run` gửi bài holdout (đã ẩn danh) tới nhà cung cấp AI qua CLI đã đăng nhập của bạn và **tiêu thụ hạn mức của tài khoản đó**.
+
 ---
 
 ## 6. Tài liệu Tham chiếu Liên quan

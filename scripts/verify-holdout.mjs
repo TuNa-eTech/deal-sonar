@@ -266,7 +266,7 @@ const holdoutRel = relative(ROOT, DIR)
 const needles = [...allTexts.keys()]
 let scanned = 0
 for (const f of trackedFiles()) {
-  if (f.startsWith(holdoutRel + '/') || f.startsWith('.agents/') || f.startsWith('.hallmark/') || SKIP_EXT.test(f)) continue
+  if (f.startsWith(holdoutRel + '/') || f.startsWith('docs/eval/reports/') || f.startsWith('.agents/') || f.startsWith('.hallmark/') || SKIP_EXT.test(f)) continue
   const abs = join(ROOT, f)
   if (!existsSync(abs) || statSync(abs).size > 4 * 1024 * 1024) continue
   const hay = norm(readFileSync(abs, 'utf8'))

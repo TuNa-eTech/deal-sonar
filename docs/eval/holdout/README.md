@@ -61,7 +61,7 @@ Bảng sinh bằng `node scripts/verify-holdout.mjs --summary` và được đ�
 
 Đây là tập **holdout**: chỉ để đo, không để chỉnh.
 
-- Cấm đưa nguyên văn bài ở đây vào `docs/eval/golden/`, `feedback_examples` của Radar, ví dụ trong prompt, bộ luật hạt giống (`crates/rules`), hay fixture kiểm thử. `verify-holdout` quét nguyên văn mọi tệp được git theo dõi (ngoài thư mục này) và **lỗi** nếu thấy.
+- Cấm đưa nguyên văn bài ở đây vào `docs/eval/golden/`, `feedback_examples` của Radar, ví dụ trong prompt, bộ luật hạt giống (`crates/rules`), hay fixture kiểm thử. `verify-holdout` quét nguyên văn mọi tệp được git theo dõi (ngoài thư mục này và `docs/eval/reports/`, nơi chỉ chứa kết quả đo có trích ví dụ lỗi) và **lỗi** nếu thấy.
 - Id dùng tiền tố `hb-` / `hg-`, không trùng `bds-` / `dv-` / `xe-` / `ml-` của bộ vàng.
 - Khi một thay đổi prompt/rules được tinh chỉnh dựa trên lỗi của holdout, kết quả holdout sau đó **không còn là số liệu độc lập** → phải thay bằng holdout v2 mới. Ghi vào PR khi xảy ra.
 - Nhãn đã đóng băng ở `holdout-v1`. Sửa nhãn sau khi đã chạy mô hình chỉ được phép khi có dòng trong [`annotation/agreement-log.jsonl`](./annotation/agreement-log.jsonl) với lý do "lỗi nhãn chứng minh được từ văn bản bài", và không dựa trên đầu ra của mô hình.
