@@ -42,6 +42,7 @@ fn draft(source_id: &str) -> CreateRadarDraftInput {
             exclude_roles: vec![],
             hard_filters: vec![],
             assumptions: vec![],
+            condition: None,
         },
         source_ids: vec![source_id.into()],
         notify: None,

@@ -17,7 +17,7 @@ use dealsonar_notify::{
 };
 use dealsonar_protocol::RawPost;
 use dealsonar_rules::{
-    classify_lead_tier, compile_ruleset_unchecked, evaluate_hard_filters, extract_vn_phone,
+    classify_lead_tier, compile_ruleset_unchecked, evaluate_match_filters, extract_vn_phone,
     normalize_text, postprocess_fields, run_basic_prefilter, BasicPrefilterInput, LeadDisposition,
     NormalizedText, RulesetBody as EngineRulesetBody, RulesetOutcome, DEDUP_WINDOW_MS,
     NEAR_DUP_MAX_HAMMING, NEAR_DUP_MIN_CHARS,
@@ -32,9 +32,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::dto::{
-    extracted_field_ai_to_rules, extracted_field_from_store, extracted_field_rules_to_store,
-    extracted_field_store_to_rules, extracted_fields_store_to_notify, field_def_store_to_ai,
-    field_def_store_to_notify, field_def_store_to_rules, hard_filters_store_to_rules,
+    condition_store_to_rules, extracted_field_ai_to_rules, extracted_field_from_store,
+    extracted_field_rules_to_store, extracted_field_store_to_rules,
+    extracted_fields_store_to_notify, field_def_store_to_ai, field_def_store_to_notify,
+    field_def_store_to_rules, hard_filters_store_to_rules,
 };
 use crate::dto::{
     AlsoSeenSource, AuthorRole, CoreEvent, DecidedBy, FeedbackLabel, Lead, LeadStatus, PostIntent,

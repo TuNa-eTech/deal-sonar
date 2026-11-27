@@ -240,6 +240,9 @@ pub struct MatchPolicy {
     /// Interpretation choices made for this brief that the user can review and edit.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub assumptions: Vec<String>,
+    /// Optional `all`/`any`/`not` expression ANDed with `hard_filters` (see `dealsonar_rules::FilterExpr`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<dealsonar_rules::FilterExpr>,
 }
 
 impl Default for MatchPolicy {
@@ -249,6 +252,7 @@ impl Default for MatchPolicy {
             exclude_roles: vec![AuthorRole::Peer],
             hard_filters: Vec::new(),
             assumptions: Vec::new(),
+            condition: None,
         }
     }
 }

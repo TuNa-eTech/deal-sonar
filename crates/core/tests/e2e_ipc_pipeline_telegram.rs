@@ -425,6 +425,7 @@ async fn full_e2e_ipc_pipeline_telegram_feedback_and_export() {
                 exclude_roles: vec![AuthorRole::Peer],
                 hard_filters: Vec::new(),
                 assumptions: Vec::new(),
+                condition: None,
             },
             source_ids: vec![grp_a.id.clone(), grp_b.id.clone()],
             notify: None,

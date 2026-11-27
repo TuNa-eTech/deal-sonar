@@ -57,12 +57,40 @@ export interface HardFilter {
   when_missing: "pass" | "fail";
 }
 
+/**
+ * Điều kiện nhóm: `all` (tất cả), `any` (ít nhất một), `not` (ngoại lệ) hoặc một điều kiện đơn.
+ * `when_missing` của từng điều kiện đơn quyết định kết quả của nó khi bài thiếu trường,
+ * trước khi `not` đảo ngược.
+ */
+export type FilterExpr =
+  | HardFilter
+  | { all: FilterExpr[] }
+  | { any: FilterExpr[] }
+  | { not: FilterExpr };
+
+/** Giải thích vì sao bộ lọc chọn hoặc loại một bài (khớp với quyết định thật của backend). */
+export interface FilterTrace {
+  kind: "all" | "any" | "not" | "filter";
+  /** Với điều kiện đơn: điều kiện đúng với bài. Với `not`: bài không vướng ngoại lệ. */
+  passed: boolean;
+  children?: FilterTrace[];
+  field?: string;
+  op?: FilterOperator;
+  value?: unknown;
+  when_missing?: "pass" | "fail";
+  /** Bài không có giá trị cho `field`, nên `when_missing` quyết định kết quả. */
+  missing?: boolean;
+}
+
 export interface MatchPolicy {
   want_intent: WantIntent;
   exclude_roles: AuthorRole[];
+  /** Danh sách điều kiện luôn ghép bằng AND. */
   hard_filters: HardFilter[];
   /** Interpretation choices the user can review and edit. */
   assumptions?: string[];
+  /** Biểu thức nhóm tùy chọn, ghép AND với `hard_filters`. Bản cũ không có khóa này. */
+  condition?: FilterExpr | null;
 }
 
 export interface QuietHours {
@@ -726,6 +754,8 @@ export interface PreviewItem {
   post_text: string;
   post_created_at: number | null;
   feedback_label: FeedbackLabel | null;
+  /** Có khi Radar có điều kiện lọc. */
+  filter_trace?: FilterTrace | null;
 }
 
 export interface PreviewWarning {

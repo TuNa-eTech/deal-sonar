@@ -181,7 +181,15 @@ pub fn finalize_candidate_evaluation(
 
     // T6 Step 4: Hard filters (`05-pipeline-rules.md §8.4`)
     let rules_hard_filters = hard_filters_store_to_rules(&radar_version.match_policy.hard_filters);
-    if !evaluate_hard_filters(&rules_hard_filters, &postprocessed.fields) {
+    // A stored `condition` that no longer parses fails closed (post is rejected) rather than being ignored.
+    let condition = condition_store_to_rules(&radar_version.match_policy);
+    let passes_filters = match &condition {
+        Ok(expr) => {
+            evaluate_match_filters(&rules_hard_filters, expr.as_ref(), &postprocessed.fields)
+        }
+        Err(_) => false,
+    };
+    if !passes_filters {
         return Ok(rt.store.mark_evaluation_done(
             evaluation_id,
             &EvaluationDoneInput {

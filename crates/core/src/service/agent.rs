@@ -142,6 +142,9 @@ struct PrepareInput {
     exclude_peers: Option<bool>,
     #[serde(default)]
     assumptions: Vec<String>,
+    /// Optional `all`/`any`/`not` expression ANDed with `hard_filters`.
+    #[serde(default)]
+    condition: Option<dealsonar_rules::FilterExpr>,
 }
 
 #[derive(Deserialize)]
@@ -318,6 +321,7 @@ async fn prepare_radar(rt: &Arc<CoreRuntime>, input: PrepareInput) -> CoreResult
             },
             hard_filters: input.hard_filters,
             assumptions,
+            condition: input.condition,
         },
         source_ids,
         notify: None,

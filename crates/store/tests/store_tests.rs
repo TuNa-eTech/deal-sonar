@@ -704,6 +704,7 @@ fn test_dynamic_lead_list_filters_fts_pagination_and_sql_injection_guard() {
                     value: json!(15_000_000),
                     when_missing: "pass".to_string(),
                 }],
+                condition: None,
                 extra: BTreeMap::new(),
             },
             notify: NotifyConfig::default(),
