@@ -29,6 +29,10 @@ pub struct JourneySnapshot {
     pub last_evaluated_at: Option<i64>,
     pub leads_total: i64,
     pub last_lead_at: Option<i64>,
+    /// Leads that were actually sent to the user (the denominator of the wrong-lead rate).
+    pub leads_notified: i64,
+    /// Notified leads the user marked wrong (irrelevant, same-trade poster, duplicate or spam).
+    pub leads_flagged_wrong: i64,
     pub delivery_pending: i64,
     pub delivery_failed: i64,
     pub last_delivery_at: Option<i64>,
@@ -92,6 +96,13 @@ impl Store {
             ))?,
             leads_total: count("SELECT COUNT(*) FROM leads")?,
             last_lead_at: one("SELECT MAX(created_at) FROM leads")?,
+            leads_notified: count("SELECT COUNT(*) FROM leads WHERE notified_at IS NOT NULL")?,
+            leads_flagged_wrong: count(
+                "SELECT COUNT(DISTINCT l.id) FROM leads l
+                 JOIN feedback f ON f.evaluation_id = l.evaluation_id
+                 WHERE l.notified_at IS NOT NULL AND f.origin != 'preview'
+                   AND f.label IN ('irrelevant', 'peer', 'duplicate', 'spam')",
+            )?,
             delivery_pending: count("SELECT COUNT(*) FROM outbox WHERE state = 'pending'")?,
             delivery_failed: count("SELECT COUNT(*) FROM outbox WHERE state = 'failed'")?,
             last_delivery_at: one("SELECT MAX(sent_at) FROM outbox WHERE state = 'sent'")?,

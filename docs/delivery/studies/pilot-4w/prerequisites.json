@@ -1,0 +1,88 @@
+{
+  "$comment": "Evidence gate for the 4-week pilot. An item is 'met' only with an evidence_ref (commit, ledger entry, dated record). Never mark an item met that was not observed. Items checked from other ledgers (#7 distribution, #14 H1/H4) are computed by scripts/pilot-report.mjs and are not listed here.",
+  "items": [
+    {
+      "id": "issue-9-first-run",
+      "kind": "code",
+      "title": "#9 Hướng dẫn từ lần mở đầu tới tin đầu tiên, giải thích khi chưa có tin, ghi mốc thời gian cài",
+      "status": "met",
+      "evidence_ref": "commit a57b754 (cargo test first_news, vitest first-news.test.tsx)"
+    },
+    {
+      "id": "issue-8",
+      "kind": "evidence",
+      "title": "#8 Kết quả của worker #8 (chưa bàn giao cho pilot)",
+      "status": "pending",
+      "evidence_ref": null,
+      "note": "Điền evidence_ref khi #8 bàn giao; ghi rõ #8 đòi hỏi gì ở pilot."
+    },
+    {
+      "id": "issue-11",
+      "kind": "evidence",
+      "title": "#11 Kết quả của worker #11 (chưa bàn giao cho pilot)",
+      "status": "pending",
+      "evidence_ref": null,
+      "note": "Điền evidence_ref khi #11 bàn giao."
+    },
+    {
+      "id": "issue-12",
+      "kind": "evidence",
+      "title": "#12 Kết quả của worker #12 (chưa bàn giao cho pilot)",
+      "status": "pending",
+      "evidence_ref": null,
+      "note": "Điền evidence_ref khi #12 bàn giao."
+    },
+    {
+      "id": "owner-thresholds-approved",
+      "kind": "owner",
+      "title": "Chủ dự án duyệt ngưỡng, cỡ mẫu tối thiểu và định nghĩa 'phiên đầu' trong pilot-4w/README.md trước khi đo",
+      "status": "pending",
+      "evidence_ref": null
+    },
+    {
+      "id": "owner-recruitment",
+      "kind": "owner",
+      "title": "Tuyển người dùng pilot (đủ cỡ mẫu tối thiểu, đủ ngành, mang nhu cầu thật)",
+      "status": "pending",
+      "evidence_ref": null
+    },
+    {
+      "id": "owner-consent",
+      "kind": "owner",
+      "title": "Văn bản đồng ý: rủi ro tài khoản Facebook, dữ liệu ở lại trên máy, số liệu chỉ gồm số đếm và thời gian",
+      "status": "pending",
+      "evidence_ref": null
+    },
+    {
+      "id": "owner-support-and-interviews",
+      "kind": "owner",
+      "title": "Kênh hỗ trợ, người trả gói AI nếu người dùng chưa có, và lịch phỏng vấn tuần 2",
+      "status": "pending",
+      "evidence_ref": null
+    }
+  ],
+  "waivers": [],
+  "expansion_evidence": [
+    {
+      "id": "quality-h2-eval",
+      "area": "quality",
+      "title": "Chất lượng trích xuất (H2) đo trên tập chuẩn bằng CLI thật, không phải mock",
+      "status": "pending",
+      "evidence_ref": null
+    },
+    {
+      "id": "ops-latency",
+      "area": "operations",
+      "title": "Độ trễ báo tin: trung vị dưới 10 phút từ giờ đăng tới Telegram (PRD G2)",
+      "status": "pending",
+      "evidence_ref": null
+    },
+    {
+      "id": "ops-ai-call-share",
+      "area": "operations",
+      "title": "Tỉ lệ bài phải gọi AI dưới 15% sau khi có bộ luật (PRD G4)",
+      "status": "pending",
+      "evidence_ref": null
+    }
+  ]
+}
