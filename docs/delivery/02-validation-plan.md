@@ -58,6 +58,8 @@ Mọi ngưỡng dưới đây là đề xuất khởi điểm. Chúng cần đư
 
 Tập chuẩn nằm ở `docs/eval/golden/` dạng JSONL, kèm định nghĩa radar dùng để chấm.
 
+Tập đánh giá riêng cho radar do khách tự mô tả (nhu cầu ngoài mẫu, cùng một bài với hai khách trái chiều) nằm ở [`docs/eval/holdout/`](../eval/holdout/README.md), kèm quy tắc xử lý nhãn bất đồng.
+
 ### 3.2 Phép đo và ngưỡng
 
 | Phép đo | Định nghĩa | Ngưỡng đạt |

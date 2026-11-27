@@ -327,11 +327,17 @@ impl CodexCliProvider {
             "read-only".to_string(),
             "--skip-git-repo-check".to_string(),
             "--ephemeral".to_string(),
-            "-c".to_string(),
-            "mcp_servers.dealsonar.enabled=false".to_string(),
         ]);
         if caps.use_ignore_user_config {
             args.push("--ignore-user-config".to_string());
+        } else {
+            // Only meaningful when the user's config is loaded. Combined with `--ignore-user-config`
+            // this would synthesize a transport-less `mcp_servers.dealsonar` table, which Codex
+            // 0.172 rejects ("invalid transport") before running the prompt.
+            args.extend([
+                "-c".to_string(),
+                "mcp_servers.dealsonar.enabled=false".to_string(),
+            ]);
         }
         if caps.use_ignore_rules {
             args.push("--ignore-rules".to_string());

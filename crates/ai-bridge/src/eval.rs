@@ -6,7 +6,8 @@ use serde_json::{json, Value};
 use crate::bridge::{AiBridge, PostEvalOutcome};
 use crate::prompts::{verify_raw_in_post, BatchConfig, DEFAULT_MAX_BATCH_INPUT_CHARS};
 use crate::types::{
-    AiError, AuthorRole, FieldDef, FieldType, PostPromptInput, RadarPromptContext, WantIntent,
+    AiCallStatus, AiError, AuthorRole, FieldDef, FieldType, PostPromptInput, RadarPromptContext,
+    WantIntent,
 };
 
 /// Single labeled record in a golden evaluation `.jsonl` dataset (`02-validation-plan.md §3.1`).
@@ -41,10 +42,41 @@ pub struct FieldEvalStats {
     pub accuracy: f64,
 }
 
+/// Per-post classification decision kept for stability checks across repeated runs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PostDecision {
+    pub post_id: String,
+    pub expected_match: bool,
+    /// `None` when the AI call for this post failed.
+    pub predicted_match: Option<bool>,
+    pub expected_role: Option<AuthorRole>,
+    pub predicted_role: Option<AuthorRole>,
+}
+
+/// One labeled error observed during evaluation (`text` comes from the already-anonymized dataset).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EvalFailure {
+    pub post_id: String,
+    /// `false_positive`, `false_negative`, `peer_missed`, `peer_false_alarm`, `field_mismatch`,
+    /// `hallucinated_raw` or `ai_failed`.
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+    pub expected: Value,
+    pub actual: Value,
+    pub text: String,
+    pub ai_reason: String,
+}
+
 /// Summary metrics produced by `run_offline_eval` (`06-ai-bridge.md §8`, `02-validation-plan.md §3.2`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EvalSummary {
     pub provider: String,
+    #[serde(default)]
+    pub radar_version_id: String,
+    /// Distinct concrete model names reported by the provider calls (empty when the CLI reports none).
+    #[serde(default)]
+    pub models: Vec<String>,
     pub batch_size: usize,
     pub total_posts: usize,
     pub evaluated_ok: usize,
@@ -58,6 +90,12 @@ pub struct EvalSummary {
     pub match_f1: f64,
     pub peer_precision: f64,
     pub peer_recall: f64,
+    #[serde(default)]
+    pub peer_tp: usize,
+    #[serde(default)]
+    pub peer_fp: usize,
+    #[serde(default)]
+    pub peer_fn: usize,
     pub field_stats: BTreeMap<String, FieldEvalStats>,
     pub total_non_null_extractions: usize,
     pub hallucinated_raw_count: usize,
@@ -67,6 +105,21 @@ pub struct EvalSummary {
     pub avg_output_tokens_per_post: f64,
     pub avg_duration_ms_per_post: f64,
     pub total_cost_usd: Option<f64>,
+    #[serde(default)]
+    pub total_input_tokens: u64,
+    #[serde(default)]
+    pub total_output_tokens: u64,
+    /// Provider invocations whose status was not `ok` (invalid output, timeout, rate limit, error).
+    #[serde(default)]
+    pub failed_calls: usize,
+    #[serde(default)]
+    pub bisection_count: usize,
+    #[serde(default)]
+    pub total_duration_ms: u64,
+    #[serde(default)]
+    pub decisions: Vec<PostDecision>,
+    #[serde(default)]
+    pub failures: Vec<EvalFailure>,
 }
 
 /// Parses a `.jsonl` golden dataset string (ignoring blank lines and `#` comments).
@@ -212,9 +265,28 @@ pub async fn run_offline_eval(
     let field_defs_by_key: BTreeMap<&str, &FieldDef> =
         radar.fields.iter().map(|f| (f.key.as_str(), f)).collect();
 
+    let mut decisions: Vec<PostDecision> = Vec::with_capacity(samples.len());
+    let mut failures: Vec<EvalFailure> = Vec::new();
+
     for (sample, outcome) in samples.iter().zip(report.outcomes.iter()) {
         match outcome {
-            PostEvalOutcome::AiFailed { .. } => {
+            PostEvalOutcome::AiFailed { error, .. } => {
+                decisions.push(PostDecision {
+                    post_id: sample.id.clone(),
+                    expected_match: sample.expected_match,
+                    predicted_match: None,
+                    expected_role: sample.expected_author_role,
+                    predicted_role: None,
+                });
+                failures.push(EvalFailure {
+                    post_id: sample.id.clone(),
+                    kind: "ai_failed".to_string(),
+                    field: None,
+                    expected: json!(sample.expected_match),
+                    actual: Value::Null,
+                    text: sample.text.clone(),
+                    ai_reason: error.clone(),
+                });
                 ai_failed_count += 1;
                 if sample.expected_match {
                     match_fn += 1;
@@ -225,10 +297,36 @@ pub async fn run_offline_eval(
             PostEvalOutcome::Done { result, .. } => {
                 evaluated_ok += 1;
 
+                decisions.push(PostDecision {
+                    post_id: sample.id.clone(),
+                    expected_match: sample.expected_match,
+                    predicted_match: Some(result.is_match),
+                    expected_role: sample.expected_author_role,
+                    predicted_role: Some(result.author_role),
+                });
+                let mut record =
+                    |kind: &str, field: Option<&str>, expected: Value, actual: Value| {
+                        failures.push(EvalFailure {
+                            post_id: sample.id.clone(),
+                            kind: kind.to_string(),
+                            field: field.map(ToOwned::to_owned),
+                            expected,
+                            actual,
+                            text: sample.text.clone(),
+                            ai_reason: result.reason.clone(),
+                        });
+                    };
+
                 match (sample.expected_match, result.is_match) {
                     (true, true) => match_tp += 1,
-                    (false, true) => match_fp += 1,
-                    (true, false) => match_fn += 1,
+                    (false, true) => {
+                        match_fp += 1;
+                        record("false_positive", None, json!(false), json!(true));
+                    }
+                    (true, false) => {
+                        match_fn += 1;
+                        record("false_negative", None, json!(true), json!(false));
+                    }
                     (false, false) => match_tn += 1,
                 }
 
@@ -237,8 +335,24 @@ pub async fn run_offline_eval(
                     let pred_peer = result.author_role == AuthorRole::Peer;
                     match (exp_peer, pred_peer) {
                         (true, true) => peer_tp += 1,
-                        (false, true) => peer_fp += 1,
-                        (true, false) => peer_fn += 1,
+                        (false, true) => {
+                            peer_fp += 1;
+                            record(
+                                "peer_false_alarm",
+                                None,
+                                json!(exp_role),
+                                json!(result.author_role),
+                            );
+                        }
+                        (true, false) => {
+                            peer_fn += 1;
+                            record(
+                                "peer_missed",
+                                None,
+                                json!(exp_role),
+                                json!(result.author_role),
+                            );
+                        }
                         (false, false) => {}
                     }
                 }
@@ -253,6 +367,12 @@ pub async fn run_offline_eval(
                             .is_some_and(|r| verify_raw_in_post(&sample.text, r));
                         if !raw_ok {
                             hallucinated_raw_count += 1;
+                            record(
+                                "hallucinated_raw",
+                                None,
+                                Value::Null,
+                                json!(cand.raw.clone()),
+                            );
                         }
                     }
                 }
@@ -278,6 +398,13 @@ pub async fn run_offline_eval(
                         .unwrap_or(&Value::Null);
                     if values_match_normalized(fdef.r#type, expected_val, actual_val) {
                         stat.exact_matches += 1;
+                    } else {
+                        record(
+                            "field_mismatch",
+                            Some(fkey.as_str()),
+                            expected_val.clone(),
+                            actual_val.clone(),
+                        );
                     }
                 }
             }
@@ -313,8 +440,23 @@ pub async fn run_offline_eval(
     let avg_output_tokens_per_post = report.total_usage.output_tokens as f64 / denom;
     let avg_duration_ms_per_post = report.total_duration.as_secs_f64() * 1000.0 / denom;
 
+    let mut models: Vec<String> = report
+        .calls
+        .iter()
+        .filter_map(|c| c.model.clone())
+        .collect();
+    models.sort();
+    models.dedup();
+    let failed_calls = report
+        .calls
+        .iter()
+        .filter(|c| c.status != AiCallStatus::Ok)
+        .count();
+
     Ok(EvalSummary {
         provider: bridge.provider_id().to_string(),
+        radar_version_id: radar.radar_version_id.clone(),
+        models,
         batch_size: effective_batch_size,
         total_posts: samples.len(),
         evaluated_ok,
@@ -328,6 +470,9 @@ pub async fn run_offline_eval(
         match_f1,
         peer_precision,
         peer_recall,
+        peer_tp,
+        peer_fp,
+        peer_fn,
         field_stats,
         total_non_null_extractions,
         hallucinated_raw_count,
@@ -337,6 +482,13 @@ pub async fn run_offline_eval(
         avg_output_tokens_per_post,
         avg_duration_ms_per_post,
         total_cost_usd: report.total_usage.cost_usd,
+        total_input_tokens: report.total_usage.input_tokens,
+        total_output_tokens: report.total_usage.output_tokens,
+        failed_calls,
+        bisection_count: report.bisection_count,
+        total_duration_ms: report.total_duration.as_millis() as u64,
+        decisions,
+        failures,
     })
 }
 
@@ -429,7 +581,7 @@ pub fn format_eval_report(summary: &EvalSummary) -> String {
 
     out.push_str("1. QUYẾT ĐỊNH KHỚP (Ngưỡng H2: Precision >= 85%, Recall >= 90%)\n");
     out.push_str(&format!(
-        "   - Precision : {:>6.2}%  [{}]  (TP={}, FP={})\n",
+        "   - Precision : {:>6.2}%  [{}]  (TP={}, FP={}; {}/{})\n",
         summary.match_precision * 100.0,
         if summary.match_precision >= 0.85 {
             "ĐẠT"
@@ -437,10 +589,12 @@ pub fn format_eval_report(summary: &EvalSummary) -> String {
             "CHƯA ĐẠT"
         },
         summary.match_tp,
-        summary.match_fp
+        summary.match_fp,
+        summary.match_tp,
+        summary.match_tp + summary.match_fp
     ));
     out.push_str(&format!(
-        "   - Recall    : {:>6.2}%  [{}]  (TP={}, FN={})\n",
+        "   - Recall    : {:>6.2}%  [{}]  (TP={}, FN={}; {}/{})\n",
         summary.match_recall * 100.0,
         if summary.match_recall >= 0.90 {
             "ĐẠT"
@@ -448,7 +602,9 @@ pub fn format_eval_report(summary: &EvalSummary) -> String {
             "CHƯA ĐẠT"
         },
         summary.match_tp,
-        summary.match_fn
+        summary.match_fn,
+        summary.match_tp,
+        summary.match_tp + summary.match_fn
     ));
     out.push_str(&format!(
         "   - F1 Score  : {:>6.2}%\n\n",
@@ -521,6 +677,204 @@ pub fn format_eval_report(summary: &EvalSummary) -> String {
     }
 
     out
+}
+
+/// One threshold comparison with explicit numerator and denominator (`02-validation-plan.md §3.2`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThresholdCheck {
+    /// `match_precision`, `match_recall`, `field:<key>` (required) …
+    pub name: String,
+    /// `issue_gate` for the three gates of issue #11; `h2_gate` for the remaining H2 thresholds.
+    pub scope: String,
+    pub numerator: usize,
+    pub denominator: usize,
+    pub value: f64,
+    pub threshold: f64,
+    /// `true` when the denominator is zero (nothing to measure) or `value >= threshold`.
+    pub passed: bool,
+}
+
+fn make_check(name: &str, scope: &str, num: usize, den: usize, threshold: f64) -> ThresholdCheck {
+    let value = if den == 0 {
+        1.0
+    } else {
+        num as f64 / den as f64
+    };
+    ThresholdCheck {
+        name: name.to_string(),
+        scope: scope.to_string(),
+        numerator: num,
+        denominator: den,
+        value,
+        threshold,
+        passed: den == 0 || value >= threshold,
+    }
+}
+
+/// Builds the pass/fail table: match precision ≥ 85%, match recall ≥ 90%, every required field ≥ 90%
+/// (issue gates), then peer precision/recall ≥ 75%, optional fields ≥ 80% and fabricated `raw` ≤ 1%.
+pub fn threshold_checks(s: &EvalSummary) -> Vec<ThresholdCheck> {
+    let mut out = vec![
+        make_check(
+            "match_precision",
+            "issue_gate",
+            s.match_tp,
+            s.match_tp + s.match_fp,
+            0.85,
+        ),
+        make_check(
+            "match_recall",
+            "issue_gate",
+            s.match_tp,
+            s.match_tp + s.match_fn,
+            0.90,
+        ),
+    ];
+    for st in s.field_stats.values().filter(|f| f.required) {
+        out.push(make_check(
+            &format!("field:{}", st.field_key),
+            "issue_gate",
+            st.exact_matches,
+            st.total_labeled,
+            0.90,
+        ));
+    }
+    out.push(make_check(
+        "peer_precision",
+        "h2_gate",
+        s.peer_tp,
+        s.peer_tp + s.peer_fp,
+        0.75,
+    ));
+    out.push(make_check(
+        "peer_recall",
+        "h2_gate",
+        s.peer_tp,
+        s.peer_tp + s.peer_fn,
+        0.75,
+    ));
+    for st in s.field_stats.values().filter(|f| !f.required) {
+        out.push(make_check(
+            &format!("field:{}", st.field_key),
+            "h2_gate",
+            st.exact_matches,
+            st.total_labeled,
+            0.80,
+        ));
+    }
+    let ok_raw =
+        s.total_non_null_extractions - s.hallucinated_raw_count.min(s.total_non_null_extractions);
+    let mut raw = make_check(
+        "raw_grounded",
+        "h2_gate",
+        ok_raw,
+        s.total_non_null_extractions,
+        0.99,
+    );
+    raw.name = "raw_grounded (1 - hallucinated_raw_rate)".to_string();
+    out.push(raw);
+    out
+}
+
+/// Stability across repeated runs of the same configuration (`02-validation-plan.md §3.2`: ≤ 3%).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StabilityReport {
+    pub runs: usize,
+    pub posts: usize,
+    /// Posts whose match decision (or AI-failed status) differs between at least two runs.
+    pub posts_changed: usize,
+    pub rate: f64,
+    pub threshold: f64,
+    /// `None` when fewer than two runs were executed.
+    pub passed: Option<bool>,
+    pub changed_post_ids: Vec<String>,
+}
+
+pub const STABILITY_MAX_CHANGE_RATE: f64 = 0.03;
+
+pub fn compute_stability(runs: &[EvalSummary]) -> StabilityReport {
+    let posts = runs.first().map_or(0, |r| r.decisions.len());
+    let mut changed_post_ids = Vec::new();
+    if runs.len() >= 2 {
+        for i in 0..posts {
+            let first = runs[0].decisions.get(i).and_then(|d| d.predicted_match);
+            let differs = runs
+                .iter()
+                .skip(1)
+                .any(|r| r.decisions.get(i).and_then(|d| d.predicted_match) != first);
+            if differs {
+                changed_post_ids.push(runs[0].decisions[i].post_id.clone());
+            }
+        }
+    }
+    let posts_changed = changed_post_ids.len();
+    let rate = if posts == 0 {
+        0.0
+    } else {
+        posts_changed as f64 / posts as f64
+    };
+    StabilityReport {
+        runs: runs.len(),
+        posts,
+        posts_changed,
+        rate,
+        threshold: STABILITY_MAX_CHANGE_RATE,
+        passed: (runs.len() >= 2).then_some(rate <= STABILITY_MAX_CHANGE_RATE),
+        changed_post_ids,
+    }
+}
+
+/// Machine-readable record of one provider × radar × dataset study (one or more repeated runs).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EvalRunReport {
+    pub schema_version: u32,
+    pub generated_at_unix_ms: u64,
+    pub provider: String,
+    pub tier: String,
+    pub model_override: Option<String>,
+    /// First line of `<cli> --version` when available.
+    pub cli_version: Option<String>,
+    pub batch_size: usize,
+    pub dataset: String,
+    pub dataset_fingerprint_fnv1a64: String,
+    pub dataset_posts: usize,
+    pub radar: String,
+    pub radar_version_id: String,
+    pub repeat: usize,
+    pub runs: Vec<EvalSummary>,
+    pub run_checks: Vec<Vec<ThresholdCheck>>,
+    pub stability: StabilityReport,
+    /// Set when a later run aborted (quota, timeout …); `runs` then holds only the completed runs
+    /// and `repeat` is the number that was requested.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aborted: Option<String>,
+}
+
+/// Stable, dependency-free fingerprint of dataset bytes (FNV-1a 64-bit, lowercase hex).
+pub fn fnv1a64_hex(bytes: &[u8]) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in bytes {
+        h ^= u64::from(*b);
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{h:016x}")
+}
+
+/// Formats the stability section appended after repeated runs.
+pub fn format_stability_report(st: &StabilityReport) -> String {
+    let verdict = match st.passed {
+        Some(true) => "ĐẠT",
+        Some(false) => "CHƯA ĐẠT",
+        None => "CHƯA ĐO (cần --repeat >= 2)",
+    };
+    format!(
+        "5. ỔN ĐỊNH QUA {} LƯỢT (Ngưỡng: tỉ lệ bài đổi quyết định khớp <= 3%)\n   - Bài đổi quyết định : {}/{} = {:.2}%  [{}]\n",
+        st.runs,
+        st.posts_changed,
+        st.posts,
+        st.rate * 100.0,
+        verdict
+    )
 }
 
 /// Built-in Vietnamese real-estate golden evaluation suite used when `--dataset` is omitted.

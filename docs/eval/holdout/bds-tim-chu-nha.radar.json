@@ -1,0 +1,89 @@
+{
+  "radar_version_id": "01HOLDOUTBDSOWNERV1",
+  "id": "holdout.bds-tim-chu-nha",
+  "industry": "Bất động sản (Holdout)",
+  "name": "Đơn vị quản lý nhà tìm chủ nhà chính chủ đăng cho thuê (Holdout v1)",
+  "description": "Chủ nhà chính chủ đang đăng cho thuê căn hộ, studio, phòng trọ hoặc nhà nguyên căn tại Hà Nội và TP.HCM (loại trừ môi giới, công ty quản lý cùng nghề, người thuê pass lại hợp đồng, người cần thuê và tin mua bán)",
+  "user_profession": "đơn vị quản lý và vận hành nhà cho thuê",
+  "language_hint": "vi",
+  "want_intent": "supply",
+  "exclude_roles": [
+    "peer"
+  ],
+  "match_policy": {
+    "want_intent": "supply",
+    "exclude_roles": [
+      "peer"
+    ],
+    "hard_filters": []
+  },
+  "seed_ruleset": null,
+  "fields": [
+    {
+      "key": "property_type",
+      "label": "Loại hình",
+      "type": "enum",
+      "description": "Loại nhà chủ nhà đang cho thuê",
+      "required": true,
+      "options": [
+        "apartment",
+        "house",
+        "room",
+        "studio"
+      ],
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Tỉnh/thành và quận/huyện của căn cho thuê",
+      "required": true,
+      "options": null,
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "price",
+      "label": "Giá thuê",
+      "type": "money",
+      "description": "Giá thuê mỗi tháng chủ nhà nêu trong bài",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "bedrooms",
+      "label": "Số phòng ngủ",
+      "type": "number",
+      "description": "Số phòng ngủ của căn cho thuê",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "furnished",
+      "label": "Có nội thất",
+      "type": "boolean",
+      "description": "Bài có nói rõ căn cho thuê có nội thất hay không",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại liên hệ của chủ nhà chuẩn E.164",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 6
+    }
+  ],
+  "feedback_examples": []
+}
