@@ -46,6 +46,21 @@ impl CoreService {
         self.rt.compute_health_status(now_ms())
     }
 
+    /// Session incidents and scan activity over the last `days` days (default 30), for the
+    /// long-running account-safety observation.
+    pub fn account_safety_report(
+        &self,
+        days: Option<u32>,
+    ) -> CoreResult<crate::safety::AccountSafetyReport> {
+        let settings = self.rt.load_settings()?;
+        crate::safety::account_safety_report(
+            &self.rt.store,
+            &settings,
+            days.unwrap_or(30),
+            now_ms(),
+        )
+    }
+
     pub fn crawl_run_list(
         &self,
         source_id: Option<&str>,

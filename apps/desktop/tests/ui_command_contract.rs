@@ -957,6 +957,15 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
     assert!(at("first_radar_activated_at") >= at("first_radar_created_at"));
     assert!(at("installed_at") <= at("first_radar_created_at"));
     assert!(at("leads_total") >= 1);
+
+    // The account-safety log is reachable from the desktop command layer.
+    let safety = invoke_command_json(&state, "account_safety_report", json!({ "days": 30 }))
+        .await
+        .expect("account_safety_report");
+    assert_eq!(safety["window_days"], json!(30));
+    assert_eq!(safety["crawl_policy"]["group_interval_minutes"], json!(15));
+    assert!(safety["incidents"].is_array());
+    assert!(safety["active_days"].is_array());
     let paused_health = state.core().toggle_crawl_paused().expect("pause crawl");
     assert!(paused_health.crawl_paused);
     let resumed_health = state.core().toggle_crawl_paused().expect("resume crawl");

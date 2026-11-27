@@ -112,6 +112,11 @@ pub fn create_diagnostic_bundle(
     zip.start_file("table_counts.json", opts)?;
     zip.write_all(&counts_json)?;
 
+    // 4b. account_safety.json (session incidents and page-load counts; no account identity)
+    let safety = crate::safety::account_safety_report(store, settings, 30, now_ms)?;
+    zip.start_file("account_safety.json", opts)?;
+    zip.write_all(&serde_json::to_vec_pretty(&safety)?)?;
+
     // 5. schema_migrations.json
     let migrations = store.list_schema_migrations()?;
     let migrations_json = serde_json::to_vec_pretty(&migrations)?;

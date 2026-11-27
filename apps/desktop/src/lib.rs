@@ -233,6 +233,7 @@ pub fn run() {
             commands::license_set,
             commands::health_get,
             commands::first_news_status,
+            commands::account_safety_report,
             commands::crawl_run_list,
             commands::ai_usage_get,
             commands::diagnostic_bundle_create,

@@ -23,6 +23,8 @@
     "eval:holdout:verify": "node scripts/verify-holdout.mjs",
     "eval:study": "node scripts/eval-study.mjs",
     "eval:holdout": "pnpm eval:holdout:verify && cargo run -q -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/holdout/bds-tim-nguoi-thue.jsonl --radar docs/eval/holdout/bds-tim-nguoi-thue.radar.json && cargo run -q -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/holdout/bds-tim-chu-nha.jsonl --radar docs/eval/holdout/bds-tim-chu-nha.radar.json && cargo run -q -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/holdout/gia-su-phu-huynh.jsonl --radar docs/eval/holdout/gia-su-phu-huynh.radar.json",
-    "desktop": "pnpm ui:build && pnpm ext:build && cargo build -p dealsonar-native-host && cargo run -p dealsonar-desktop"
+    "desktop": "pnpm ui:build && pnpm ext:build && cargo build -p dealsonar-native-host && cargo run -p dealsonar-desktop",
+    "study:h5": "node scripts/account-safety-report.mjs",
+    "study:h5:test": "node --test scripts/account-safety-report.test.mjs"
   }
 }

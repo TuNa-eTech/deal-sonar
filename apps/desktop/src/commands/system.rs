@@ -4,6 +4,7 @@ use dealsonar_core::dto::{
     AiUsageStats, CrawlRun, DataBackupResult, DataDeleteAllResult, DataPurgeResult,
     DiagnosticBundleResult, FirstNewsStatus, HealthStatus,
 };
+use dealsonar_core::safety::AccountSafetyReport;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, State};
@@ -28,6 +29,14 @@ pub async fn first_news_status(
     state: State<'_, DesktopState>,
 ) -> Result<FirstNewsStatus, CommandError> {
     Ok(state.core().first_news_status()?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn account_safety_report(
+    state: State<'_, DesktopState>,
+    days: Option<u32>,
+) -> Result<AccountSafetyReport, CommandError> {
+    Ok(state.core().account_safety_report(days)?)
 }
 
 #[tauri::command(rename_all = "snake_case")]
