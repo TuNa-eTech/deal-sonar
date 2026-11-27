@@ -44,19 +44,20 @@ use tokio::task::JoinHandle;
 use crate::diagnostics::create_diagnostic_bundle;
 use crate::dto::{
     extracted_fields_store_to_notify, field_def_from_ai, field_def_from_store,
-    field_def_store_to_notify, field_def_to_store, filter_op_to_store, match_policy_to_store, validate_store_match_policy,
-    notify_from_store, notify_to_store, radar_version_from_store, ruleset_record_to_dto,
-    AiDailyUsageRow, AiProviderId, AiUsageStats, BlocklistEntry, BlocklistKind,
-    BlocklistRemoveResult, Channel, ChannelConfig, ChannelRemoveResult, ChromeConnectOptions,
-    ChromeConnectResult, Contact, ContactBlockResult, ContactDetail, CoreEvent, CrawlRun,
-    CreateRadarDraftInput, DataBackupResult, DataDeleteAllResult, DataPurgeResult, DecidedBy,
-    DiagnosticBundleResult, ExportFormat, FacebookSessionState, FeedbackLabel, FirstNewsStatus,
-    FunnelStats,
-    HardFilter, HealthStatus, LeadCrmPatch, LeadDetail, LeadEvent, LeadExportInput,
-    LeadExportResult, LeadFeedbackInput, LeadFeedbackResult, LeadFilterQuery, LeadListResponse,
-    LeadStatus, LicenseStatus, ModelTierMap, Post, PrefilterHintDto, PreviewRunState,
-    PreviewStartInput, ProbeResult, Radar, RadarDetail, RadarNotifyConfig, RadarStatus,
-    RadarTemplate, RadarUpdateResult, RejectReason, RejectedEvaluation, Ruleset, RulesetBody,
+    field_def_store_to_notify, field_def_to_store, filter_op_to_store, match_policy_from_store,
+    match_policy_to_store, notify_from_store, notify_to_store, radar_version_from_store,
+    ruleset_record_to_dto, validate_store_match_policy, AiDailyUsageRow, AiProviderId,
+    AiUsageStats, BlocklistEntry, BlocklistKind, BlocklistRemoveResult, Channel, ChannelConfig,
+    ChannelRemoveResult, ChromeConnectOptions, ChromeConnectResult, Contact, ContactBlockResult,
+    ContactDetail, CoreEvent, CrawlRun, CreateRadarDraftInput, CreateRadarVariantInput,
+    DataBackupResult, DataDeleteAllResult, DataPurgeResult, DecidedBy, DiagnosticBundleResult,
+    ExportFormat, FacebookSessionState, FeedbackLabel, FirstNewsStatus, FunnelStats, HardFilter,
+    HealthStatus, LeadCrmPatch, LeadDetail, LeadEvent, LeadExportInput, LeadExportResult,
+    LeadFeedbackInput, LeadFeedbackResult, LeadFilterQuery, LeadListResponse, LeadStatus,
+    LicenseStatus, ModelTierMap, Post, PrefilterHintDto, PreviewRunState, PreviewStartInput,
+    ProbeResult, Radar, RadarCompareInput, RadarComparison, RadarComparisonSummary, RadarDetail,
+    RadarNotifyConfig, RadarNotifyPatch, RadarStatus, RadarTemplate, RadarUpdateResult,
+    RadarVariantDraft, RejectReason, RejectedEvaluation, Ruleset, RulesetBody,
     RulesetCompileResult, Settings, SettingsPatch, Source, SourceCrawlNowResult, SourceState,
     SuggestFieldsInput, SuggestFieldsResult, TelegramSetupStatus, TelegramTestResult,
     UpdateRadarInput, WantIntent, WhenMissing,
@@ -66,8 +67,9 @@ use crate::ipc_server::{push_crawl_request, spawn_ipc_server};
 use crate::license::{enforce_plan_limits_on_store, LicenseVerifier, LICENSE_TOKEN_SETTING_KEY};
 use crate::pipeline::{lead_detail_to_lead_dto, load_lead_dto, run_silent_backfill_24h};
 use crate::preview_rules::{
-    cancel_radar_preview, get_radar_preview, handle_negative_feedback_on_rule_eval,
-    run_compile_ruleset_for_version, save_user_ruleset, start_radar_preview,
+    cancel_radar_preview, get_radar_comparison, get_radar_preview,
+    handle_negative_feedback_on_rule_eval, list_radar_comparisons, run_compile_ruleset_for_version,
+    run_radar_comparison, save_user_ruleset, start_radar_preview,
 };
 use crate::state::{
     AiRuntimeHealth, CoreConfig, CoreRuntime, IncidentTracker, InflightAiGuard, IpcHub,

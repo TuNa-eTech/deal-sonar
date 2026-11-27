@@ -24,6 +24,7 @@ impl CoreService {
                 current_version: item.radar.current_version,
                 source_ids: item.source_ids,
                 notify: notify_from_store(&item.radar.notify),
+                variant_of: item.radar.variant_of,
                 created_at: item.radar.created_at,
                 updated_at: item.radar.updated_at,
                 leads_24h: Some(item.leads_24h),
@@ -51,8 +52,104 @@ impl CoreService {
 
     pub fn radar_create_draft(&self, input: CreateRadarDraftInput) -> CoreResult<RadarDetail> {
         self.ensure_not_shutting_down()?;
-        let (rw, now) = persist_radar_draft(&self.rt, input, None)?;
+        let (rw, now) = persist_radar_draft(&self.rt, input, None, None)?;
         self.build_radar_detail_dto(&rw, now)
+    }
+
+    /// Propose a copy of the radar's live definition, sources and notification settings so the
+    /// user can review and change it before saving it as a variant. Writes nothing.
+    pub fn radar_variant_prepare(&self, source_radar_id: &str) -> CoreResult<RadarVariantDraft> {
+        let source =
+            self.rt
+                .store
+                .radar_get(source_radar_id)?
+                .ok_or_else(|| CoreError::NotFound {
+                    entity: "radar",
+                    id: source_radar_id.to_string(),
+                })?;
+        // The live version is what the radar is doing now; a pending candidate is unconfirmed.
+        let version = &source.current_version;
+        let notify = notify_from_store(&source.radar.notify);
+        Ok(RadarVariantDraft {
+            source_radar_id: source.radar.id.clone(),
+            source_radar_name: source.radar.name.clone(),
+            input: CreateRadarDraftInput {
+                name: format!("{} (biến thể)", source.radar.name),
+                template_id: source.radar.template_id.clone(),
+                description: version.description.clone(),
+                user_profession: version.user_profession.clone(),
+                language_hint: version.language_hint.clone(),
+                fields: version.fields.iter().map(field_def_from_store).collect(),
+                match_policy: match_policy_from_store(&version.match_policy),
+                source_ids: source.source_ids.clone(),
+                notify: Some(RadarNotifyPatch {
+                    channel_ids: Some(notify.channel_ids),
+                    inherit_channels: notify.inherit_channels,
+                    mode: Some(notify.mode),
+                    min_score: Some(notify.min_score),
+                    quiet_hours: Some(notify.quiet_hours),
+                    lead_ttl_hours: Some(notify.lead_ttl_hours),
+                }),
+            },
+        })
+    }
+
+    /// Save the reviewed copy as a new draft radar linked to `source_radar_id`.
+    ///
+    /// The variant gets its own ID, version history and (empty) lead, evaluation and feedback
+    /// history, and never sends notifications until it is activated. The source radar is only
+    /// read. Plan limits are the ones that apply when creating a radar from scratch.
+    pub fn radar_create_variant(&self, input: CreateRadarVariantInput) -> CoreResult<RadarDetail> {
+        self.ensure_not_shutting_down()?;
+        let source = self
+            .rt
+            .store
+            .radar_get(&input.source_radar_id)?
+            .ok_or_else(|| CoreError::NotFound {
+                entity: "radar",
+                id: input.source_radar_id.clone(),
+            })?;
+        let mut draft = input.input;
+        draft.source_ids.sort();
+        draft.source_ids.dedup();
+        self.ensure_variant_sources_allowed(&draft.source_ids)?;
+        let (rw, now) = persist_radar_draft(&self.rt, draft, None, Some(source.radar.id.as_str()))?;
+        self.rt
+            .emit(CoreEvent::RadarDraftCreated(rw.radar.id.clone()));
+        self.build_radar_detail_dto(&rw, now)
+    }
+
+    /// The sources must exist and fit the plan's followed-group limit, as in the radar wizard.
+    fn ensure_variant_sources_allowed(&self, source_ids: &[String]) -> CoreResult<()> {
+        if source_ids.is_empty() {
+            return Ok(());
+        }
+        let now = now_ms();
+        let max_groups = self
+            .rt
+            .current_license_status(now)?
+            .limits
+            .max_followed_groups;
+        let sources = self.rt.store.source_list(now)?;
+        let mut followed: HashSet<&str> = sources
+            .iter()
+            .filter(|row| row.source.followed)
+            .map(|row| row.source.id.as_str())
+            .collect();
+        for id in source_ids {
+            if !sources.iter().any(|row| row.source.id == *id) {
+                return Err(CoreError::Validation(format!(
+                    "Group {id} không còn trong danh sách nguồn."
+                )));
+            }
+            followed.insert(id.as_str());
+        }
+        if followed.len() > max_groups {
+            return Err(CoreError::LicenseLimitExceeded(format!(
+                "Current plan allows following at most {max_groups} groups"
+            )));
+        }
+        Ok(())
     }
 
     pub fn radar_update(&self, input: UpdateRadarInput) -> CoreResult<RadarUpdateResult> {
@@ -202,18 +299,22 @@ impl CoreService {
         if status == RadarStatus::Active {
             let radar = self.radar_get(id)?.radar;
             if radar.source_ids.is_empty() {
-                return Err(CoreError::Validation("Hãy chọn ít nhất một nhóm cho radar.".into()));
+                return Err(CoreError::Validation(
+                    "Hãy chọn ít nhất một nhóm cho radar.".into(),
+                ));
             }
             if radar.status == RadarStatus::Draft {
-                let preview_id = preview_id.ok_or_else(|| CoreError::Validation(
-                    "Hãy xem thử bản nháp trước khi bật radar.".into()
-                ))?;
+                let preview_id = preview_id.ok_or_else(|| {
+                    CoreError::Validation("Hãy xem thử bản nháp trước khi bật radar.".into())
+                })?;
                 let preview = self.radar_preview_get(id, None)?;
                 if preview.preview_id != preview_id
                     || preview.status != crate::dto::PreviewStatus::Done
                     || preview.total_posts == 0
                 {
-                    return Err(CoreError::Validation("Cần hoàn tất xem thử trên bài thật.".into()));
+                    return Err(CoreError::Validation(
+                        "Cần hoàn tất xem thử trên bài thật.".into(),
+                    ));
                 }
             }
         }
@@ -263,6 +364,21 @@ impl CoreService {
 
         let detail = self.radar_get(id)?;
         Ok(detail.radar)
+    }
+
+    /// Evaluate two saved radar definitions on one shared set of posts and report which posts
+    /// appear, disappear or change extracted fields. Creates no leads and sends nothing.
+    pub async fn radar_compare_run(&self, input: RadarCompareInput) -> CoreResult<RadarComparison> {
+        self.ensure_not_shutting_down()?;
+        run_radar_comparison(&self.rt, input).await
+    }
+
+    pub fn radar_compare_get(&self, id: &str) -> CoreResult<RadarComparison> {
+        get_radar_comparison(&self.rt, id)
+    }
+
+    pub fn radar_compare_list(&self) -> CoreResult<Vec<RadarComparisonSummary>> {
+        list_radar_comparisons(&self.rt)
     }
 
     pub async fn radar_preview_start(
@@ -338,6 +454,7 @@ impl CoreService {
             current_version: rw.radar.current_version,
             source_ids: rw.source_ids.clone(),
             notify: notify_from_store(&rw.radar.notify),
+            variant_of: rw.radar.variant_of.clone(),
             created_at: rw.radar.created_at,
             updated_at: rw.radar.updated_at,
             leads_24h: list_meta.map(|m| m.leads_24h),
@@ -372,6 +489,7 @@ pub(super) fn persist_radar_draft(
     rt: &CoreRuntime,
     input: CreateRadarDraftInput,
     id: Option<String>,
+    variant_of: Option<&str>,
 ) -> CoreResult<(dealsonar_store::models::RadarWithVersion, i64)> {
     if input.name.trim().is_empty() {
         return Err(CoreError::Validation(
@@ -427,7 +545,7 @@ pub(super) fn persist_radar_draft(
     let store_fields: Vec<_> = input.fields.iter().map(field_def_to_store).collect();
     let store_policy = match_policy_to_store(&input.match_policy);
     validate_store_match_policy(&store_policy, &store_fields)?;
-    let rw = rt.store.radar_create_draft(&StoreCreateRadarDraftInput {
+    let store_input = StoreCreateRadarDraftInput {
         id,
         name: input.name.trim().to_string(),
         template_id: input.template_id.clone(),
@@ -439,7 +557,13 @@ pub(super) fn persist_radar_draft(
         source_ids: input.source_ids,
         notify: notify_to_store(&base_notify),
         now_ms: now,
-    })?;
+    };
+    let rw = match variant_of {
+        Some(parent_id) => rt
+            .store
+            .radar_create_variant_draft(parent_id, &store_input)?,
+        None => rt.store.radar_create_draft(&store_input)?,
+    };
 
     // Auto-attach seed ruleset (`bds-vi-v1`) when creating from a template specifying it (`05-pipeline-rules.md §6.3`)
     if let Some(tid) = &input.template_id {

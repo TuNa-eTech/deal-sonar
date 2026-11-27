@@ -11,6 +11,7 @@ import type {
   ContactDetail,
   CrawlRun,
   CreateRadarDraftInput,
+  CreateRadarVariantInput,
   FunnelStats,
   FirstNewsStatus,
   HealthStatus,
@@ -29,10 +30,14 @@ import type {
   PreviewStartInput,
   ProbeResult,
   Radar,
+  RadarCompareInput,
+  RadarComparison,
+  RadarComparisonSummary,
   RadarDetail,
   RadarStatus,
   RadarTemplate,
   RadarUpdateResult,
+  RadarVariantDraft,
   RejectedEvaluation,
   Ruleset,
   RulesetBody,
@@ -91,6 +96,14 @@ export const api = {
   radarGet: (id: string) => callCommand<RadarDetail>("radar_get", { id }),
   radarCreateDraft: (input: CreateRadarDraftInput) =>
     callCommand<RadarDetail>("radar_create_draft", { input }),
+  radarVariantPrepare: (source_radar_id: string) =>
+    callCommand<RadarVariantDraft>("radar_variant_prepare", { source_radar_id }),
+  radarCreateVariant: (input: CreateRadarVariantInput) =>
+    callCommand<RadarDetail>("radar_create_variant", { input }),
+  radarCompareRun: (input: RadarCompareInput) =>
+    callCommand<RadarComparison>("radar_compare_run", { input }),
+  radarCompareGet: (id: string) => callCommand<RadarComparison>("radar_compare_get", { id }),
+  radarCompareList: () => callCommand<RadarComparisonSummary[]>("radar_compare_list"),
   radarUpdate: (input: UpdateRadarInput) =>
     callCommand<RadarUpdateResult>("radar_update", { input }),
   radarSuggestFields: (input: SuggestFieldsInput) =>

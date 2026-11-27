@@ -344,6 +344,9 @@ pub struct Radar {
     pub current_version: i32,
     pub source_ids: Vec<String>,
     pub notify: RadarNotifyConfig,
+    /// Radar this one was copied from. Provenance only; the two radars are independent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant_of: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
     #[serde(skip_serializing_if = "Option::is_none")]

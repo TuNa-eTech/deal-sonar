@@ -6,6 +6,10 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[[bin]]
+name = "dealsonar-soak-report"
+path = "src/bin/soak_report.rs"
+
 [dependencies]
 rusqlite = { version = "0.32", features = ["bundled", "backup", "functions"] }
 serde.workspace = true

@@ -18,6 +18,7 @@
     "rust:lint": "cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check",
     "test": "pnpm ext:test && pnpm ui:test && pnpm protocol:verify && cargo test --workspace",
     "lint": "pnpm ext:typecheck && pnpm ui:typecheck && pnpm rust:lint",
+    "soak:report": "cargo run -p dealsonar-store --bin dealsonar-soak-report --",
     "eval:bds": "cargo run -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/golden/bds.jsonl --radar docs/eval/golden/bds.radar.json",
     "desktop": "pnpm ui:build && pnpm ext:build && cargo build -p dealsonar-native-host && cargo run -p dealsonar-desktop"
   }

@@ -1,8 +1,10 @@
 //! Radar commands (`radar_*`).
 
 use dealsonar_core::dto::{
-    CreateRadarDraftInput, FunnelStats, PreviewRunState, PreviewStartInput, Radar, RadarDetail,
-    RadarStatus, RadarUpdateResult, SuggestFieldsInput, SuggestFieldsResult, UpdateRadarInput,
+    CreateRadarDraftInput, CreateRadarVariantInput, FunnelStats, PreviewRunState,
+    PreviewStartInput, Radar, RadarCompareInput, RadarComparison, RadarComparisonSummary,
+    RadarDetail, RadarStatus, RadarUpdateResult, RadarVariantDraft,
+    SuggestFieldsInput, SuggestFieldsResult, UpdateRadarInput,
 };
 use tauri::State;
 
@@ -28,6 +30,45 @@ pub async fn radar_create_draft(
     input: CreateRadarDraftInput,
 ) -> Result<RadarDetail, CommandError> {
     Ok(state.core().radar_create_draft(input)?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn radar_variant_prepare(
+    state: State<'_, DesktopState>,
+    source_radar_id: String,
+) -> Result<RadarVariantDraft, CommandError> {
+    Ok(state.core().radar_variant_prepare(&source_radar_id)?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn radar_create_variant(
+    state: State<'_, DesktopState>,
+    input: CreateRadarVariantInput,
+) -> Result<RadarDetail, CommandError> {
+    Ok(state.core().radar_create_variant(input)?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn radar_compare_run(
+    state: State<'_, DesktopState>,
+    input: RadarCompareInput,
+) -> Result<RadarComparison, CommandError> {
+    Ok(state.core().radar_compare_run(input).await?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn radar_compare_get(
+    state: State<'_, DesktopState>,
+    id: String,
+) -> Result<RadarComparison, CommandError> {
+    Ok(state.core().radar_compare_get(&id)?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn radar_compare_list(
+    state: State<'_, DesktopState>,
+) -> Result<Vec<RadarComparisonSummary>, CommandError> {
+    Ok(state.core().radar_compare_list()?)
 }
 
 #[tauri::command(rename_all = "snake_case")]

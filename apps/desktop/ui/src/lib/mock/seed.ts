@@ -22,6 +22,7 @@ import type {
   PreviewItem,
   PlanTier,
   FieldDef,
+  RadarComparison,
 } from "../../types/ipc";
 import tplBdsKhachThue from "../../../../templates/bds.khach-thue.json";
 
@@ -51,6 +52,7 @@ export interface MockState {
   crawlRuns: CrawlRun[];
   previews: Record<string, PreviewRunState>;
   previewFeedback: Record<string, Record<string, PreviewItem["feedback_label"]>>;
+  comparisons: RadarComparison[];
   calls: MockCommandCall[];
 }
 
@@ -905,6 +907,7 @@ export function createInitialState(): MockState {
     crawlRuns,
     previews: {},
     previewFeedback: {},
+    comparisons: [],
     calls: [],
   };
 }

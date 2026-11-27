@@ -3,6 +3,8 @@
 import type {
   RadarDetail,
   CreateRadarDraftInput,
+  CreateRadarVariantInput,
+  RadarVariantDraft,
   Radar,
   RadarVersion,
   UpdateRadarInput,
@@ -137,6 +139,43 @@ export const radarCommands: MockCommandTable = {
     }
 
     return getRadarDetail(radarId);
+  },
+
+  radar_variant_prepare: async (args) => {
+    const detail = getRadarDetail(String(args.source_radar_id ?? ""));
+    const { radar, current_version_data: version } = detail;
+    return structuredClone({
+      source_radar_id: radar.id,
+      source_radar_name: radar.name,
+      input: {
+        name: `${radar.name} (biến thể)`,
+        template_id: radar.template_id,
+        description: version.description,
+        user_profession: version.user_profession,
+        language_hint: version.language_hint,
+        fields: version.fields,
+        match_policy: version.match_policy,
+        source_ids: radar.source_ids,
+        notify: radar.notify,
+      },
+    } satisfies RadarVariantDraft);
+  },
+
+  radar_create_variant: async (args) => {
+    const { source_radar_id, input } = args.input as CreateRadarVariantInput;
+    getRadarDetail(source_radar_id);
+    const followed = new Set(state.sources.filter((x) => x.followed).map((x) => x.id));
+    for (const id of input.source_ids) followed.add(id);
+    if (followed.size > state.license.limits.max_followed_groups) {
+      throw new Error(
+        `Gói hiện tại giới hạn tối đa ${state.license.limits.max_followed_groups} group theo dõi.`
+      );
+    }
+    const created = await radarCommands.radar_create_draft!({ input });
+    const radar = state.radars.find((r) => r.id === (created as RadarDetail).radar.id)!;
+    radar.variant_of = source_radar_id;
+    if (input.notify) radar.notify = { ...radar.notify, ...input.notify };
+    return getRadarDetail(radar.id);
   },
 
   radar_update: async (args) => {

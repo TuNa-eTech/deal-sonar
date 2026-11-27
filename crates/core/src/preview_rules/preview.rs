@@ -293,6 +293,26 @@ pub(super) async fn evaluate_preview_posts(
     posts: &[dealsonar_store::models::PostRecord],
     state: &mut PreviewRunState,
 ) -> CoreResult<()> {
+    evaluate_posts_without_side_effects(rt, rw, effective_ver, posts, state, EvalMode::Preview)
+        .await
+}
+
+/// Run T3–T6 for `posts` under `effective_ver` without creating leads or notifications.
+///
+/// `EvalMode::Preview` reports progress on the radar's preview session. `EvalMode::Compare`
+/// uses scratch evaluation rows and leaves the radar's preview session untouched, so the same
+/// radar can be compared while it is previewed or running.
+pub(super) async fn evaluate_posts_without_side_effects(
+    rt: &Arc<CoreRuntime>,
+    rw: &dealsonar_store::models::RadarWithVersion,
+    effective_ver: &RadarVersionRecord,
+    posts: &[dealsonar_store::models::PostRecord],
+    state: &mut PreviewRunState,
+    mode: EvalMode,
+) -> CoreResult<()> {
+    debug_assert!(mode.is_preview());
+    let report_progress = mode == EvalMode::Preview;
+    let scope = mode.eval_scope();
     let now = now_ms();
     // Step 1: Run T3–T4 synchronously across all selected posts (T2 dedup intentionally skipped!)
     let mut done_immediately = Vec::new();
@@ -307,7 +327,7 @@ pub(super) async fn evaluate_preview_posts(
             &rw.radar.status,
             &rw.radar.notify,
             effective_ver,
-            EvalMode::Preview,
+            mode,
             now,
         )?;
         if eval.state == "done" {
@@ -316,7 +336,9 @@ pub(super) async fn evaluate_preview_posts(
     }
 
     if !done_immediately.is_empty() {
-        let all_preview = rt.store.list_preview_evaluations(&effective_ver.id)?;
+        let all_preview = rt
+            .store
+            .list_evaluations_in_scope(&effective_ver.id, scope)?;
         let new_items: Vec<PreviewItem> = all_preview
             .iter()
             .filter(|it| done_immediately.iter().any(|id| id == &it.evaluation.id))
@@ -324,16 +346,16 @@ pub(super) async fn evaluate_preview_posts(
             .collect();
         state.evaluated_posts += new_items.len();
         state.items.extend(new_items.clone());
-        save_preview_state(rt, state);
-        emit_preview_progress(rt, state, new_items);
+        if report_progress {
+            save_preview_state(rt, state);
+            emit_preview_progress(rt, state, new_items);
+        }
     }
 
     // Step 2: Evaluate `pending_ai` preview posts in streaming batches of `preview_batch_size` (default 3)
-    let pending_preview = rt.store.list_pending_ai_for_version(
-        &effective_ver.id,
-        true,
-        rt.config.preview_max_posts,
-    )?;
+    let pending_preview =
+        rt.store
+            .list_pending_ai_in_scope(&effective_ver.id, scope, rt.config.preview_max_posts)?;
 
     let post_ids: std::collections::HashSet<_> = posts.iter().map(|p| p.id.as_str()).collect();
     let pending_preview: Vec<_> = pending_preview
@@ -500,7 +522,7 @@ pub(super) async fn evaluate_preview_posts(
                                         reason: result.reason,
                                         candidate_fields: merged,
                                     },
-                                    EvalMode::Preview,
+                                    mode,
                                     chunk_now,
                                 )?;
                                 chunk_eval_ids.push(finalized.id);
@@ -508,7 +530,9 @@ pub(super) async fn evaluate_preview_posts(
                         }
                     }
 
-                    let all_preview = rt.store.list_preview_evaluations(&effective_ver.id)?;
+                    let all_preview = rt
+                        .store
+                        .list_evaluations_in_scope(&effective_ver.id, scope)?;
                     let chunk_items: Vec<PreviewItem> = all_preview
                         .iter()
                         .filter(|it| chunk_eval_ids.iter().any(|id| id == &it.evaluation.id))
@@ -517,9 +541,10 @@ pub(super) async fn evaluate_preview_posts(
 
                     state.evaluated_posts += chunk_items.len();
                     state.items.extend(chunk_items.clone());
-                    save_preview_state(rt, state);
-
-                    emit_preview_progress(rt, state, chunk_items);
+                    if report_progress {
+                        save_preview_state(rt, state);
+                        emit_preview_progress(rt, state, chunk_items);
+                    }
                 }
             }
         }

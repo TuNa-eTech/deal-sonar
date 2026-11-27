@@ -6,6 +6,7 @@ pub mod models;
 pub mod ops;
 pub mod posts;
 pub mod radars;
+pub mod soak;
 pub mod sources;
 
 use std::collections::BTreeMap;
@@ -47,10 +48,15 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "0003_workflow",
         sql: include_str!("../migrations/0003_workflow.sql"),
     },
+    Migration {
+        version: 4,
+        name: "0004_radar_variants",
+        sql: include_str!("../migrations/0004_radar_variants.sql"),
+    },
 ];
 
 /// Latest schema version supported by this binary.
-pub const LATEST_SCHEMA_VERSION: i32 = 3;
+pub const LATEST_SCHEMA_VERSION: i32 = 4;
 
 /// Maximum number of pre-migration automatic backups retained in `backups/`.
 pub const MAX_PRE_MIGRATION_BACKUPS: usize = 5;

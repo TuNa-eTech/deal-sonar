@@ -71,6 +71,13 @@ pub async fn invoke_command_json(
         "radar_list" => to_json(c.radar_list()?),
         "radar_get" => to_json(c.radar_get(&parse_arg::<String>(map, "id")?)?),
         "radar_create_draft" => to_json(c.radar_create_draft(parse_arg(map, "input")?)?),
+        "radar_variant_prepare" => {
+            to_json(c.radar_variant_prepare(&parse_arg::<String>(map, "source_radar_id")?)?)
+        }
+        "radar_create_variant" => to_json(c.radar_create_variant(parse_arg(map, "input")?)?),
+        "radar_compare_run" => to_json(c.radar_compare_run(parse_arg(map, "input")?).await?),
+        "radar_compare_get" => to_json(c.radar_compare_get(&parse_arg::<String>(map, "id")?)?),
+        "radar_compare_list" => to_json(c.radar_compare_list()?),
         "radar_update" => to_json(c.radar_update(parse_arg(map, "input")?)?),
         "radar_suggest_fields" => to_json(c.radar_suggest_fields(parse_arg(map, "input")?).await?),
         "radar_set_status" => to_json(

@@ -153,6 +153,30 @@ Mọi radar đều có, người dùng không xoá được:
 
 Sửa định nghĩa của radar đang chạy: tạo phiên bản mới, tự chạy xem thử trên 50 bài gần nhất, radar tiếp tục dùng phiên bản cũ cho tới khi người dùng xác nhận.
 
+### Biến thể
+
+Chủ xe muốn giữ bộ trường đang dùng nhưng đổi tuyến, nhóm nguồn hoặc kênh nhận tin thì **tạo biến thể** từ radar hiện có (thao tác "Tạo biến thể" trên danh sách radar).
+
+1. App đề xuất một bản sao từ phiên bản đang chạy của radar gốc: tên (thêm "(biến thể)"), mô tả, trường, `match_policy`, `user_profession`, nguồn và cấu hình `notify`. Phiên bản ứng viên chưa xác nhận không được sao chép.
+2. Người dùng xem và chỉnh bản sao (tên, mô tả, nhóm nguồn, kênh báo, chế độ báo, hạn sống, ngưỡng điểm) rồi mới lưu. Bấm huỷ thì không ghi gì.
+3. Biến thể là **radar độc lập**: có ID riêng, `current_version = 1` với phiên bản riêng, và luôn bắt đầu ở `draft` nên chưa chấm bài và chưa gửi thông báo. Muốn chạy phải xem thử và bật như radar mới. Biến thể ghi `variant_of` = ID radar gốc, chỉ để hiển thị nguồn gốc; không có quan hệ nào khác.
+4. Tin cũ, lịch sử chấm (`evaluations`) và nhãn phản hồi vẫn gắn với radar gốc và phiên bản của nó; biến thể bắt đầu với lịch sử trống. Vì vậy ví dụ phản hồi của radar gốc không lọt vào prompt của biến thể.
+5. Bật, sửa, tạm dừng và lưu trữ biến thể không ảnh hưởng radar gốc, và ngược lại. Lưu trữ radar gốc không làm biến thể mất liên kết dữ liệu.
+6. Giới hạn gói tính như radar tạo mới (§8): số trường kiểm khi lưu bản sao, số radar đang chạy kiểm khi bật, số group được theo dõi kiểm khi chọn nguồn.
+
+Danh sách chặn riêng của radar gốc (`blocklist.radar_id`) không được sao chép; chặn áp dụng cho mọi radar vẫn có hiệu lực.
+
+### So sánh hai định nghĩa
+
+Khi đổi tiêu chí, khách cần thấy bài nào xuất hiện hoặc biến mất. Thao tác "So sánh" chấm **một tập bài chung** bằng hai phiên bản radar (cùng radar khác phiên bản, biến thể với radar gốc, hoặc hai radar khác hẳn nhau như "tìm xe" và "tìm hàng" trên cùng một group).
+
+- **Đầu vào:** hai định nghĩa (radar + số phiên bản, mặc định phiên bản đang dùng) và tập bài: các group đã chọn (tối đa 50 bài gần nhất) hoặc danh sách bài cụ thể. Không chọn thì dùng các group hai radar cùng theo dõi.
+- **Bản ghi:** mỗi lần so sánh lưu ID phiên bản và nội dung định nghĩa hai bên, danh sách ID bài đã dùng, các group, và kết quả từng bài. Nội dung bài không được lưu kèm; nó theo thời hạn giữ bài như bình thường.
+- **Phân loại từng bài:** mới khớp (chỉ B khớp), hết khớp (chỉ A khớp), vẫn khớp nhưng đổi trường trích (chỉ xét các trường có ở cả hai định nghĩa, so giá trị chuẩn hoá), vẫn khớp không đổi, không khớp ở cả hai, và chưa so sánh được (một bên chưa chấm xong, ví dụ lỗi AI).
+- **Lý do từng bài:** lý do của mỗi bên (khớp bao nhiêu phần trăm, hoặc bị loại vì sao) kèm gợi ý điểm khác nhau giữa hai định nghĩa (mô tả, chiều cần tìm, lọc người cùng nghề, điều kiện lọc cứng) và giá trị trường trước/sau.
+- **Không có tác dụng phụ:** so sánh chạy như xem thử (§5): không tạo tin, liên hệ hay thông báo, không đổi trạng thái hay phiên bản radar nào. Kết quả chấm tạm nằm ở một phạm vi riêng nên không đè lên kết quả xem thử hay kết quả chạy thật của radar, và bị xoá ngay sau khi đọc. Phần duy nhất ghi thêm là nhật ký gọi AI và bản ghi so sánh (giữ 20 bản gần nhất).
+- Kết quả do AI chấm nên có thể lệch nhẹ giữa các lần chạy.
+
 ## 5. Xem thử
 
 Mục đích: cho người dùng thấy radar làm gì trên bài thật trước khi nó bắt đầu làm phiền họ, và thu nhãn đầu tiên.
