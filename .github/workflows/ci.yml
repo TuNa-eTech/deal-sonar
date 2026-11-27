@@ -28,6 +28,7 @@ jobs:
       - run: pnpm ext:test
       - run: pnpm ui:test
       - run: pnpm protocol:verify
+      - run: pnpm study:test
 
   rust:
     name: Rust (${{ matrix.os }})
