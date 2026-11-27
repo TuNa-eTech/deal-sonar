@@ -29,6 +29,7 @@ jobs:
       - run: pnpm ui:test
       - run: pnpm protocol:verify
       - run: pnpm study:h5:test
+      - run: pnpm pilot:test
       - run: pnpm study:test
       - run: pnpm dist:verify
 
