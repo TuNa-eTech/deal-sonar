@@ -23,6 +23,8 @@ Bộ tài liệu này mô tả sản phẩm và đặc tả kỹ thuật đủ �
 | 13 | [delivery/01-roadmap.md](delivery/01-roadmap.md) | Thứ tự xây, tiêu chí xong của từng mốc |
 | 14 | [delivery/02-validation-plan.md](delivery/02-validation-plan.md) | Kiểm chứng 3 giả thuyết bằng cách nào |
 | 15 | [delivery/03-risks-compliance.md](delivery/03-risks-compliance.md) | Rủi ro, nguyên tắc an toàn, pháp lý |
+| 16 | [delivery/04-distribution.md](delivery/04-distribution.md) | Phân phối cho khách: hệ điều hành, kênh, chữ ký, định danh, bằng chứng chạy thật |
+| 17 | [delivery/customer-install-guide.md](delivery/customer-install-guide.md) | Hướng dẫn khách cài và ghép nối Desktop với extension |
 
 ## Thuật ngữ
 

@@ -21,6 +21,58 @@ pub const NATIVE_HOST_MANIFEST_FILENAME: &str = "com.dealsonar.host.json";
 pub const WINDOWS_CHROME_REGISTRY_KEY: &str =
     r"HKCU\Software\Google\Chrome\NativeMessagingHosts\com.dealsonar.host";
 
+/// Per-user (HKCU) registry sub-keys that Chromium browsers on Windows read to locate the host
+/// manifest. Chrome, Edge and Brave each look only under their own vendor key, and a manifest
+/// file alone is never discovered on Windows without one of these values.
+pub const WINDOWS_NATIVE_HOST_REGISTRY_SUBKEYS: [&str; 3] = [
+    r"Software\Google\Chrome\NativeMessagingHosts\com.dealsonar.host",
+    r"Software\Microsoft\Edge\NativeMessagingHosts\com.dealsonar.host",
+    r"Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\com.dealsonar.host",
+];
+
+/// Arguments for `reg.exe` that set the default value of `HKCU\<subkey>` to `manifest_path`.
+pub fn windows_registry_add_args(subkey: &str, manifest_path: &Path) -> Vec<String> {
+    vec![
+        "add".to_owned(),
+        format!(r"HKCU\{subkey}"),
+        "/ve".to_owned(),
+        "/t".to_owned(),
+        "REG_SZ".to_owned(),
+        "/d".to_owned(),
+        manifest_path.to_string_lossy().into_owned(),
+        "/f".to_owned(),
+    ]
+}
+
+/// Register `manifest_path` for Chrome, Edge and Brave under HKCU so Chromium can find the native
+/// host on Windows. No-op on other platforms. Idempotent (`/f` overwrites the same value).
+/// Fails only if the Chrome key cannot be written; Edge and Brave are best effort because those
+/// browsers may not be installed.
+pub fn register_native_host_windows(manifest_path: &Path) -> Result<(), ManifestError> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        for (index, subkey) in WINDOWS_NATIVE_HOST_REGISTRY_SUBKEYS.iter().enumerate() {
+            let status = std::process::Command::new("reg")
+                .args(windows_registry_add_args(subkey, manifest_path))
+                .creation_flags(CREATE_NO_WINDOW)
+                .output();
+            let ok = matches!(&status, Ok(out) if out.status.success());
+            if !ok && index == 0 {
+                return Err(ManifestError::Io(io::Error::other(format!(
+                    "could not write registry key HKCU\\{subkey}"
+                ))));
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = manifest_path;
+    }
+    Ok(())
+}
+
 /// Errors produced when building or installing a Native Messaging host manifest.
 #[derive(Debug, Error)]
 pub enum ManifestError {

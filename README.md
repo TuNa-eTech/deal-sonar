@@ -106,7 +106,7 @@ Startup flags supported by the `dealsonar` binary:
 
 1. Build the extension (`pnpm ext:build`) and open `chrome://extensions` in Google Chrome / Brave / Edge.
 2. Enable **Developer mode**, click **Load unpacked**, and select `apps/extension/dist`.
-3. Copy the 32-character **Extension ID** shown on the card and register the Native Messaging Host manifest for that unpacked ID:
+3. The built extension keeps the manifest `key`, so its ID is the stable `hkmjpcenjjebhpjicnbpmogidfcbmbjn` and the Desktop app accepts it without any step (go to step 4). Only for an extension loaded with a different ID, copy the 32-character **Extension ID** shown on the card and register the Native Messaging Host manifest for it:
    ```bash
    ./scripts/install-native-host-dev.sh <YOUR_32_CHAR_EXTENSION_ID>
    ```
@@ -184,23 +184,30 @@ Source package versions are not changed by the workflow.
 
 Release downloads include:
 
-- `DealSonar-extension-<tag>.zip`: extract and **Load unpacked** in Chrome/Edge/Brave.
+- `DealSonar-extension-<tag>-internal-unpacked.zip`: extract and **Load unpacked** (internal trials; keeps the manifest `key`, so the extension ID is stable).
+- `DealSonar-extension-<tag>-webstore.zip`: the same build without the manifest `key`, for upload to the Chrome Web Store.
 - Windows x64: NSIS `.exe` installer.
-- Linux x64: `.deb` and `.AppImage`.
+- Linux x64: `.deb` and `.AppImage` (internal only, not a supported customer platform).
 - macOS Intel and Apple Silicon: separate `.dmg` installers.
-- `SHA256SUMS.txt`: SHA-256 checksums for all downloads.
+- `SHA256SUMS.txt`, `release-manifest.json` (channel, blockers, per-installer signing state) and one `*.provenance.json` per installer.
 
 Each desktop installer includes `dealsonar-native-host` alongside the app binary.
 The release is published only after every CI gate and platform build succeeds;
 successful build jobs also retain their downloads as Actions artifacts for 7 days.
-Rerunning the same tag replaces the assets on its existing release.
+Rerunning the same tag replaces the assets and notes on its existing release.
 
-No signing secrets or certificates are required. Windows installers are unsigned;
-macOS bundles use a local ad-hoc signature (`signingIdentity: "-"`) for Apple Silicon
-compatibility, without an Apple Developer certificate or notarization. The OS may
-ask for approval before opening these downloads. The extension is an unpacked ZIP,
-not a signed CRX or a Chrome Web Store publication. Publishing uses only the
-automatic `GITHUB_TOKEN`, with `contents: write` restricted to the final publish job.
+**Internal trial vs customer release.** `scripts/release-manifest.mjs` publishes a tag as a
+normal release only when the owner has confirmed the distribution decision, every committed
+platform's installer is verified signed (Authenticode on Windows; Developer ID + notarization on
+macOS) and the extension is published on the Chrome Web Store. Anything else becomes a
+**prerelease titled "(bản thử nội bộ)"** with the blockers listed. Without publisher credentials
+builds still succeed (Windows unsigned, macOS ad-hoc `signingIdentity: "-"`, which is not a
+publisher identity); when credentials are configured, signing is mandatory and a failure fails the
+job. Credentials, accounts and the open owner decisions are listed in
+[docs/delivery/04-distribution.md](docs/delivery/04-distribution.md); customers follow
+[docs/delivery/customer-install-guide.md](docs/delivery/customer-install-guide.md); real
+install-and-pair runs are recorded in `docs/delivery/distribution-evidence.json`
+(`pnpm dist:verify` validates the identity, scripts and ledger).
 
 ### Full Verification Checklist
 

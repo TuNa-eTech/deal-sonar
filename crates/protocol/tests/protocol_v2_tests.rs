@@ -570,6 +570,33 @@ fn ipc_endpoint_and_manifest_paths_match_all_platforms() {
 }
 
 #[test]
+fn windows_registry_registration_covers_chromium_browsers_and_matches_documented_key() {
+    use dealsonar_protocol::native_manifest::{
+        windows_registry_add_args, WINDOWS_NATIVE_HOST_REGISTRY_SUBKEYS,
+    };
+    let manifest = Path::new(r"C:\Users\alice\AppData\Roaming\DealSonar\com.dealsonar.host.json");
+    let chrome = windows_registry_add_args(WINDOWS_NATIVE_HOST_REGISTRY_SUBKEYS[0], manifest);
+    assert_eq!(
+        chrome,
+        vec![
+            "add",
+            WINDOWS_CHROME_REGISTRY_KEY,
+            "/ve",
+            "/t",
+            "REG_SZ",
+            "/d",
+            r"C:\Users\alice\AppData\Roaming\DealSonar\com.dealsonar.host.json",
+            "/f",
+        ]
+    );
+    let all = WINDOWS_NATIVE_HOST_REGISTRY_SUBKEYS.join("|");
+    assert!(all.contains("Google") && all.contains("Microsoft") && all.contains("BraveSoftware"));
+    assert!(WINDOWS_NATIVE_HOST_REGISTRY_SUBKEYS
+        .iter()
+        .all(|k| k.ends_with(r"NativeMessagingHosts\com.dealsonar.host")));
+}
+
+#[test]
 fn native_manifest_validation_and_idempotent_install() {
     let tmp = tempdir().unwrap();
     let manifest_path = tmp

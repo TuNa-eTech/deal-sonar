@@ -132,8 +132,10 @@ impl CoreService {
             .unwrap_or(DEFAULT_CHROME_EXTENSION_ID);
 
         let mut origins_to_allow: Vec<String> = vec![primary_ext_id.to_string()];
-        if strip_origin_wrapper(primary_ext_id) != DEFAULT_CHROME_EXTENSION_ID {
-            origins_to_allow.push(DEFAULT_CHROME_EXTENSION_ID.to_string());
+        for known in KNOWN_CHROME_EXTENSION_IDS {
+            if strip_origin_wrapper(primary_ext_id) != *known {
+                origins_to_allow.push((*known).to_string());
+            }
         }
         if let Some(ref existing) = existing_manifest {
             for origin in &existing.allowed_origins {
@@ -164,6 +166,8 @@ impl CoreService {
             for extra_path in secondary_chromium_manifest_paths() {
                 let _ = verify_or_write_manifest(&extra_path, &manifest);
             }
+            // Windows Chromium finds the host only through HKCU registry values.
+            let _ = register_native_host_windows(&target_manifest_path);
         }
 
         if let Some(origin) = manifest.allowed_origins.first() {
@@ -243,8 +247,10 @@ impl CoreService {
         };
 
         let mut origins_to_allow: Vec<String> = vec![primary_ext_id.clone()];
-        if strip_origin_wrapper(&primary_ext_id) != DEFAULT_CHROME_EXTENSION_ID {
-            origins_to_allow.push(DEFAULT_CHROME_EXTENSION_ID.to_string());
+        for known in KNOWN_CHROME_EXTENSION_IDS {
+            if strip_origin_wrapper(&primary_ext_id) != *known {
+                origins_to_allow.push((*known).to_string());
+            }
         }
         if let Some(ref existing) = existing_manifest {
             for origin in &existing.allowed_origins {
@@ -266,6 +272,7 @@ impl CoreService {
             for extra_path in secondary_chromium_manifest_paths() {
                 let _ = verify_or_write_manifest(&extra_path, &expected);
             }
+            let _ = register_native_host_windows(&target_manifest_path);
         }
 
         if let Some(origin) = expected.allowed_origins.first() {

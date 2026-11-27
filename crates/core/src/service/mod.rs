@@ -25,8 +25,8 @@ use dealsonar_notify::{
 };
 use dealsonar_protocol::ipc::{ensure_secure_socket_dir, IpcEndpoint, IpcListener};
 use dealsonar_protocol::native_manifest::{
-    chrome_manifest_path, secondary_chromium_manifest_paths, verify_or_write_manifest,
-    NativeHostManifest,
+    chrome_manifest_path, register_native_host_windows, secondary_chromium_manifest_paths,
+    verify_or_write_manifest, NativeHostManifest,
 };
 use dealsonar_protocol::{Body, CrawlReason, Envelope};
 use dealsonar_store::models::{
@@ -100,6 +100,12 @@ use settings::*;
 /// Default Chrome Web Store / deterministic MV3 `manifest.json` `"key"` extension ID
 /// (`SHA256(SPKI_DER)[0..16]` mapped `0..15 -> 'a'..'p'`).
 pub const DEFAULT_CHROME_EXTENSION_ID: &str = "hkmjpcenjjebhpjicnbpmogidfcbmbjn";
+
+/// Every extension ID the native host must accept without the customer typing anything: the
+/// ID derived from `apps/extension/public/manifest.json` `"key"` (internal/unpacked builds) plus
+/// the Chrome Web Store item ID once the project owner has published one. Kept in sync with
+/// `docs/delivery/distribution.json` by `scripts/verify-extension-identity.mjs`.
+pub const KNOWN_CHROME_EXTENSION_IDS: &[&str] = &[DEFAULT_CHROME_EXTENSION_ID];
 
 const LEGACY_PLACEHOLDER_EXTENSION_ID: &str = "dealsonarchromeextensionid000001";
 
