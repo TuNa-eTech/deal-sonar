@@ -1,5 +1,19 @@
 import type { WantIntent } from "../../types/ipc";
 
+export const INTENT_LABELS: Record<WantIntent, string> = {
+  demand: "Người đang cần mua / thuê / tìm",
+  supply: "Người đang bán / cho thuê / cung cấp",
+  any: "Cả hai chiều (trung tính)",
+};
+
+/** Start of the core's note that the trade side was left neutral; removed once the user chooses. */
+export const SIDE_NEUTRAL_PREFIX = "Chưa rõ bạn muốn tìm bài của người cần";
+
+/** Trim, drop empty and duplicate lines, keep at most five assumptions. */
+export function cleanAssumptions(items: readonly string[]): string[] {
+  return [...new Set(items.map(item => item.trim()).filter(Boolean))].slice(0, 5);
+}
+
 export const BLANK_EXAMPLES = [
   {
     title: "BĐS — Khách thuê chung cư",

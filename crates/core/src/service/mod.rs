@@ -83,6 +83,7 @@ mod builder;
 mod channels;
 mod chrome;
 mod contacts;
+mod goal;
 mod leads;
 mod posts;
 mod radars;
@@ -94,6 +95,7 @@ mod system;
 pub(crate) use agent::{handle_agent_request, issue_agent_token};
 pub use builder::*;
 use contacts::*;
+use goal::interpret_goal;
 use posts::*;
 use settings::*;
 

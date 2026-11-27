@@ -254,12 +254,29 @@ pub fn match_policy_to_store(mp: &MatchPolicy) -> dealsonar_store::models::Match
                 when_missing: hf.when_missing.as_str().to_string(),
             })
             .collect(),
-        extra: BTreeMap::new(),
+        extra: match_policy_extra(&mp.assumptions),
     }
+}
+
+/// Assumptions travel in the stored policy's open-ended `extra` map, so older databases and
+/// builds keep reading the same JSON.
+const ASSUMPTIONS_KEY: &str = "assumptions";
+
+fn match_policy_extra(assumptions: &[String]) -> BTreeMap<String, serde_json::Value> {
+    let mut extra = BTreeMap::new();
+    if !assumptions.is_empty() {
+        extra.insert(ASSUMPTIONS_KEY.to_string(), serde_json::json!(assumptions));
+    }
+    extra
 }
 
 pub fn match_policy_from_store(mp: &dealsonar_store::models::MatchPolicy) -> MatchPolicy {
     MatchPolicy {
+        assumptions: mp
+            .extra
+            .get(ASSUMPTIONS_KEY)
+            .and_then(|value| serde_json::from_value(value.clone()).ok())
+            .unwrap_or_default(),
         want_intent: WantIntent::from_db(&mp.want_intent),
         exclude_roles: mp
             .exclude_roles

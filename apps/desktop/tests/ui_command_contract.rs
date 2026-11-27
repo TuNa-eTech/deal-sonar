@@ -376,6 +376,13 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
     .await
     .expect("radar_suggest_fields");
     assert!(suggested["fields"].as_array().is_some());
+    // The desktop wizard receives the shared interpretation: side, excluded audience, assumptions.
+    assert_eq!(suggested["want_intent"], json!("demand"));
+    assert_eq!(suggested["side_ambiguous"], json!(false));
+    assert_eq!(suggested["exclude_roles"], json!(["peer"]));
+    assert!(suggested["assumptions"]
+        .as_array()
+        .is_some_and(|items| !items.is_empty()));
 
     let created_radar = invoke_command_json(
         &state,

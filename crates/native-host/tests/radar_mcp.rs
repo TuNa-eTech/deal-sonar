@@ -207,18 +207,59 @@ async fn agent_prepares_single_reviewable_draft_without_exposing_posts() {
         json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}),
     )
     .await;
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 4);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 5);
     let sources = tool(&mut input, &mut output, "list_radar_sources", json!({})).await;
-    let radar_id = sources["draft_id"].as_str().unwrap();
     let source = &sources["sources"][0];
     assert_eq!(source["name"], "Cộng đồng thuê căn hộ Tân Phú");
+
+    // The agent reads the goal through the same interpretation the desktop wizard uses.
+    let ambiguous = tool(
+        &mut input,
+        &mut output,
+        "interpret_radar_goal",
+        json!({"description": "Tìm xe tải hoặc tìm hàng chở khu vực Tân Phú"}),
+    )
+    .await;
+    assert_eq!(ambiguous["needs_clarification"], true);
+    assert_eq!(ambiguous["want_intent"], "any");
+    assert_eq!(ambiguous["exclude_peers"], false);
+    assert!(!ambiguous["clarifying_questions"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    let interpreted = tool(
+        &mut input,
+        &mut output,
+        "interpret_radar_goal",
+        json!({"description": "Tìm người cần thuê căn hộ ở Tân Phú dưới 8 triệu"}),
+    )
+    .await;
+    assert_eq!(interpreted["want_intent"], "demand");
+    assert_eq!(interpreted["needs_clarification"], false);
+    assert_eq!(interpreted["suggested_sources"][0]["id"], source["id"]);
+    assert_eq!(
+        interpreted["excluded_audiences"][0],
+        "Người cùng nghề đăng bài chào khách"
+    );
+    let assumptions = interpreted["assumptions"].clone();
+    assert!(!assumptions.as_array().unwrap().is_empty());
+
+    let radar_id = interpreted["draft_id"].as_str().unwrap();
     let draft = json!({
         "draft_id": radar_id, "name": "Khách thuê Tân Phú", "description": "Người cần thuê căn hộ ở Tân Phú",
-        "source_ids": [source["id"]], "fields": [{"type":"location", "key":"area", "label":"Khu vực", "description":"Khu vực cần thuê"}],
-        "want_intent": "demand"
+        "source_ids": [source["id"]], "fields": interpreted["fields"],
+        "want_intent": interpreted["want_intent"], "exclude_peers": interpreted["exclude_peers"],
+        "assumptions": assumptions,
     });
     let prepared = tool(&mut input, &mut output, "prepare_radar", draft.clone()).await;
     assert_eq!(prepared["radar_id"], radar_id);
+    assert_eq!(prepared["interpretation"]["want_intent"], "demand");
+    assert_eq!(prepared["interpretation"]["sources"][0], source["name"]);
+    assert_eq!(prepared["interpretation"]["assumptions"], assumptions);
+    assert_eq!(
+        prepared["interpretation"]["excluded_audiences"][0],
+        "Người cùng nghề đăng bài chào khách"
+    );
     tool(&mut input, &mut output, "prepare_radar", draft).await;
     let summary = tokio::time::timeout(Duration::from_secs(10), async {
         loop {

@@ -111,6 +111,15 @@ pub struct SuggestFieldsResult {
     pub prefilter_hint: Option<PrefilterHintDto>,
     #[serde(default)]
     pub suggested_source_ids: Vec<String>,
+    /// Authors excluded by default for this brief; shown so the user can change it.
+    #[serde(default)]
+    pub exclude_roles: Vec<AuthorRole>,
+    /// Interpretation choices (trade side, excluded audience, area...) the user can edit.
+    #[serde(default)]
+    pub assumptions: Vec<String>,
+    /// The brief did not say which side of the trade to follow; `want_intent` stays `any`.
+    #[serde(default)]
+    pub side_ambiguous: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

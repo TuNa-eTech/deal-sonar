@@ -140,8 +140,13 @@ Start a new chat and ask, for example:
 > Dùng DealSonar tạo Radar tìm người cần thuê căn hộ ở Tân Phú, ngân sách dưới 8 triệu/tháng.
 > Tự chọn nhóm phù hợp và chạy xem thử.
 
-The agent selects from existing DealSonar groups, saves a draft, starts a real preview and reports
-the counts and warnings. Open **Radar → Xem kết quả** in DealSonar to inspect individual posts,
+The agent reads the goal with `interpret_radar_goal`, which applies the same interpretation as the
+desktop wizard, then selects from existing, connected DealSonar groups, saves a draft, starts a real
+preview and reports the counts and warnings. Both the wizard and the agent show the trade side,
+the excluded audience, the fields, the groups and the assumptions made, so you can correct them. When a goal does not say which
+side to follow (for example finding a vehicle versus finding cargo), the Radar stays neutral
+(both sides, nobody excluded) and you are asked. A Radar stays a draft until you click **Bật radar**.
+Open **Radar → Xem kết quả** in DealSonar to inspect individual posts,
 review notifications and click **Bật radar**. If the selected groups have no cached posts, the
 preview may need the connected Chrome extension to fetch them. The **DealSonar** MCP tools provide
 group names, activity counts and preview summaries. Individual posts stay in the DealSonar review.

@@ -61,6 +61,8 @@ export interface MatchPolicy {
   want_intent: WantIntent;
   exclude_roles: AuthorRole[];
   hard_filters: HardFilter[];
+  /** Interpretation choices the user can review and edit. */
+  assumptions?: string[];
 }
 
 export interface QuietHours {
@@ -665,6 +667,12 @@ export interface SuggestFieldsResult {
   hard_filters: HardFilter[];
   clarifying_questions: string[];
   suggested_source_ids?: string[];
+  /** Authors the interpretation excludes; shown so the user can change it. */
+  exclude_roles?: AuthorRole[];
+  /** Choices the brief did not state, for the user to review and edit. */
+  assumptions?: string[];
+  /** The brief did not say which side to follow; `want_intent` stays "any". */
+  side_ambiguous?: boolean;
   prefilter_hint: {
     any: string[];
     none: string[];

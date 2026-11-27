@@ -5,6 +5,7 @@ import { readWorkspace, saveWorkspace } from "../../lib/workspace";
 import { api, onDesktopEvent } from "../../lib/api";
 import { offerUndo } from "../UndoCenter";
 import { composeTemplateDescription, slugifyFieldKey } from "../../lib/format";
+import { cleanAssumptions, SIDE_NEUTRAL_PREFIX } from "./constants";
 import type {
   Channel,
   HealthStatus,
@@ -104,13 +105,19 @@ export function useRadarWizard({
   const [wantIntent, setWantIntent] = useState<WantIntent>(
     restored?.wantIntent ?? version?.match_policy.want_intent ??
       defaultTpl?.match_policy.want_intent ??
-      "demand"
+      "any"
   );
+  // A blank brief has no side or excluded audience until the interpretation (or the user)
+  // sets one, so nothing is hidden by a default.
   const [excludePeers, setExcludePeers] = useState<boolean>(
     restored?.excludePeers ?? (editRadar
       ? version!.match_policy.exclude_roles.includes("peer")
-      : (defaultTpl?.match_policy.exclude_roles.includes("peer") ?? true))
+      : (defaultTpl?.match_policy.exclude_roles.includes("peer") ?? false))
   );
+  const [assumptions, setAssumptions] = useState<string[]>(
+    restored?.assumptions ?? version?.match_policy.assumptions ?? defaultTpl?.match_policy.assumptions ?? []
+  );
+  const [sideAmbiguous, setSideAmbiguous] = useState<boolean>(restored?.sideAmbiguous ?? false);
 
   const [fields, setFields] = useState<FieldDef[]>(
     structuredClone(
@@ -121,7 +128,7 @@ export function useRadarWizard({
   const suggestionInFlight = useRef(false);
   const preparing = useRef(false);
   const [analyzedDescription, setAnalyzedDescription] = useState<string | null>(restored?.analyzedDescription ?? null);
-  const [clarifyingQuestions, setClarifyingQuestions] = useState<string[]>([]);
+  const [clarifyingQuestions, setClarifyingQuestions] = useState<string[]>(restored?.clarifyingQuestions ?? []);
   const [clarifyingDismissed, setClarifyingDismissed] = useState(false);
 
   const [sources, setSources] = useState<Source[]>(initialSources);
@@ -161,8 +168,8 @@ export function useRadarWizard({
 
 
   useEffect(()=>{
-    saveWorkspace(draftKey,{step,mode,selectedTemplate,placeholderValues,radarName,description,userProfession,wantIntent,excludePeers,fields,selectedSourceIds,draftRadarId,hardFilters,notify,analyzedDescription,sourcesManual,sourcesSuggested});
-  },[draftKey,step,mode,selectedTemplate,placeholderValues,radarName,description,userProfession,wantIntent,excludePeers,fields,selectedSourceIds,draftRadarId,hardFilters,notify,analyzedDescription,sourcesManual,sourcesSuggested]);
+    saveWorkspace(draftKey,{step,mode,selectedTemplate,placeholderValues,radarName,description,userProfession,wantIntent,excludePeers,fields,selectedSourceIds,draftRadarId,hardFilters,notify,analyzedDescription,sourcesManual,sourcesSuggested,assumptions,sideAmbiguous,clarifyingQuestions});
+  },[draftKey,step,mode,selectedTemplate,placeholderValues,radarName,description,userProfession,wantIntent,excludePeers,fields,selectedSourceIds,draftRadarId,hardFilters,notify,analyzedDescription,sourcesManual,sourcesSuggested,assumptions,sideAmbiguous,clarifyingQuestions]);
   const maxFields = license.limits.max_fields_per_radar;
   const maxGroups = license.limits.max_followed_groups;
   const descriptionKey = JSON.stringify([description.trim(), userProfession.trim(), selectedTemplate?.id ?? null]);
@@ -178,6 +185,9 @@ export function useRadarWizard({
     setUserProfession(tpl.user_profession);
     setWantIntent(tpl.match_policy.want_intent);
     setExcludePeers(tpl.match_policy.exclude_roles.includes("peer"));
+    setAssumptions(tpl.match_policy.assumptions ?? []);
+    setSideAmbiguous(false);
+    setClarifyingQuestions([]);
     setFields(structuredClone(tpl.fields).slice(0, maxFields));
     // Each trade has its own clock: a bargain car is gone in hours, a job seeker stays for weeks.
     setNotify((n) => ({ ...n, lead_ttl_hours: tpl.lead_ttl_hours ?? null, mode: tpl.notify_mode ?? n.mode }));
@@ -190,8 +200,11 @@ export function useRadarWizard({
     setRadarName("");
     setDescription(initialGoal);
     setUserProfession("");
-    setWantIntent("demand");
-    setExcludePeers(true);
+    setWantIntent("any");
+    setExcludePeers(false);
+    setAssumptions([]);
+    setSideAmbiguous(false);
+    setClarifyingQuestions([]);
     setFields([]);
     setHardFilters([]);
     setNotify(n => ({ ...n, lead_ttl_hours: null }));
@@ -236,13 +249,33 @@ export function useRadarWizard({
       ]);
       const plan = getPreviewPlan();
       if (forceReplace || !fields.length) {
+        const previous = { fields, wantIntent, excludePeers, hardFilters, assumptions, sideAmbiguous };
         plan.fields = res.fields.slice(0, maxFields);
         plan.matchPolicy.want_intent = res.want_intent;
         plan.matchPolicy.hard_filters = res.hard_filters.filter(filter =>
           plan.fields.some(field => field.key === filter.field));
+        const peersExcluded = (res.exclude_roles ?? []).includes("peer");
+        const nextAssumptions = cleanAssumptions(res.assumptions ?? []);
+        plan.matchPolicy.exclude_roles = peersExcluded ? ["peer"] : [];
+        if (nextAssumptions.length) plan.matchPolicy.assumptions = nextAssumptions;
+        else delete plan.matchPolicy.assumptions;
         setFields(plan.fields);
         setHardFilters(plan.matchPolicy.hard_filters);
         setWantIntent(plan.matchPolicy.want_intent);
+        setExcludePeers(peersExcluded);
+        setAssumptions(nextAssumptions);
+        setSideAmbiguous(Boolean(res.side_ambiguous));
+        if (fields.length) {
+          // The user's manual edits are replaced only on request, and can be brought back.
+          offerUndo("Đã cập nhật tiêu chí theo mô tả", async () => {
+            setFields(previous.fields);
+            setHardFilters(previous.hardFilters);
+            setWantIntent(previous.wantIntent);
+            setExcludePeers(previous.excludePeers);
+            setAssumptions(previous.assumptions);
+            setSideAmbiguous(previous.sideAmbiguous);
+          });
+        }
       }
       if (!radarName.trim()) setRadarName(plan.name = res.suggested_name);
       if (!sourcesManual) {
@@ -354,11 +387,16 @@ export function useRadarWizard({
     } finally { setPreviewLoading(false); }
   };
 
-  const currentMatchPolicy = (): MatchPolicy => ({
-    want_intent: wantIntent,
-    exclude_roles: excludePeers ? ["peer"] : [],
-    hard_filters: hardFilters,
-  });
+  const currentMatchPolicy = (): MatchPolicy => {
+    const kept = cleanAssumptions(assumptions);
+    return {
+      want_intent: wantIntent,
+      exclude_roles: excludePeers ? ["peer"] : [],
+      hard_filters: hardFilters,
+      // Omitted when empty, exactly as the backend stores it, so unchanged drafts compare equal.
+      ...(kept.length ? { assumptions: kept } : {}),
+    };
+  };
 
   const getPreviewPlan = (): RadarPreviewPlan => ({
     name: radarName.trim() || "Radar mới",
@@ -556,6 +594,11 @@ export function useRadarWizard({
   };
 
   const toggleSource = (id: string) => {
+    const source = sources.find((candidate) => candidate.id === id);
+    if (source && source.state !== "ok" && !selectedSourceIds.includes(id)) {
+      setErrorMsg("Chỉ chọn được nhóm đã kết nối và đang hoạt động. Mở nhóm trên Facebook rồi làm mới danh sách.");
+      return;
+    }
     setSourcesManual(true);
     setSourcesSuggested(false);
     setSelectedSourceIds((prev) => {
@@ -682,6 +725,14 @@ export function useRadarWizard({
     }
   };
 
+  /** The user answers the "which side?" question: record it and drop the neutral-side note. */
+  const chooseSide = (intent: WantIntent) => {
+    setWantIntent(intent);
+    setSideAmbiguous(false);
+    setClarifyingDismissed(true);
+    setAssumptions(items => items.filter(item => !item.startsWith(SIDE_NEUTRAL_PREFIX)));
+  };
+
   const goalTemplateId = /bán xe|bán ô tô/i.test(initialGoal) ? "xe-cu.duoi-gia"
     : /cần thợ|tìm thợ/i.test(initialGoal) ? "dich-vu.tim-tho"
     : /cần thuê căn hộ|tìm thuê căn hộ/i.test(initialGoal) ? "bds.khach-thue" : null;
@@ -764,6 +815,11 @@ export function useRadarWizard({
     setWantIntent,
     excludePeers,
     setExcludePeers,
+    assumptions,
+    setAssumptions,
+    sideAmbiguous,
+    setSideAmbiguous,
+    chooseSide,
     fields,
     setFields,
     suggesting,

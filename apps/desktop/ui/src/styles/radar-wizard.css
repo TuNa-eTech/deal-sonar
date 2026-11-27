@@ -98,6 +98,27 @@
   gap: var(--space-xs);
 }
 
+.radar-interpretation {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-xs) var(--space-sm);
+  margin: 0 0 var(--space-sm);
+}
+
+.radar-interpretation dt {
+  color: var(--text-muted, inherit);
+  font-weight: 600;
+}
+
+.radar-interpretation dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.radar-assumptions {
+  margin-top: var(--space-sm);
+}
+
 .radar-field-disclosure {
   margin-top: var(--space-md);
 }

@@ -88,11 +88,13 @@ export const StepSources: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
                         type="checkbox"
                         aria-label={`Chọn nguồn ${src.name}`}
                         checked={checked}
+                        disabled={!checked && src.state !== "ok"}
                         onChange={() => toggleSource(src.id)}
                       />
                     </td>
                     <td>
                       <strong>{src.name}</strong>
+                      {src.state !== "ok" && <span className="field-hint"> · Chưa kết nối ổn định, chưa dùng được</span>}
                     </td>
                     <td>
                       <Badge >

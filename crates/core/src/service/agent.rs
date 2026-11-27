@@ -16,13 +16,15 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::dto::{
-    field_def_to_store, match_policy_to_store, AuthorRole, CreateRadarDraftInput, FieldDef,
-    HardFilter, MatchPolicy, PreviewRunState, PreviewStartInput, PreviewStatus, WantIntent,
+    field_def_to_store, match_policy_from_store, match_policy_to_store, AuthorRole,
+    CreateRadarDraftInput, FieldDef, HardFilter, MatchPolicy, PreviewRunState, PreviewStartInput,
+    PreviewStatus, SuggestFieldsInput, WantIntent,
 };
 use crate::error::{CoreError, CoreResult};
 use crate::preview_rules::{get_radar_preview, start_radar_preview};
 use crate::state::CoreRuntime;
 
+use super::goal::{clean_assumptions, interpret_goal, resolve_peer_exclusion};
 use super::radars::persist_radar_draft;
 
 pub(crate) fn issue_agent_token(data_dir: &Path) -> io::Result<[u8; TOKEN_BYTES]> {
@@ -69,6 +71,9 @@ pub(crate) async fn handle_agent_request(
         }
         match request.method {
             AgentMethod::ListRadarSources => list_sources(rt),
+            AgentMethod::InterpretRadarGoal => {
+                interpret_for_agent(rt, parse_arguments(request.arguments)?).await
+            }
             AgentMethod::PrepareRadar => prepare_radar(rt, parse_arguments(request.arguments)?).await,
             AgentMethod::CheckRadarPreview | AgentMethod::RetryRadarPreview => {
                 let input: PreviewInput = parse_arguments(request.arguments)?;
@@ -131,12 +136,122 @@ struct PrepareInput {
     want_intent: WantIntent,
     #[serde(default)]
     hard_filters: Vec<HardFilter>,
-    #[serde(default = "exclude_peers_by_default")]
-    exclude_peers: bool,
+    /// `None` lets the shared goal rules decide: keep peers for a neutral Radar, otherwise
+    /// exclude them and record that as an assumption.
+    #[serde(default)]
+    exclude_peers: Option<bool>,
+    #[serde(default)]
+    assumptions: Vec<String>,
 }
 
-fn exclude_peers_by_default() -> bool {
-    true
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InterpretInput {
+    description: String,
+    #[serde(default)]
+    user_profession: Option<String>,
+}
+
+/// Same interpretation the Desktop wizard shows: trade side, excluded audience, fields,
+/// assumptions and the connected groups that look relevant. It creates nothing.
+async fn interpret_for_agent(rt: &Arc<CoreRuntime>, input: InterpretInput) -> CoreResult<Value> {
+    let result = interpret_goal(
+        rt,
+        SuggestFieldsInput {
+            description: input.description,
+            user_profession: input.user_profession,
+            template_id: None,
+            language_hint: None,
+            suggest_sources: true,
+        },
+    )
+    .await?;
+    let now = now_ms();
+    let suggested_sources: Vec<_> = rt
+        .store
+        .source_list(now)?
+        .into_iter()
+        .filter(|item| {
+            eligible_source(&item.source) && result.suggested_source_ids.contains(&item.source.id)
+        })
+        .map(|item| json!({ "id": item.source.id, "name": item.source.name }))
+        .collect();
+    let exclude_peers = result.exclude_roles.contains(&AuthorRole::Peer);
+    // Same shape `prepare_radar` accepts: no internal ordering, no null options.
+    let fields: Vec<Value> = result
+        .fields
+        .iter()
+        .map(|field| {
+            let mut value = serde_json::to_value(field).unwrap_or_default();
+            if let Some(object) = value.as_object_mut() {
+                object.remove("order");
+                if object.get("options").is_some_and(Value::is_null) {
+                    object.remove("options");
+                }
+            }
+            value
+        })
+        .collect();
+    Ok(json!({
+        "draft_id": new_ulid(),
+        "name": result.suggested_name,
+        "want_intent": result.want_intent,
+        "side_ambiguous": result.side_ambiguous,
+        "needs_clarification": result.side_ambiguous,
+        "clarifying_questions": result.clarifying_questions,
+        "exclude_peers": exclude_peers,
+        "excluded_audiences": excluded_audience_labels(&result.exclude_roles),
+        "fields": fields,
+        "hard_filters": result.hard_filters,
+        "assumptions": result.assumptions,
+        "suggested_sources": suggested_sources,
+        "next_step": if result.side_ambiguous {
+            "Ask the user the clarifying question. If they do not choose, keep want_intent any and exclude_peers false."
+        } else {
+            "Show the user the interpretation, then call prepare_radar with these values and the chosen source IDs."
+        },
+    }))
+}
+
+fn excluded_audience_labels<'a>(
+    roles: impl IntoIterator<Item = &'a AuthorRole>,
+) -> Vec<&'static str> {
+    roles
+        .into_iter()
+        .filter_map(|role| match role {
+            AuthorRole::Peer => Some("Người cùng nghề đăng bài chào khách"),
+            _ => None,
+        })
+        .collect()
+}
+
+fn trade_side_label(want_intent: &str) -> &'static str {
+    match want_intent {
+        "demand" => "Người đang cần mua, thuê hoặc tìm dịch vụ",
+        "supply" => "Người đang bán, cho thuê hoặc cung cấp",
+        _ => "Cả hai phía (trung tính)",
+    }
+}
+
+/// What the Radar will look for, in the same terms the Desktop wizard shows.
+fn describe_interpretation(rt: &CoreRuntime, radar: &RadarWithVersion) -> CoreResult<Value> {
+    let version = &radar.current_version;
+    let policy = match_policy_from_store(&version.match_policy);
+    let sources = rt.store.source_list(now_ms())?;
+    let source_names: Vec<_> = radar
+        .source_ids
+        .iter()
+        .filter_map(|id| sources.iter().find(|item| item.source.id == *id))
+        .map(|item| item.source.name.clone())
+        .collect();
+    Ok(json!({
+        "trade_side": trade_side_label(&version.match_policy.want_intent),
+        "want_intent": version.match_policy.want_intent,
+        "excluded_audiences": excluded_audience_labels(&policy.exclude_roles),
+        "fields": version.fields.iter().map(|field| field.label.clone()).collect::<Vec<_>>(),
+        "assumptions": policy.assumptions,
+        "sources": source_names,
+    }))
 }
 
 #[derive(Deserialize)]
@@ -168,6 +283,14 @@ async fn prepare_radar(rt: &Arc<CoreRuntime>, input: PrepareInput) -> CoreResult
     let mut source_ids = input.source_ids;
     source_ids.sort();
     source_ids.dedup();
+    let (exclude_peers, default_note) =
+        resolve_peer_exclusion(input.want_intent, input.exclude_peers);
+    let assumptions = clean_assumptions(
+        default_note
+            .map(str::to_owned)
+            .into_iter()
+            .chain(input.assumptions),
+    );
     let draft = CreateRadarDraftInput {
         name: input.name,
         description: input.description,
@@ -188,12 +311,13 @@ async fn prepare_radar(rt: &Arc<CoreRuntime>, input: PrepareInput) -> CoreResult
             .collect(),
         match_policy: MatchPolicy {
             want_intent: input.want_intent,
-            exclude_roles: if input.exclude_peers {
+            exclude_roles: if exclude_peers {
                 vec![AuthorRole::Peer]
             } else {
                 vec![]
             },
             hard_filters: input.hard_filters,
+            assumptions,
         },
         source_ids,
         notify: None,
@@ -221,7 +345,7 @@ async fn prepare_radar(rt: &Arc<CoreRuntime>, input: PrepareInput) -> CoreResult
         }
         let preview = get_radar_preview(rt, &id, None)?;
         if preview.preview_id != "restored" {
-            return Ok(summarize(&existing, &preview));
+            return summarize(rt, &existing, &preview);
         }
         return preview_summary(rt, &existing, true).await;
     }
@@ -279,7 +403,7 @@ async fn preview_summary(
             PreviewStatus::Crawling | PreviewStatus::Evaluating
         )
     {
-        return Ok(summarize(radar, &current));
+        return summarize(rt, radar, &current);
     }
     let start = async {
         validate_sources(rt, &radar.source_ids)?;
@@ -297,7 +421,7 @@ async fn preview_summary(
         .await
     };
     match start.await {
-        Ok(state) => Ok(summarize(radar, &state)),
+        Ok(state) => summarize(rt, radar, &state),
         Err(error) => Ok(json!({
             "radar_id": id, "name": radar.radar.name, "status": "error",
             "error": error.to_string(), "review_in": "DealSonar → Radar",
@@ -305,7 +429,11 @@ async fn preview_summary(
     }
 }
 
-fn summarize(radar: &RadarWithVersion, preview: &PreviewRunState) -> Value {
+fn summarize(
+    rt: &CoreRuntime,
+    radar: &RadarWithVersion,
+    preview: &PreviewRunState,
+) -> CoreResult<Value> {
     let status = if preview.preview_id == "restored" {
         json!("not_started")
     } else {
@@ -323,12 +451,13 @@ fn summarize(radar: &RadarWithVersion, preview: &PreviewRunState) -> Value {
     } else {
         None
     };
-    json!({
+    Ok(json!({
         "radar_id": radar.radar.id, "name": radar.radar.name,
         "source_ids": radar.source_ids, "status": status,
         "total_posts": preview.total_posts, "evaluated_posts": preview.evaluated_posts,
         "matched_posts": matches, "failed_posts": preview.failed_posts,
         "warnings": preview.warnings, "error": error,
+        "interpretation": describe_interpretation(rt, radar)?,
         "review_in": "DealSonar → Radar → Xem kết quả",
-    })
+    }))
 }
