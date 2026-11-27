@@ -18,6 +18,22 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::sync::oneshot;
 
+/// A Unix socket under `dir`, or a uniquely named pipe on Windows (which has no socket files).
+fn test_endpoint(dir: &std::path::Path, name: &str) -> IpcEndpoint {
+    #[cfg(windows)]
+    {
+        let _ = (dir, name);
+        IpcEndpoint::from_path(format!(
+            r"\\.\pipe\dealsonar-test-{}",
+            dealsonar_protocol::new_ulid()
+        ))
+    }
+    #[cfg(not(windows))]
+    {
+        IpcEndpoint::from_path(dir.join(name))
+    }
+}
+
 /// S3 Milestone Integration Test (`docs/delivery/01-roadmap.md §2 S3`):
 /// 1) Desktop server NOT running -> `desktop_unavailable` (`retryable: true`, `reply_to` preserved).
 /// 2) Desktop server starts -> background loop reconnects automatically.
@@ -29,8 +45,7 @@ use tokio::sync::oneshot;
 #[tokio::test]
 async fn s3_relay_full_lifecycle_1200_bidirectional_frames_and_recovery() {
     let tmp = tempdir().unwrap();
-    let sock_path = tmp.path().join("ipc-dir").join("ipc.sock");
-    let endpoint = IpcEndpoint::from_path(&sock_path);
+    let endpoint = test_endpoint(&tmp.path().join("ipc-dir"), "ipc.sock");
 
     let (mut ext_to_host, host_stdin) = tokio::io::duplex(256 * 1024);
     let (host_stdout, mut host_to_ext) = tokio::io::duplex(256 * 1024);
@@ -268,8 +283,7 @@ async fn s3_relay_full_lifecycle_1200_bidirectional_frames_and_recovery() {
 #[tokio::test]
 async fn subprocess_binary_relays_1000_frames_and_exits_zero_on_stdin_eof() {
     let tmp = tempdir().unwrap();
-    let sock_path = tmp.path().join("subproc").join("ipc.sock");
-    let endpoint = IpcEndpoint::from_path(&sock_path);
+    let endpoint = test_endpoint(&tmp.path().join("subproc"), "ipc.sock");
 
     let mut listener = IpcListener::bind(&endpoint).unwrap();
     let count: u32 = 1_000;
@@ -293,7 +307,7 @@ async fn subprocess_binary_relays_1000_frames_and_exits_zero_on_stdin_eof() {
 
     let bin = env!("CARGO_BIN_EXE_dealsonar-native-host");
     let mut child = Command::new(bin)
-        .env(DEALSONAR_IPC_PATH_ENV, &sock_path)
+        .env(DEALSONAR_IPC_PATH_ENV, endpoint.as_path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

@@ -602,7 +602,17 @@ fn native_manifest_validation_and_idempotent_install() {
     let manifest_path = tmp
         .path()
         .join("NativeMessagingHosts/com.dealsonar.host.json");
-    let bin_path = Path::new("/Applications/DealSonar.app/Contents/MacOS/dealsonar-native-host");
+    // Absolute binary paths are platform-specific: `/...` is relative on Windows.
+    #[cfg(windows)]
+    let (bin_path, moved_bin_path) = (
+        Path::new(r"C:\Program Files\DealSonar\dealsonar-native-host.exe"),
+        Path::new(r"C:\Tools\dealsonar-native-host.exe"),
+    );
+    #[cfg(not(windows))]
+    let (bin_path, moved_bin_path) = (
+        Path::new("/Applications/DealSonar.app/Contents/MacOS/dealsonar-native-host"),
+        Path::new("/usr/local/bin/dealsonar-native-host"),
+    );
 
     let manifest = NativeHostManifest::new("abcdefghijklmnopabcdefghijklmnop", bin_path).unwrap();
     assert_eq!(manifest.name, "com.dealsonar.host");
@@ -618,7 +628,7 @@ fn native_manifest_validation_and_idempotent_install() {
 
     let moved_manifest = NativeHostManifest::new(
         "chrome-extension://abcdefghijklmnopabcdefghijklmnop/",
-        Path::new("/usr/local/bin/dealsonar-native-host"),
+        moved_bin_path,
     )
     .unwrap();
     assert!(verify_or_write_manifest(&manifest_path, &moved_manifest).unwrap());
