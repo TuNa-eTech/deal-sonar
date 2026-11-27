@@ -151,6 +151,17 @@ async fn handle_extension_connection(
             Err(parse_err) => {
                 // Return structured `error` envelope (`protocol_mismatch`, `unknown_type`,
                 // `invalid_payload`) WITHOUT dropping the IPC stream (`01-protocol.md §4.2`).
+                if parse_err.code == ErrorCode::ProtocolMismatch {
+                    // Remember it so the Desktop UI can tell the user which side to update;
+                    // the extension itself never reaches `hello`, so nothing else would notice.
+                    let mut guard = rt.ipc_hub.state.lock().expect("ipc state lock");
+                    guard.protocol_mismatch = Some(crate::state::ProtocolMismatchInfo {
+                        at: now_ms(),
+                        detail: parse_err.message.clone(),
+                    });
+                    drop(guard);
+                    let _ = rt.emit_health_if_changed(now_ms());
+                }
                 let _ = tx.send(parse_err.to_error_envelope());
                 continue;
             }
@@ -237,6 +248,7 @@ fn handle_body(
             let (current_rev, is_paused, pause_reason) = {
                 let mut guard = rt.ipc_hub.state.lock().expect("ipc state lock");
                 guard.last_disconnected_at = None;
+                guard.protocol_mismatch = None;
                 guard.connections.insert(
                     conn_id,
                     ConnectedProfile {
@@ -278,7 +290,7 @@ fn handle_body(
             let _ = tx.send(Envelope::reply(
                 msg_id,
                 Body::HelloOk {
-                    desktop_version: env!("CARGO_PKG_VERSION").to_string(),
+                    desktop_version: crate::DESKTOP_VERSION.to_string(),
                     config_rev: current_rev,
                 },
             ));
@@ -702,10 +714,12 @@ fn upsert_sources_respecting_plan(
 fn handle_session_status(
     rt: &CoreRuntime,
     state: SessionState,
-    _detail: Option<String>,
+    detail: Option<String>,
     now: i64,
 ) -> CoreResult<()> {
     if state == SessionState::Ok {
+        // The session is healthy again: close the account-safety entries that were open.
+        crate::safety::resolve_open_incidents(&rt.store, now)?;
         {
             let mut hub = rt.ipc_hub.state.lock().expect("ipc state lock");
             let was_checkpoint = hub.facebook_session == FacebookSessionState::Checkpoint
@@ -762,11 +776,23 @@ fn handle_session_status(
         SessionState::Unknown => (FacebookSessionState::LoggedOut, CrawlPauseReason::LoggedOut),
     };
 
-    {
+    let changed = {
         let mut hub = rt.ipc_hub.state.lock().expect("ipc state lock");
+        let changed = hub.facebook_session != mapped_state;
         hub.facebook_session = mapped_state;
         hub.crawl_paused = true;
         hub.crawl_pause_reason = Some(pause_reason);
+        changed
+    };
+    // Log each new problem once, with the page loads that preceded it (H5 account-safety study).
+    if changed {
+        let kind = match state {
+            SessionState::Checkpoint => crate::safety::AccountIncidentKind::Checkpoint,
+            SessionState::LoggedOut => crate::safety::AccountIncidentKind::LoggedOut,
+            SessionState::RateLimited => crate::safety::AccountIncidentKind::RateLimited,
+            _ => crate::safety::AccountIncidentKind::Unknown,
+        };
+        crate::safety::record_incident(&rt.store, kind, detail.as_deref(), now)?;
     }
 
     let pause_env = Envelope::new(Body::CrawlPause {

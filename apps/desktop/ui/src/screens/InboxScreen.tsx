@@ -6,6 +6,7 @@ import { formatExactTime, LEAD_STATUS_LABELS, REJECT_REASON_LABELS } from "../li
 import { AgeChip } from "../components/AgeChip";
 import { renderHighlightedPostText } from "../lib/security";
 import type {
+  HealthStatus,
   Lead,
   LeadFilterQuery,
   Radar,
@@ -13,6 +14,7 @@ import type {
   RejectedEvaluation,
 } from "../types/ipc";
 import { LeadDetailPanel } from "../components/LeadDetailPanel";
+import { NewsFlowStatus } from "../components/NewsFlowStatus";
 import { Badge, Button, Card, Input, Modal, ModalBody, ModalHeader, Select } from "../components/ui";
 
 export type LeadQueue = "new" | "working" | "due" | "overdue" | "upcoming" | "expired" | "done" | "all";
@@ -60,6 +62,7 @@ function queueQuery(queue: LeadQueue, now: number): Partial<LeadFilterQuery> {
 interface InboxScreenProps {
   radars: Radar[];
   templates: RadarTemplate[];
+  health?: HealthStatus | null;
   refreshToken: number;
   onCreateRadarFromTemplate: (tpl: RadarTemplate | null) => void;
   onLeadChanged: () => void;
@@ -68,6 +71,7 @@ interface InboxScreenProps {
 export const InboxScreen: React.FC<InboxScreenProps> = ({
   radars,
   templates,
+  health = null,
   refreshToken,
   onCreateRadarFromTemplate,
   onLeadChanged,
@@ -339,6 +343,7 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
               <Button variant="primary" onClick={() => void openRejectedModal()}>
                 Kiểm tra bài bị loại
               </Button>
+              {!filtered && <NewsFlowStatus health={health} compact />}
             </>
           )}
         </div>

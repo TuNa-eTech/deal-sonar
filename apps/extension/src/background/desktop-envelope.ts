@@ -1,5 +1,6 @@
 // Handlers for envelopes received from the Desktop app over the native port.
 
+import { desktopOutdatedKind } from "../compat";
 import { type DesktopEnvelope, replyEnvelope } from "../protocol";
 import { applyConfigUpdate, applyDesktopPause, applyDesktopResume } from "./scheduler";
 import { updateActionBadge } from "./badge";
@@ -27,6 +28,7 @@ export async function handleDesktopEnvelope(env: DesktopEnvelope): Promise<void>
           desktop_available: true,
           desktop_version: env.payload.desktop_version,
           last_seen_at: now,
+          compat: desktopOutdatedKind(env.payload.desktop_version),
         };
         return state;
       }, now);
@@ -129,6 +131,7 @@ export async function handleDesktopEnvelope(env: DesktopEnvelope): Promise<void>
           state.connection.desktop_available = false;
           state.connection.last_error =
             "Phiên bản giao thức không khớp — vui lòng cập nhật DealSonar";
+          state.connection.compat = "protocol_mismatch";
           return state;
         }, now);
         abortActiveCrawlIfRunning();

@@ -50,7 +50,7 @@ Trong Rust, biểu diễn bằng một struct `Envelope` và enum `Body` gắn t
 2. Desktop trả `hello.ok` hoặc `error` mã `protocol_mismatch`.
 3. Desktop gửi ngay `config.update` nếu `config_rev` của extension cũ hơn.
 
-Quy tắc tương thích: hai phía chấp nhận nhau khi cùng số `v`. Trường lạ trong `payload` bị bỏ qua (cho phép thêm trường mà không tăng `v`). Kiểu message lạ được trả `error` mã `unknown_type` và không làm đứt kết nối. Thay đổi phá vỡ thì tăng `v`; khi lệch, cả hai phía hiện thông báo yêu cầu cập nhật phía cũ hơn.
+Quy tắc tương thích: hai phía chấp nhận nhau khi cùng số `v` (cổng cứng). Ngoài ra mỗi bên khai báo bản phát hành tối thiểu của bên kia (`MIN_EXTENSION_VERSION`, `MIN_DESKTOP_VERSION`); bên thấy đối phương cũ hơn mức đó vẫn phục vụ nhưng báo hướng dẫn cập nhật cho người dùng, và Desktop ghi nhận `protocol_mismatch` để hiển thị. Xem [05-upgrade-and-recovery.md](../delivery/05-upgrade-and-recovery.md). Trường lạ trong `payload` bị bỏ qua (cho phép thêm trường mà không tăng `v`). Kiểu message lạ được trả `error` mã `unknown_type` và không làm đứt kết nối. Thay đổi phá vỡ thì tăng `v`; khi lệch, cả hai phía hiện thông báo yêu cầu cập nhật phía cũ hơn.
 
 ## 4. Danh mục message
 

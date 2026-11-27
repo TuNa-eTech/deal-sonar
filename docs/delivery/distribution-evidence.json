@@ -1,0 +1,6 @@
+{
+  "$comment": "Ledger of REAL install-and-pair runs, one entry per platform and release. Never add an entry that was not observed. Schema and rules: scripts/distribution-evidence.mjs and docs/delivery/04-distribution.md. No personal data: testers are referenced by an opaque id. upgrade_runs records real in-place upgrades (previous customer build -> new build) per platform; rules in scripts/distribution-evidence.mjs and docs/delivery/05-upgrade-and-recovery.md.",
+  "schema": 1,
+  "entries": [],
+  "upgrade_runs": []
+}

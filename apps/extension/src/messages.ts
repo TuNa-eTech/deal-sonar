@@ -114,6 +114,8 @@ export type PopupStatusSnapshot = {
   desktopAvailable: boolean;
   desktopVersion?: string;
   connectionError?: string;
+  /** Present when the extension and Desktop need an update to work together (Vietnamese guidance). */
+  compat?: { kind: "desktop_outdated" | "protocol_mismatch"; message: string; action: string };
   extensionId?: string;
   session: {
     state: SessionState;

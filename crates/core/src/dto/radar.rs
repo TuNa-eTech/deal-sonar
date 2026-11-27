@@ -237,6 +237,12 @@ pub struct MatchPolicy {
     pub exclude_roles: Vec<AuthorRole>,
     #[serde(default)]
     pub hard_filters: Vec<HardFilter>,
+    /// Interpretation choices made for this brief that the user can review and edit.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assumptions: Vec<String>,
+    /// Optional `all`/`any`/`not` expression ANDed with `hard_filters` (see `dealsonar_rules::FilterExpr`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<dealsonar_rules::FilterExpr>,
 }
 
 impl Default for MatchPolicy {
@@ -245,6 +251,8 @@ impl Default for MatchPolicy {
             want_intent: WantIntent::Any,
             exclude_roles: vec![AuthorRole::Peer],
             hard_filters: Vec::new(),
+            assumptions: Vec::new(),
+            condition: None,
         }
     }
 }
@@ -336,6 +344,9 @@ pub struct Radar {
     pub current_version: i32,
     pub source_ids: Vec<String>,
     pub notify: RadarNotifyConfig,
+    /// Radar this one was copied from. Provenance only; the two radars are independent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant_of: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
     #[serde(skip_serializing_if = "Option::is_none")]

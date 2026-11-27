@@ -58,6 +58,8 @@ Mọi ngưỡng dưới đây là đề xuất khởi điểm. Chúng cần đư
 
 Tập chuẩn nằm ở `docs/eval/golden/` dạng JSONL, kèm định nghĩa radar dùng để chấm.
 
+Tập đánh giá riêng cho radar do khách tự mô tả (nhu cầu ngoài mẫu, cùng một bài với hai khách trái chiều) nằm ở [`docs/eval/holdout/`](../eval/holdout/README.md), kèm quy tắc xử lý nhãn bất đồng.
+
 ### 3.2 Phép đo và ngưỡng
 
 | Phép đo | Định nghĩa | Ngưỡng đạt |
@@ -117,6 +119,8 @@ Chạy thật trong 7 ngày trên ba cấu hình: 5 group vắng; 10 group trung
 | Số bài lên AI mỗi ngày, sau khi bộ luật `active` | ≤ 15% số bài thu được (G4) |
 | Số lần chạm giới hạn hạn mức của gói AI rẻ nhất có CLI | 0 lần trong 7 ngày ở cấu hình trung bình |
 | Người dùng thử có nhận thấy gói AI của họ bị ảnh hưởng khi dùng cho việc khác không | Không ai báo |
+
+**Đo thế nào.** Công cụ báo cáo, quy trình ghi gián đoạn và các định nghĩa nằm ở [Quy trình đo chạy dài ngày](04-soak-runbook.md). Ngoài bảng trên, lần chạy 7 ngày còn phải ghi, cho từng cấu hình: số bài thu, số cặp bài–Radar cần chấm, số lần gọi AI và số tin gửi; trung vị thời gian từ lúc đăng đến lúc gửi tin (đạt khi dưới 10 phút); tỉ lệ bài duy nhất cần AI trên bài duy nhất đã thu sau khi bộ luật hoạt động, kèm lượng AI theo từng Radar; và, sau mỗi gián đoạn (máy ngủ, mất phiên Chrome, hết hạn mức AI, lỗi kênh báo), đối soát bài chậm, sót, trùng và tiến độ sau phục hồi.
 
 **Nếu không đạt:** đẩy việc sinh bộ luật lên sớm hơn (ít mẫu hơn, cổng lỏng hơn ở chế độ chỉ lọc sơ bộ); hạ trần bài mỗi ngày mặc định; cân nhắc provider mô hình tại máy cho tầng `Fast`.
 

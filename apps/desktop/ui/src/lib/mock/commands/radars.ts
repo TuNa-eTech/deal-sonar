@@ -3,6 +3,8 @@
 import type {
   RadarDetail,
   CreateRadarDraftInput,
+  CreateRadarVariantInput,
+  RadarVariantDraft,
   Radar,
   RadarVersion,
   UpdateRadarInput,
@@ -139,6 +141,43 @@ export const radarCommands: MockCommandTable = {
     return getRadarDetail(radarId);
   },
 
+  radar_variant_prepare: async (args) => {
+    const detail = getRadarDetail(String(args.source_radar_id ?? ""));
+    const { radar, current_version_data: version } = detail;
+    return structuredClone({
+      source_radar_id: radar.id,
+      source_radar_name: radar.name,
+      input: {
+        name: `${radar.name} (biến thể)`,
+        template_id: radar.template_id,
+        description: version.description,
+        user_profession: version.user_profession,
+        language_hint: version.language_hint,
+        fields: version.fields,
+        match_policy: version.match_policy,
+        source_ids: radar.source_ids,
+        notify: radar.notify,
+      },
+    } satisfies RadarVariantDraft);
+  },
+
+  radar_create_variant: async (args) => {
+    const { source_radar_id, input } = args.input as CreateRadarVariantInput;
+    getRadarDetail(source_radar_id);
+    const followed = new Set(state.sources.filter((x) => x.followed).map((x) => x.id));
+    for (const id of input.source_ids) followed.add(id);
+    if (followed.size > state.license.limits.max_followed_groups) {
+      throw new Error(
+        `Gói hiện tại giới hạn tối đa ${state.license.limits.max_followed_groups} group theo dõi.`
+      );
+    }
+    const created = await radarCommands.radar_create_draft!({ input });
+    const radar = state.radars.find((r) => r.id === (created as RadarDetail).radar.id)!;
+    radar.variant_of = source_radar_id;
+    if (input.notify) radar.notify = { ...radar.notify, ...input.notify };
+    return getRadarDetail(radar.id);
+  },
+
   radar_update: async (args) => {
     const input = args.input as UpdateRadarInput;
     const radar = state.radars.find((r) => r.id === input.id);
@@ -223,6 +262,9 @@ export const radarCommands: MockCommandTable = {
           clarifying_questions: [],
           prefilter_hint: null,
           suggested_source_ids: suggestedSourceIds,
+          exclude_roles: tpl.match_policy.exclude_roles,
+          assumptions: tpl.match_policy.assumptions ?? [],
+          side_ambiguous: false,
         } satisfies SuggestFieldsResult);
       }
     }
@@ -343,13 +385,34 @@ export const radarCommands: MockCommandTable = {
       when_missing: "fail",
     }] : [];
 
+    const demandCue = ["can thue", "can mua", "can tim", "tim thue", "tim mua", "khach thue", "khach can", "nguoi can", "can xe", "can tho", "can nguoi"]
+      .some(cue => folded.includes(cue));
+    const supplyCue = ["chinh chu", "cho thue", "tin ban", "can ban", "nhuong", "nguoi tim viec", "co xe trong"]
+      .some(cue => folded.includes(cue));
+    // "tim xe" / "tim hang" do not say who the post author is: stay neutral and ask.
+    const sideAmbiguous = (demandCue && supplyCue)
+      || (!demandCue && !supplyCue && (/(^|\s)xe(\s|$)/.test(folded) || folded.includes("hang")));
+    const wantsPeers = ["doi tac", "cung nghe", "hop tac", "ket noi"].some(cue => folded.includes(cue));
+    const wantIntent: SuggestFieldsResult["want_intent"] = sideAmbiguous ? "any" : supplyCue ? "supply" : "demand";
+    const excludePeers = !sideAmbiguous && !wantsPeers;
+    const assumptions: string[] = [];
+    if (sideAmbiguous) {
+      assumptions.push("Chưa rõ bạn muốn tìm bài của người cần hay người cung cấp, nên giữ trung tính cả hai chiều và không loại bài của người cùng nghề.");
+    } else if (excludePeers) {
+      assumptions.push("Loại bài của người cùng nghề vì mô tả không nói bạn muốn nhận bài từ họ.");
+    }
+    if (sideAmbiguous) clarifying.unshift("Bạn muốn tìm bài của người đang cần hay người đang cung cấp (ví dụ tìm xe hay tìm hàng)?");
+
     const result: SuggestFieldsResult = {
       suggested_name: input.description.trim().slice(0, 48) || "Radar tuỳ chỉnh",
-      want_intent: folded.includes("can ban") || folded.includes("cho thue") ? "supply" : "demand",
+      want_intent: wantIntent,
       fields,
       hard_filters: hardFilters,
-      clarifying_questions: clarifying,
+      clarifying_questions: clarifying.slice(0, 2),
       suggested_source_ids: suggestedSourceIds,
+      exclude_roles: excludePeers ? ["peer"] : [],
+      assumptions,
+      side_ambiguous: sideAmbiguous,
       prefilter_hint: {
         any: ["can", "tim"],
         none: ["tuyen cong tac vien"],

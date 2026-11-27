@@ -1,0 +1,1648 @@
+{
+  "schema_version": 1,
+  "generated_at_unix_ms": 1795756141505,
+  "provider": "claude_cli",
+  "tier": "fast",
+  "model_override": "sonnet",
+  "cli_version": "2.1.332 (Claude Code)",
+  "batch_size": 20,
+  "dataset": "/Users/anhtu/orca/workspaces/DealSonar/radar-factory-10/docs/eval/holdout/gia-su-phu-huynh.jsonl",
+  "dataset_fingerprint_fnv1a64": "a2a1ec30b602e289",
+  "dataset_posts": 41,
+  "radar": "/Users/anhtu/orca/workspaces/DealSonar/radar-factory-10/docs/eval/holdout/gia-su-phu-huynh.radar.json",
+  "radar_version_id": "01HOLDOUTTUTORV1",
+  "repeat": 3,
+  "runs": [
+    {
+      "provider": "claude_cli",
+      "radar_version_id": "01HOLDOUTTUTORV1",
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "batch_size": 20,
+      "total_posts": 41,
+      "evaluated_ok": 41,
+      "ai_failed_count": 0,
+      "match_tp": 13,
+      "match_fp": 0,
+      "match_fn": 0,
+      "match_tn": 28,
+      "match_precision": 1.0,
+      "match_recall": 1.0,
+      "match_f1": 1.0,
+      "peer_precision": 1.0,
+      "peer_recall": 1.0,
+      "peer_tp": 9,
+      "peer_fp": 0,
+      "peer_fn": 0,
+      "field_stats": {
+        "budget": {
+          "field_key": "budget",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "grade": {
+          "field_key": "grade",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "location": {
+          "field_key": "location",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 9,
+          "accuracy": 0.6923076923076923
+        },
+        "mode": {
+          "field_key": "mode",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "phone": {
+          "field_key": "phone",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "subject": {
+          "field_key": "subject",
+          "required": true,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        }
+      },
+      "total_non_null_extractions": 121,
+      "hallucinated_raw_count": 0,
+      "hallucinated_raw_rate": 0.0,
+      "total_calls": 3,
+      "avg_input_tokens_per_post": 603.219512195122,
+      "avg_output_tokens_per_post": 386.5609756097561,
+      "avg_duration_ms_per_post": 2389.2195121951218,
+      "total_cost_usd": 0.243756,
+      "total_input_tokens": 24732,
+      "total_output_tokens": 15849,
+      "failed_calls": 0,
+      "bisection_count": 0,
+      "total_duration_ms": 97958,
+      "decisions": [
+        {
+          "post_id": "hg-001",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-002",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-003",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-004",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-005",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-006",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-007",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-008",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-009",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-010",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-011",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-012",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-013",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-014",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-015",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-016",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-017",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-018",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-019",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-020",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-021",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-022",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-023",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-024",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-025",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-026",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-027",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-028",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-029",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-030",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-031",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-032",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": null,
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-033",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-034",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-035",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-036",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-037",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-038",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-039",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-040",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-041",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        }
+      ],
+      "failures": [
+        {
+          "post_id": "hg-003",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Quận 7",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Quận 7",
+            "province": "TP.HCM",
+            "raw": "quan 7",
+            "ward": null
+          },
+          "text": "can tim gia su ly 11 on thi hsg, hoc tai nha quan 7, sdt 0909.000.113",
+          "ai_reason": "Tìm gia sư vật lý lớp 11 ôn thi học sinh giỏi, học tại nhà ở quận 7."
+        },
+        {
+          "post_id": "hg-008",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Tân Bình",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Tân Bình",
+            "province": "TP.HCM",
+            "raw": "khu Tân Bình",
+            "ward": null
+          },
+          "text": "Nhờ mọi người giới thiệu giúp trung tâm hoặc gia sư kèm toán lớp 7 cho con, khu Tân Bình, ưu tiên dạy 1-1, 0909.000.118",
+          "ai_reason": "Phụ huynh tìm người kèm toán cho con lớp 7 ở Tân Bình; chấp nhận cả trung tâm lẫn gia sư."
+        },
+        {
+          "post_id": "hg-010",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "TP.HCM",
+            "raw": "quận Gò Vấp",
+            "ward": null
+          },
+          "text": "Con mình lớp 5 yếu toán, tìm sinh viên sư phạm dạy kèm cuối tuần quận Gò Vấp, học phí thoả thuận",
+          "ai_reason": "Phụ huynh tìm người kèm toán lớp 5 tại Gò Vấp, học phí thoả thuận."
+        },
+        {
+          "post_id": "hg-013",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "TP.HCM",
+            "raw": "khu Gò Vấp",
+            "ward": null
+          },
+          "text": "Cần gia sư tiếng Anh lớp 8 học tại nhà khu Gò Vấp, bé mất gốc, 250k/buổi, zalo 0909.000.124",
+          "ai_reason": "Tìm gia sư tiếng Anh lớp 8 học tại nhà ở TP.HCM."
+        }
+      ]
+    },
+    {
+      "provider": "claude_cli",
+      "radar_version_id": "01HOLDOUTTUTORV1",
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "batch_size": 20,
+      "total_posts": 41,
+      "evaluated_ok": 41,
+      "ai_failed_count": 0,
+      "match_tp": 13,
+      "match_fp": 0,
+      "match_fn": 0,
+      "match_tn": 28,
+      "match_precision": 1.0,
+      "match_recall": 1.0,
+      "match_f1": 1.0,
+      "peer_precision": 1.0,
+      "peer_recall": 1.0,
+      "peer_tp": 9,
+      "peer_fp": 0,
+      "peer_fn": 0,
+      "field_stats": {
+        "budget": {
+          "field_key": "budget",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "grade": {
+          "field_key": "grade",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "location": {
+          "field_key": "location",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 9,
+          "accuracy": 0.6923076923076923
+        },
+        "mode": {
+          "field_key": "mode",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "phone": {
+          "field_key": "phone",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "subject": {
+          "field_key": "subject",
+          "required": true,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        }
+      },
+      "total_non_null_extractions": 121,
+      "hallucinated_raw_count": 0,
+      "hallucinated_raw_rate": 0.0,
+      "total_calls": 3,
+      "avg_input_tokens_per_post": 598.9268292682926,
+      "avg_output_tokens_per_post": 376.0,
+      "avg_duration_ms_per_post": 2282.7073170731705,
+      "total_cost_usd": 0.231897,
+      "total_input_tokens": 24556,
+      "total_output_tokens": 15416,
+      "failed_calls": 0,
+      "bisection_count": 0,
+      "total_duration_ms": 93591,
+      "decisions": [
+        {
+          "post_id": "hg-001",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-002",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-003",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-004",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-005",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-006",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-007",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-008",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-009",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-010",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-011",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-012",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-013",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-014",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-015",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-016",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-017",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-018",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-019",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-020",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-021",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-022",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-023",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-024",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-025",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-026",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-027",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-028",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-029",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-030",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-031",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-032",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": null,
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-033",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-034",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-035",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-036",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-037",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-038",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-039",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-040",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-041",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        }
+      ],
+      "failures": [
+        {
+          "post_id": "hg-003",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Quận 7",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Quận 7",
+            "province": "TP.HCM",
+            "raw": "quan 7",
+            "ward": null
+          },
+          "text": "can tim gia su ly 11 on thi hsg, hoc tai nha quan 7, sdt 0909.000.113",
+          "ai_reason": "Tìm gia sư lý lớp 11 ôn thi HSG, học tại nhà quận 7 (TP.HCM)."
+        },
+        {
+          "post_id": "hg-008",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Tân Bình",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Tân Bình",
+            "province": "TP.HCM",
+            "raw": "Tân Bình",
+            "ward": null
+          },
+          "text": "Nhờ mọi người giới thiệu giúp trung tâm hoặc gia sư kèm toán lớp 7 cho con, khu Tân Bình, ưu tiên dạy 1-1, 0909.000.118",
+          "ai_reason": "Phụ huynh tìm người kèm toán lớp 7 cho con ở Tân Bình; chấp nhận cả gia sư."
+        },
+        {
+          "post_id": "hg-010",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "TP.HCM",
+            "raw": "quận Gò Vấp",
+            "ward": null
+          },
+          "text": "Con mình lớp 5 yếu toán, tìm sinh viên sư phạm dạy kèm cuối tuần quận Gò Vấp, học phí thoả thuận",
+          "ai_reason": "Phụ huynh tìm người kèm toán lớp 5 cho con tại Gò Vấp; học phí thoả thuận."
+        },
+        {
+          "post_id": "hg-013",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "TP.HCM",
+            "raw": "Gò Vấp",
+            "ward": null
+          },
+          "text": "Cần gia sư tiếng Anh lớp 8 học tại nhà khu Gò Vấp, bé mất gốc, 250k/buổi, zalo 0909.000.124",
+          "ai_reason": "Phụ huynh tìm gia sư tiếng Anh lớp 8 tại nhà cho bé mất gốc ở TP.HCM."
+        }
+      ]
+    },
+    {
+      "provider": "claude_cli",
+      "radar_version_id": "01HOLDOUTTUTORV1",
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "batch_size": 20,
+      "total_posts": 41,
+      "evaluated_ok": 41,
+      "ai_failed_count": 0,
+      "match_tp": 13,
+      "match_fp": 0,
+      "match_fn": 0,
+      "match_tn": 28,
+      "match_precision": 1.0,
+      "match_recall": 1.0,
+      "match_f1": 1.0,
+      "peer_precision": 1.0,
+      "peer_recall": 1.0,
+      "peer_tp": 9,
+      "peer_fp": 0,
+      "peer_fn": 0,
+      "field_stats": {
+        "budget": {
+          "field_key": "budget",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "grade": {
+          "field_key": "grade",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "location": {
+          "field_key": "location",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 9,
+          "accuracy": 0.6923076923076923
+        },
+        "mode": {
+          "field_key": "mode",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "phone": {
+          "field_key": "phone",
+          "required": false,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        },
+        "subject": {
+          "field_key": "subject",
+          "required": true,
+          "total_labeled": 13,
+          "exact_matches": 13,
+          "accuracy": 1.0
+        }
+      },
+      "total_non_null_extractions": 123,
+      "hallucinated_raw_count": 0,
+      "hallucinated_raw_rate": 0.0,
+      "total_calls": 3,
+      "avg_input_tokens_per_post": 601.3658536585366,
+      "avg_output_tokens_per_post": 381.1463414634146,
+      "avg_duration_ms_per_post": 2289.7073170731705,
+      "total_cost_usd": 0.234407,
+      "total_input_tokens": 24656,
+      "total_output_tokens": 15627,
+      "failed_calls": 0,
+      "bisection_count": 0,
+      "total_duration_ms": 93878,
+      "decisions": [
+        {
+          "post_id": "hg-001",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-002",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-003",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-004",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-005",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-006",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-007",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-008",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-009",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-010",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-011",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-012",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-013",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-014",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-015",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-016",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-017",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-018",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-019",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-020",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-021",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-022",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hg-023",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-024",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-025",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-026",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-027",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-028",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-029",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-030",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-031",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-032",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": null,
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-033",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-034",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-035",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-036",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-037",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-038",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hg-039",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-040",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hg-041",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        }
+      ],
+      "failures": [
+        {
+          "post_id": "hg-003",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Quận 7",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Quận 7",
+            "province": "TP.HCM",
+            "raw": "quan 7",
+            "ward": null
+          },
+          "text": "can tim gia su ly 11 on thi hsg, hoc tai nha quan 7, sdt 0909.000.113",
+          "ai_reason": "Đang tìm gia sư lý lớp 11 học tại nhà ở quận 7: nhu cầu thật."
+        },
+        {
+          "post_id": "hg-008",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Tân Bình",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Tân Bình",
+            "province": "TP.HCM",
+            "raw": "Tân Bình",
+            "ward": null
+          },
+          "text": "Nhờ mọi người giới thiệu giúp trung tâm hoặc gia sư kèm toán lớp 7 cho con, khu Tân Bình, ưu tiên dạy 1-1, 0909.000.118",
+          "ai_reason": "Phụ huynh nhờ giới thiệu gia sư hoặc trung tâm kèm toán cho con: nhu cầu thật."
+        },
+        {
+          "post_id": "hg-010",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "TP.HCM",
+            "raw": "quận Gò Vấp",
+            "ward": null
+          },
+          "text": "Con mình lớp 5 yếu toán, tìm sinh viên sư phạm dạy kèm cuối tuần quận Gò Vấp, học phí thoả thuận",
+          "ai_reason": "Phụ huynh có con yếu toán lớp 5 đang tìm người kèm. Học phí thoả thuận, không có số điện thoại."
+        },
+        {
+          "post_id": "hg-013",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "TP.HCM",
+            "raw": "Gò Vấp",
+            "ward": null
+          },
+          "text": "Cần gia sư tiếng Anh lớp 8 học tại nhà khu Gò Vấp, bé mất gốc, 250k/buổi, zalo 0909.000.124",
+          "ai_reason": "Tìm gia sư tiếng Anh cho bé lớp 8 mất gốc tại Gò Vấp."
+        }
+      ]
+    }
+  ],
+  "run_checks": [
+    [
+      {
+        "name": "match_precision",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.85,
+        "passed": true
+      },
+      {
+        "name": "match_recall",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "field:subject",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "peer_precision",
+        "scope": "h2_gate",
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1.0,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "peer_recall",
+        "scope": "h2_gate",
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1.0,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "field:budget",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:grade",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:location",
+        "scope": "h2_gate",
+        "numerator": 9,
+        "denominator": 13,
+        "value": 0.6923076923076923,
+        "threshold": 0.8,
+        "passed": false
+      },
+      {
+        "name": "field:mode",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:phone",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "raw_grounded (1 - hallucinated_raw_rate)",
+        "scope": "h2_gate",
+        "numerator": 121,
+        "denominator": 121,
+        "value": 1.0,
+        "threshold": 0.99,
+        "passed": true
+      }
+    ],
+    [
+      {
+        "name": "match_precision",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.85,
+        "passed": true
+      },
+      {
+        "name": "match_recall",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "field:subject",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "peer_precision",
+        "scope": "h2_gate",
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1.0,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "peer_recall",
+        "scope": "h2_gate",
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1.0,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "field:budget",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:grade",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:location",
+        "scope": "h2_gate",
+        "numerator": 9,
+        "denominator": 13,
+        "value": 0.6923076923076923,
+        "threshold": 0.8,
+        "passed": false
+      },
+      {
+        "name": "field:mode",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:phone",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "raw_grounded (1 - hallucinated_raw_rate)",
+        "scope": "h2_gate",
+        "numerator": 121,
+        "denominator": 121,
+        "value": 1.0,
+        "threshold": 0.99,
+        "passed": true
+      }
+    ],
+    [
+      {
+        "name": "match_precision",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.85,
+        "passed": true
+      },
+      {
+        "name": "match_recall",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "field:subject",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "peer_precision",
+        "scope": "h2_gate",
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1.0,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "peer_recall",
+        "scope": "h2_gate",
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1.0,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "field:budget",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:grade",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:location",
+        "scope": "h2_gate",
+        "numerator": 9,
+        "denominator": 13,
+        "value": 0.6923076923076923,
+        "threshold": 0.8,
+        "passed": false
+      },
+      {
+        "name": "field:mode",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:phone",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "raw_grounded (1 - hallucinated_raw_rate)",
+        "scope": "h2_gate",
+        "numerator": 123,
+        "denominator": 123,
+        "value": 1.0,
+        "threshold": 0.99,
+        "passed": true
+      }
+    ]
+  ],
+  "stability": {
+    "runs": 3,
+    "posts": 41,
+    "posts_changed": 0,
+    "rate": 0.0,
+    "threshold": 0.03,
+    "passed": true,
+    "changed_post_ids": []
+  }
+}

@@ -25,8 +25,24 @@ export const GlobalHealthBanner: React.FC<GlobalHealthBannerProps> = ({
 
   const banners: React.ReactNode[] = [];
 
+  // 0. Chrome and Desktop updated out of step: say which side to update and that data is safe.
+  if (health.extension_compat) {
+    const danger = health.extension_compat.state === "protocol_mismatch";
+    banners.push(
+      <div key="ext-compat" className={`health-banner ${danger ? "danger" : "warning"}`} role="alert">
+        <div>
+          <strong>Cần cập nhật Chrome hoặc ứng dụng:</strong> {health.extension_compat.message}{" "}
+          {health.extension_compat.action}
+        </div>
+        <Button size="sm" onClick={onRetryConnect}>
+          Kiểm tra lại kết nối
+        </Button>
+      </div>
+    );
+  }
+
   // 1. Extension disconnected (`03-ux-flows.md §5`)
-  if (!health.extension_connected) {
+  if (!health.extension_connected && !health.extension_compat) {
     banners.push(
       <div key="ext-down" className="health-banner danger" role="alert">
         <div>

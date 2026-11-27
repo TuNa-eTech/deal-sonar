@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {PipelineDiagnosis} from "../components/PipelineDiagnosis";
+import { NewsFlowStatus } from "../components/NewsFlowStatus";
+import { AccountSafetyLog } from "../components/AccountSafetyLog";
 import { OperationStatus } from "../components/OperationStatus";
 import { api } from "../lib/api";
 import { formatExactTime, formatRelativeTime } from "../lib/format";
@@ -121,6 +123,8 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       )}
 
       {/* 4 Status Lamps (`03-ux-flows.md §3`) */}
+      <NewsFlowStatus health={health} />
+      <AccountSafetyLog health={health} />
       <PipelineDiagnosis health={health} onRefresh={onRefreshHealth}/>
       <OperationStatus health={health}/>
       <div className="connection-ledger">
@@ -133,6 +137,11 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
               ? `Đang kết nối (v${health.extension_version ?? "0.2.0"})`
               : "Mất kết nối, cần mở Chrome / bấm Thử lại trong popup tiện ích"}
           </div>
+          {health?.extension_compat && (
+            <div className="field-hint" role="status" style={{ marginTop: 6 }}>
+              {health.extension_compat.message} {health.extension_compat.action}
+            </div>
+          )}
           {!health?.extension_connected && (
             <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
               <Input

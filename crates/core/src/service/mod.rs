@@ -25,8 +25,8 @@ use dealsonar_notify::{
 };
 use dealsonar_protocol::ipc::{ensure_secure_socket_dir, IpcEndpoint, IpcListener};
 use dealsonar_protocol::native_manifest::{
-    chrome_manifest_path, secondary_chromium_manifest_paths, verify_or_write_manifest,
-    NativeHostManifest,
+    chrome_manifest_path, register_native_host_windows, secondary_chromium_manifest_paths,
+    verify_or_write_manifest, NativeHostManifest,
 };
 use dealsonar_protocol::{Body, CrawlReason, Envelope};
 use dealsonar_store::models::{
@@ -44,18 +44,20 @@ use tokio::task::JoinHandle;
 use crate::diagnostics::create_diagnostic_bundle;
 use crate::dto::{
     extracted_fields_store_to_notify, field_def_from_ai, field_def_from_store,
-    field_def_store_to_notify, field_def_to_store, filter_op_to_store, match_policy_to_store,
-    notify_from_store, notify_to_store, radar_version_from_store, ruleset_record_to_dto,
-    AiDailyUsageRow, AiProviderId, AiUsageStats, BlocklistEntry, BlocklistKind,
-    BlocklistRemoveResult, Channel, ChannelConfig, ChannelRemoveResult, ChromeConnectOptions,
-    ChromeConnectResult, Contact, ContactBlockResult, ContactDetail, CoreEvent, CrawlRun,
-    CreateRadarDraftInput, DataBackupResult, DataDeleteAllResult, DataPurgeResult, DecidedBy,
-    DiagnosticBundleResult, ExportFormat, FacebookSessionState, FeedbackLabel, FunnelStats,
-    HardFilter, HealthStatus, LeadCrmPatch, LeadDetail, LeadEvent, LeadExportInput,
-    LeadExportResult, LeadFeedbackInput, LeadFeedbackResult, LeadFilterQuery, LeadListResponse,
-    LeadStatus, LicenseStatus, ModelTierMap, Post, PrefilterHintDto, PreviewRunState,
-    PreviewStartInput, ProbeResult, Radar, RadarDetail, RadarNotifyConfig, RadarStatus,
-    RadarTemplate, RadarUpdateResult, RejectReason, RejectedEvaluation, Ruleset, RulesetBody,
+    field_def_store_to_notify, field_def_to_store, filter_op_to_store, match_policy_from_store,
+    match_policy_to_store, notify_from_store, notify_to_store, radar_version_from_store,
+    ruleset_record_to_dto, validate_store_match_policy, AiDailyUsageRow, AiProviderId,
+    AiUsageStats, BlocklistEntry, BlocklistKind, BlocklistRemoveResult, Channel, ChannelConfig,
+    ChannelRemoveResult, ChromeConnectOptions, ChromeConnectResult, Contact, ContactBlockResult,
+    ContactDetail, CoreEvent, CrawlRun, CreateRadarDraftInput, CreateRadarVariantInput,
+    DataBackupResult, DataDeleteAllResult, DataPurgeResult, DecidedBy, DiagnosticBundleResult,
+    ExportFormat, FacebookSessionState, FeedbackLabel, FirstNewsStatus, FunnelStats, HardFilter,
+    HealthStatus, LeadCrmPatch, LeadDetail, LeadEvent, LeadExportInput, LeadExportResult,
+    LeadFeedbackInput, LeadFeedbackResult, LeadFilterQuery, LeadListResponse, LeadStatus,
+    LicenseStatus, ModelTierMap, Post, PrefilterHintDto, PreviewRunState, PreviewStartInput,
+    ProbeResult, Radar, RadarCompareInput, RadarComparison, RadarComparisonSummary, RadarDetail,
+    RadarNotifyConfig, RadarNotifyPatch, RadarStatus, RadarTemplate, RadarUpdateResult,
+    RadarVariantDraft, RejectReason, RejectedEvaluation, Ruleset, RulesetBody,
     RulesetCompileResult, Settings, SettingsPatch, Source, SourceCrawlNowResult, SourceState,
     SuggestFieldsInput, SuggestFieldsResult, TelegramSetupStatus, TelegramTestResult,
     UpdateRadarInput, WantIntent, WhenMissing,
@@ -65,8 +67,9 @@ use crate::ipc_server::{push_crawl_request, spawn_ipc_server};
 use crate::license::{enforce_plan_limits_on_store, LicenseVerifier, LICENSE_TOKEN_SETTING_KEY};
 use crate::pipeline::{lead_detail_to_lead_dto, load_lead_dto, run_silent_backfill_24h};
 use crate::preview_rules::{
-    cancel_radar_preview, get_radar_preview, handle_negative_feedback_on_rule_eval,
-    run_compile_ruleset_for_version, save_user_ruleset, start_radar_preview,
+    cancel_radar_preview, get_radar_comparison, get_radar_preview,
+    handle_negative_feedback_on_rule_eval, list_radar_comparisons, run_compile_ruleset_for_version,
+    run_radar_comparison, save_user_ruleset, start_radar_preview,
 };
 use crate::state::{
     AiRuntimeHealth, CoreConfig, CoreRuntime, IncidentTracker, InflightAiGuard, IpcHub,
@@ -83,6 +86,8 @@ mod builder;
 mod channels;
 mod chrome;
 mod contacts;
+mod goal;
+mod journey;
 mod leads;
 mod posts;
 mod radars;
@@ -94,12 +99,19 @@ mod system;
 pub(crate) use agent::{handle_agent_request, issue_agent_token};
 pub use builder::*;
 use contacts::*;
+use goal::interpret_goal;
 use posts::*;
 use settings::*;
 
 /// Default Chrome Web Store / deterministic MV3 `manifest.json` `"key"` extension ID
 /// (`SHA256(SPKI_DER)[0..16]` mapped `0..15 -> 'a'..'p'`).
 pub const DEFAULT_CHROME_EXTENSION_ID: &str = "hkmjpcenjjebhpjicnbpmogidfcbmbjn";
+
+/// Every extension ID the native host must accept without the customer typing anything: the
+/// ID derived from `apps/extension/public/manifest.json` `"key"` (internal/unpacked builds) plus
+/// the Chrome Web Store item ID once the project owner has published one. Kept in sync with
+/// `docs/delivery/distribution.json` by `scripts/verify-extension-identity.mjs`.
+pub const KNOWN_CHROME_EXTENSION_IDS: &[&str] = &[DEFAULT_CHROME_EXTENSION_ID];
 
 const LEGACY_PLACEHOLDER_EXTENSION_ID: &str = "dealsonarchromeextensionid000001";
 

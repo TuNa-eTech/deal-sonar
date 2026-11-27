@@ -57,10 +57,40 @@ export interface HardFilter {
   when_missing: "pass" | "fail";
 }
 
+/**
+ * Điều kiện nhóm: `all` (tất cả), `any` (ít nhất một), `not` (ngoại lệ) hoặc một điều kiện đơn.
+ * `when_missing` của từng điều kiện đơn quyết định kết quả của nó khi bài thiếu trường,
+ * trước khi `not` đảo ngược.
+ */
+export type FilterExpr =
+  | HardFilter
+  | { all: FilterExpr[] }
+  | { any: FilterExpr[] }
+  | { not: FilterExpr };
+
+/** Giải thích vì sao bộ lọc chọn hoặc loại một bài (khớp với quyết định thật của backend). */
+export interface FilterTrace {
+  kind: "all" | "any" | "not" | "filter";
+  /** Với điều kiện đơn: điều kiện đúng với bài. Với `not`: bài không vướng ngoại lệ. */
+  passed: boolean;
+  children?: FilterTrace[];
+  field?: string;
+  op?: FilterOperator;
+  value?: unknown;
+  when_missing?: "pass" | "fail";
+  /** Bài không có giá trị cho `field`, nên `when_missing` quyết định kết quả. */
+  missing?: boolean;
+}
+
 export interface MatchPolicy {
   want_intent: WantIntent;
   exclude_roles: AuthorRole[];
+  /** Danh sách điều kiện luôn ghép bằng AND. */
   hard_filters: HardFilter[];
+  /** Interpretation choices the user can review and edit. */
+  assumptions?: string[];
+  /** Biểu thức nhóm tùy chọn, ghép AND với `hard_filters`. Bản cũ không có khóa này. */
+  condition?: FilterExpr | null;
 }
 
 export interface QuietHours {
@@ -86,6 +116,8 @@ export interface Radar {
   current_version: number;
   source_ids: string[];
   notify: RadarNotifyConfig;
+  /** Radar this one was copied from. Provenance only; the two radars are independent. */
+  variant_of?: string | null;
   created_at: number;
   updated_at: number;
   // Operational summary fields for Radar list & Inbox
@@ -392,6 +424,15 @@ export type FacebookSessionState = "ok" | "logged_out" | "checkpoint" | "rate_li
 export type AiProviderId = "claude_cli" | "codex_cli" | "agy_cli";
 export type AiHealthState = "ok" | "not_configured" | "error" | "rate_limited" | "daily_cap_reached";
 
+export interface ExtensionCompat {
+  state: "extension_outdated" | "protocol_mismatch";
+  extension_version: string | null;
+  desktop_version: string;
+  min_extension_version: string;
+  message: string;
+  action: string;
+}
+
 export interface HealthStatus {
   automatic_scanning?: boolean | null;
   next_crawl_at?: number | null;
@@ -399,6 +440,8 @@ export interface HealthStatus {
   runtime_checked_at?: number | null;
   extension_connected: boolean;
   extension_version: string | null;
+  /** Present only when Chrome and Desktop were updated out of step (guidance is Vietnamese). */
+  extension_compat?: ExtensionCompat | null;
   facebook_session: FacebookSessionState;
   crawl_paused: boolean;
   crawl_pause_reason: "manual" | "checkpoint_awaiting_resume" | "rate_limited" | "logged_out" | null;
@@ -414,6 +457,79 @@ export interface HealthStatus {
   outbox_pending: number;
   outbox_failed: number;
   flood_radars: Array<{ radar_id: string; radar_name: string; leads_last_hour: number }>;
+  checked_at: number;
+}
+
+export type AccountIncidentKind = "checkpoint" | "logged_out" | "rate_limited" | "unknown";
+
+/** A Facebook session problem; scanning was paused when it was recorded. */
+export interface AccountIncident {
+  id: string;
+  kind: AccountIncidentKind;
+  occurred_at: number;
+  detail: string;
+  page_loads_24h: number;
+  page_loads_1h: number;
+  scanning_paused: boolean;
+  resolved_at: number | null;
+}
+
+export interface CrawlDayActivity {
+  date: string;
+  runs: number;
+  page_loads: number;
+  blocked_runs: number;
+}
+
+/** Session incidents and scan activity for the long account-safety observation. */
+export interface AccountSafetyReport {
+  generated_at: number;
+  app_version: string;
+  window_days: number;
+  crawl_policy: {
+    group_interval_minutes: number;
+    priority_interval_minutes: number;
+    hourly_page_load_budget: number;
+    daily_page_load_budget: number;
+    active_hours: { from: string; to: string };
+    max_scroll_steps: number;
+    max_posts_per_visit: number;
+    only_when_idle: boolean;
+  };
+  followed_groups: number;
+  active_days: CrawlDayActivity[];
+  incidents: AccountIncident[];
+}
+
+/** Facts about the path from first launch to the first real lead. */
+export interface FirstNewsStatus {
+  /** First app launch, not Radar creation. */
+  installed_at: number;
+  /** The database already had data, so `installed_at` is the earliest timestamp found. */
+  installed_at_estimated: boolean;
+  /** First time any Radar was switched on. */
+  first_radar_activated_at: number | null;
+  first_followed_source_at: number | null;
+  first_radar_created_at: number | null;
+  first_post_captured_at: number | null;
+  first_lead_at: number | null;
+  first_delivery_at: number | null;
+  active_radars: number;
+  active_sources: number;
+  posts_captured: number;
+  last_post_captured_at: number | null;
+  evaluated_match: number;
+  evaluated_no_match: number;
+  waiting_ai: number;
+  last_evaluated_at: number | null;
+  leads_total: number;
+  last_lead_at: number | null;
+  leads_notified: number;
+  leads_flagged_wrong: number;
+  delivery_pending: number;
+  delivery_failed: number;
+  last_delivery_at: number | null;
+  last_delivery_error: string | null;
   checked_at: number;
 }
 
@@ -632,6 +748,18 @@ export interface CreateRadarDraftInput {
   notify?: Partial<RadarNotifyConfig>;
 }
 
+/** Editable copy of an existing radar, proposed before it is saved as a variant. */
+export interface RadarVariantDraft {
+  source_radar_id: string;
+  source_radar_name: string;
+  input: CreateRadarDraftInput;
+}
+
+export interface CreateRadarVariantInput {
+  source_radar_id: string;
+  input: CreateRadarDraftInput;
+}
+
 export interface UpdateRadarInput {
   id: string;
   name?: string;
@@ -665,6 +793,12 @@ export interface SuggestFieldsResult {
   hard_filters: HardFilter[];
   clarifying_questions: string[];
   suggested_source_ids?: string[];
+  /** Authors the interpretation excludes; shown so the user can change it. */
+  exclude_roles?: AuthorRole[];
+  /** Choices the brief did not state, for the user to review and edit. */
+  assumptions?: string[];
+  /** The brief did not say which side to follow; `want_intent` stays "any". */
+  side_ambiguous?: boolean;
   prefilter_hint: {
     any: string[];
     none: string[];
@@ -688,6 +822,8 @@ export interface PreviewItem {
   post_text: string;
   post_created_at: number | null;
   feedback_label: FeedbackLabel | null;
+  /** Có khi Radar có điều kiện lọc. */
+  filter_trace?: FilterTrace | null;
 }
 
 export interface PreviewWarning {
@@ -798,4 +934,123 @@ export interface TauriEventMap {
   "health:changed": HealthStatus;
   "crawl:finished": CrawlRun;
   "job:failed": JobFailedEvent;
+}
+
+// --- Radar variant comparison ---
+
+/** One side of a comparison: a saved radar version (`version` omitted = current version). */
+export interface RadarCompareSide {
+  radar_id: string;
+  version?: number | null;
+}
+
+/** Two definitions plus one shared set of posts: explicit `post_ids` or the recent posts of `source_ids`. */
+export interface RadarCompareInput {
+  left: RadarCompareSide;
+  right: RadarCompareSide;
+  source_ids?: string[] | null;
+  post_ids?: string[] | null;
+  max_posts?: number | null;
+}
+
+/** The exact definition a side was evaluated with. */
+export interface CompareDefinition {
+  radar_id: string;
+  radar_name: string;
+  version_id: string;
+  version: number;
+  description: string;
+  user_profession: string | null;
+  fields: FieldDef[];
+  match_policy: MatchPolicy;
+}
+
+export type CompareChange =
+  | "newly_matched"
+  | "no_longer_matched"
+  | "fields_changed"
+  | "still_matched"
+  | "still_unmatched"
+  | "not_compared";
+
+export interface CompareVerdict {
+  state: string;
+  verdict: "match" | "no_match" | null;
+  score: number | null;
+  decided_by: string | null;
+  reject_reason: string | null;
+  reason: string | null;
+  summary: string | null;
+  intent: string | null;
+  author_role: string | null;
+  fields: Record<string, ExtractedField>;
+}
+
+export interface CompareFieldChange {
+  key: string;
+  label: string;
+  before: ExtractedField | null;
+  after: ExtractedField | null;
+}
+
+export interface CompareItem {
+  post_id: string;
+  change: CompareChange;
+  /** Why the post moved (or stayed), from both sides' own reasons. */
+  reason: string;
+  left: CompareVerdict;
+  right: CompareVerdict;
+  field_changes: CompareFieldChange[];
+  source_name: string;
+  author_name: string;
+  permalink: string;
+  post_text: string | null;
+  post_created_at: number | null;
+}
+
+export interface CompareCounts {
+  total: number;
+  newly_matched: number;
+  no_longer_matched: number;
+  fields_changed: number;
+  still_matched: number;
+  still_unmatched: number;
+  not_compared: number;
+  left_matches: number;
+  right_matches: number;
+}
+
+export interface DefinitionDiff {
+  same_version: boolean;
+  description_changed: boolean;
+  user_profession_changed: boolean;
+  want_intent_changed: boolean;
+  exclude_roles_changed: boolean;
+  hard_filters_changed: boolean;
+  fields_only_left: string[];
+  fields_only_right: string[];
+  fields_changed: string[];
+}
+
+export interface RadarComparison {
+  id: string;
+  created_at: number;
+  left: CompareDefinition;
+  right: CompareDefinition;
+  source_ids: string[];
+  post_ids: string[];
+  skipped_post_ids: string[];
+  counts: CompareCounts;
+  definition_diff: DefinitionDiff;
+  items: CompareItem[];
+}
+
+export interface RadarComparisonSummary {
+  id: string;
+  created_at: number;
+  left_radar_name: string;
+  left_version: number;
+  right_radar_name: string;
+  right_version: number;
+  post_count: number;
 }

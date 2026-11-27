@@ -160,6 +160,10 @@ pub struct MatchPolicy {
     pub exclude_roles: Vec<String>,
     #[serde(default)]
     pub hard_filters: Vec<HardFilter>,
+    /// Optional `all`/`any`/`not` expression (JSON) ANDed with `hard_filters`. Kept as raw JSON so a
+    /// malformed value can never make the radar unreadable; `dealsonar-rules` parses and validates it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<serde_json::Value>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, serde_json::Value>,
 }
@@ -170,6 +174,7 @@ impl Default for MatchPolicy {
             want_intent: default_want_intent(),
             exclude_roles: vec!["peer".to_string()],
             hard_filters: Vec::new(),
+            condition: None,
             extra: BTreeMap::new(),
         }
     }

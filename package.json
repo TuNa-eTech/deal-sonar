@@ -13,12 +13,25 @@
     "ui:typecheck": "pnpm --filter @dealsonar/desktop-ui typecheck",
     "ui:test": "pnpm --filter @dealsonar/desktop-ui test",
     "protocol:verify": "node scripts/verify-protocol-fixtures.mjs",
+    "dist:verify": "node scripts/extension-identity.mjs && node --test scripts/*.test.mjs && node scripts/distribution-evidence.mjs",
     "rust:check": "cargo check --workspace",
     "rust:test": "cargo test --workspace",
     "rust:lint": "cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check",
     "test": "pnpm ext:test && pnpm ui:test && pnpm protocol:verify && cargo test --workspace",
     "lint": "pnpm ext:typecheck && pnpm ui:typecheck && pnpm rust:lint",
+    "soak:report": "cargo run -p dealsonar-store --bin dealsonar-soak-report --",
     "eval:bds": "cargo run -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/golden/bds.jsonl --radar docs/eval/golden/bds.radar.json",
-    "desktop": "pnpm ui:build && pnpm ext:build && cargo build -p dealsonar-native-host && cargo run -p dealsonar-desktop"
+    "eval:holdout:verify": "node scripts/verify-holdout.mjs",
+    "eval:study": "node scripts/eval-study.mjs",
+    "eval:holdout": "pnpm eval:holdout:verify && cargo run -q -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/holdout/bds-tim-nguoi-thue.jsonl --radar docs/eval/holdout/bds-tim-nguoi-thue.radar.json && cargo run -q -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/holdout/bds-tim-chu-nha.jsonl --radar docs/eval/holdout/bds-tim-chu-nha.radar.json && cargo run -q -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/holdout/gia-su-phu-huynh.jsonl --radar docs/eval/holdout/gia-su-phu-huynh.radar.json",
+    "desktop": "pnpm ui:build && pnpm ext:build && cargo build -p dealsonar-native-host && cargo run -p dealsonar-desktop",
+    "study:h5": "node scripts/account-safety-report.mjs",
+    "study:h5:test": "node --test scripts/account-safety-report.test.mjs",
+    "pilot:gate": "node scripts/pilot-report.mjs gate",
+    "pilot:report": "node scripts/pilot-report.mjs report",
+    "pilot:decision": "node scripts/pilot-report.mjs decision",
+    "pilot:test": "node --test scripts/pilot-report.test.mjs",
+    "study:report": "node scripts/study-report.mjs",
+    "study:test": "node --test scripts/study-report.test.mjs"
   }
 }

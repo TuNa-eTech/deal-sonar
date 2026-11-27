@@ -1,0 +1,2235 @@
+{
+  "schema_version": 1,
+  "generated_at_unix_ms": 1795755436674,
+  "provider": "claude_cli",
+  "tier": "fast",
+  "model_override": "sonnet",
+  "cli_version": "2.1.332 (Claude Code)",
+  "batch_size": 20,
+  "dataset": "/Users/anhtu/orca/workspaces/DealSonar/radar-factory-10/docs/eval/holdout/bds-tim-nguoi-thue.jsonl",
+  "dataset_fingerprint_fnv1a64": "e3c24ce13c7abda4",
+  "dataset_posts": 55,
+  "radar": "/Users/anhtu/orca/workspaces/DealSonar/radar-factory-10/docs/eval/holdout/bds-tim-nguoi-thue.radar.json",
+  "radar_version_id": "01HOLDOUTBDSTENANTV1",
+  "repeat": 3,
+  "runs": [
+    {
+      "provider": "claude_cli",
+      "radar_version_id": "01HOLDOUTBDSTENANTV1",
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "batch_size": 20,
+      "total_posts": 55,
+      "evaluated_ok": 55,
+      "ai_failed_count": 0,
+      "match_tp": 13,
+      "match_fp": 0,
+      "match_fn": 1,
+      "match_tn": 41,
+      "match_precision": 1.0,
+      "match_recall": 0.9285714285714286,
+      "match_f1": 0.962962962962963,
+      "peer_precision": 0.5454545454545454,
+      "peer_recall": 1.0,
+      "peer_tp": 12,
+      "peer_fp": 10,
+      "peer_fn": 0,
+      "field_stats": {
+        "bedrooms": {
+          "field_key": "bedrooms",
+          "required": false,
+          "total_labeled": 14,
+          "exact_matches": 13,
+          "accuracy": 0.9285714285714286
+        },
+        "location": {
+          "field_key": "location",
+          "required": true,
+          "total_labeled": 14,
+          "exact_matches": 6,
+          "accuracy": 0.42857142857142855
+        },
+        "phone": {
+          "field_key": "phone",
+          "required": false,
+          "total_labeled": 14,
+          "exact_matches": 14,
+          "accuracy": 1.0
+        },
+        "price": {
+          "field_key": "price",
+          "required": false,
+          "total_labeled": 14,
+          "exact_matches": 14,
+          "accuracy": 1.0
+        },
+        "property_type": {
+          "field_key": "property_type",
+          "required": true,
+          "total_labeled": 14,
+          "exact_matches": 14,
+          "accuracy": 1.0
+        }
+      },
+      "total_non_null_extractions": 197,
+      "hallucinated_raw_count": 0,
+      "hallucinated_raw_rate": 0.0,
+      "total_calls": 3,
+      "avg_input_tokens_per_post": 499.1818181818182,
+      "avg_output_tokens_per_post": 422.5272727272727,
+      "avg_duration_ms_per_post": 2746.327272727273,
+      "total_cost_usd": 0.3298116,
+      "total_input_tokens": 27455,
+      "total_output_tokens": 23239,
+      "failed_calls": 0,
+      "bisection_count": 0,
+      "total_duration_ms": 151048,
+      "decisions": [
+        {
+          "post_id": "hb-001",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-002",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-003",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-004",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-005",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-006",
+          "expected_match": true,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-007",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-008",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-009",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-010",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-011",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-012",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-013",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-014",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-015",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-016",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-017",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-018",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-019",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-020",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-021",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-022",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-023",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-024",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-025",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-026",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-027",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-028",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-029",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-030",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-031",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-032",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-033",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-034",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-035",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-036",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-037",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-038",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-039",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-040",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-041",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-042",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-043",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-044",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-045",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-046",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-047",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-048",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-049",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-050",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-051",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": null,
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-052",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-053",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-054",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-055",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        }
+      ],
+      "failures": [
+        {
+          "post_id": "hb-002",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Bình Thạnh",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Bình Thạnh",
+            "province": "TP.HCM",
+            "raw": "q binh thanh",
+            "ward": null
+          },
+          "text": "can thue phong tro khep kin q binh thanh gan hutech gia 3tr-4tr5 sdt o909 000 102",
+          "ai_reason": "Cần thuê phòng trọ ở Bình Thạnh gần Hutech, có ngân sách; giống người thuê thật."
+        },
+        {
+          "post_id": "hb-003",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Quận 7",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Quận 7",
+            "province": "TP.HCM",
+            "raw": "Quận 7",
+            "ward": null
+          },
+          "text": "Cần thuê chung cư 2pn Quận 7 13tr 0909000103",
+          "ai_reason": "Nhu cầu thuê chung cư tại Quận 7 rõ ràng; bài ngắn, không có dấu hiệu môi giới."
+        },
+        {
+          "post_id": "hb-006",
+          "kind": "false_negative",
+          "expected": true,
+          "actual": false,
+          "text": "Cần thuê căn hộ 1pn gần trường ĐH, giá tầm 8tr, nhắn mình qua Zalo 0909.000.106",
+          "ai_reason": "Có nhu cầu thuê thật nhưng không nêu thành phố, trường hay quận; không xác định được có thuộc Hà Nội/TP.HCM."
+        },
+        {
+          "post_id": "hb-007",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Tân Bình",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Tân Bình",
+            "province": "TP.HCM",
+            "raw": "khu Tân Bình",
+            "ward": null
+          },
+          "text": "🙏🙏 Vợ chồng mới cưới e cần thuê chung cư 1pn khu Tân Bình tc 8 củ/tháng ạ, ai có nhắn e zalo 0909.000.107 🏠💕",
+          "ai_reason": "Vợ chồng mới cưới tự tìm nhà để ở tại Tân Bình, là người thuê thật."
+        },
+        {
+          "post_id": "hb-008",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Quận 7",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Quận 7",
+            "province": "TP.HCM",
+            "raw": "District 7 HCMC",
+            "ward": null
+          },
+          "text": "Hi all, I'm looking to rent a studio in District 7 HCMC, budget 10-12tr per month, pls PM or call 0909.000.108",
+          "ai_reason": "Người đăng tự tìm thuê studio ở Quận 7, có ngân sách và số liên hệ."
+        },
+        {
+          "post_id": "hb-009",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": null,
+          "actual": {
+            "district": "Hai Bà Trưng",
+            "province": "Hà Nội",
+            "raw": "gần ĐH Bách Khoa",
+            "ward": null
+          },
+          "text": "Cần thuê phòng trọ gần ĐH Bách Khoa, sinh viên nữ, giá 2tr5-3tr, ưu tiên khép kín. Zalo 0909.000.109",
+          "ai_reason": "Sinh viên cần phòng trọ; địa điểm suy ra là Hà Nội từ ĐH Bách Khoa và nhóm Hà Nội."
+        },
+        {
+          "post_id": "hb-010",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "TP.HCM",
+            "raw": "khu Gò Vấp",
+            "ward": null
+          },
+          "text": "Gia đình 4 người cần thuê nhà nguyên căn 2 tầng khu Gò Vấp, 4 phòng ngủ, 14-16tr/tháng, thuê dài hạn 2 năm. 0909.000.110",
+          "ai_reason": "Gia đình cần thuê nhà ở dài hạn tại Gò Vấp, là người thuê thật."
+        },
+        {
+          "post_id": "hb-012",
+          "kind": "field_mismatch",
+          "field": "bedrooms",
+          "expected": null,
+          "actual": 1,
+          "text": "Mình là nhân viên văn phòng, cần thuê studio hoặc căn 1pn khu Hai Bà Trưng, tầm 7-9tr/th, có thang máy. Zalo 0909.000.112",
+          "ai_reason": "Người đi làm tự tìm chỗ ở tại Hai Bà Trưng, chấp nhận studio hoặc 1PN."
+        },
+        {
+          "post_id": "hb-013",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Thủ Đức",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Thủ Đức",
+            "province": "TP.HCM",
+            "raw": "Thủ Đức",
+            "ward": null
+          },
+          "text": "Em cần thuê căn hộ 3pn Thủ Đức cho gia đình có con nhỏ, 15-18tr, gần trường học. 0909.000.113",
+          "ai_reason": "Gia đình có con nhỏ cần thuê căn hộ để ở tại Thủ Đức."
+        },
+        {
+          "post_id": "hb-014",
+          "kind": "peer_false_alarm",
+          "expected": "end_user",
+          "actual": "peer",
+          "text": "Chính chủ cho thuê căn hộ 2pn 70m2 full nội thất khu Cầu Giấy, 13tr/tháng, hợp đồng 1 năm, miễn trung gian. LH 0909.000.201",
+          "ai_reason": "Chủ nhà đăng tin cho thuê (\"Chính chủ cho thuê\"), thuộc bên cung, bị loại."
+        },
+        {
+          "post_id": "hb-015",
+          "kind": "peer_false_alarm",
+          "expected": "end_user",
+          "actual": "peer",
+          "text": "Chủ nhà cho thuê phòng trọ khép kín 25m2 ngõ 12 Hà Đông 2tr8/tháng, điện nước giá nhà nước, không chung chủ. 0909.000.202",
+          "ai_reason": "Tin cho thuê của chủ nhà (\"Chủ nhà cho thuê\"), không phải người cần thuê."
+        },
+        {
+          "post_id": "hb-016",
+          "kind": "peer_false_alarm",
+          "expected": "end_user",
+          "actual": "peer",
+          "text": "chinh chu cho thue nha nguyen can 1 tret 2 lau q Binh Thanh 4pn gia 20tr, de xe oto thoai mai, lh 0909.000.203",
+          "ai_reason": "Chủ nhà đăng cho thuê nhà nguyên căn (\"chinh chu cho thue\"), bên cung."
+        },
+        {
+          "post_id": "hb-017",
+          "kind": "peer_false_alarm",
+          "expected": "end_user",
+          "actual": "peer",
+          "text": "Nhà mình còn trống 1 căn studio khu Thanh Xuân, nội thất đầy đủ, ai cần thì inbox.",
+          "ai_reason": "Người có phòng trống mời thuê (\"còn trống\", \"ai cần thì inbox\"), không phải nhu cầu thuê."
+        },
+        {
+          "post_id": "hb-018",
+          "kind": "peer_false_alarm",
+          "expected": "end_user",
+          "actual": "peer",
+          "text": "Cho thuê căn hộ 3pn 95m2 Thủ Đức view sông, giá thương lượng cho người thuê lâu dài. Chủ nhà 0909.000.205",
+          "ai_reason": "Chủ nhà đăng tin cho thuê căn hộ, thuộc bên cung, bị loại."
+        },
+        {
+          "post_id": "hb-019",
+          "kind": "peer_false_alarm",
+          "expected": "end_user",
+          "actual": "peer",
+          "text": "🏠 Chính chủ cho thuê căn hộ 1pn Tân Bình, có ban công, tc 7tr5/th ✅ nội thất cơ bản ✅ gần sân bay. Zalo 0909.000.206",
+          "ai_reason": "Tin cho thuê của chính chủ, dù có chữ \"tc\" nhưng là giá chào thuê."
+        },
+        {
+          "post_id": "hb-020",
+          "kind": "peer_false_alarm",
+          "expected": "end_user",
+          "actual": "peer",
+          "text": "Owner renting out a 2BR apartment in District 7, 14tr/month, furnished, available now. Call 0909.000.207",
+          "ai_reason": "Chủ nhà cho thuê (\"Owner renting out\"), không phải người cần thuê."
+        },
+        {
+          "post_id": "hb-038",
+          "kind": "peer_false_alarm",
+          "expected": "unknown",
+          "actual": "peer",
+          "text": "Công ty quản lý vận hành căn hộ dịch vụ nhận ký gửi và quản lý căn hộ cho chủ nhà tại Hà Nội, cam kết lấp đầy 95%, hợp tác lâu dài. Liên hệ 0909.000.601",
+          "ai_reason": "Doanh nghiệp cùng ngành chào dịch vụ cho chủ nhà, không có nhu cầu thuê ở."
+        },
+        {
+          "post_id": "hb-039",
+          "kind": "peer_false_alarm",
+          "expected": "unknown",
+          "actual": "peer",
+          "text": "Nhận quản lý toàn diện nhà cho thuê (thu tiền, sửa chữa, tìm khách) tại TP.HCM, phí 8% doanh thu, ai có nhà trống liên hệ 0909.000.602",
+          "ai_reason": "Chào dịch vụ quản lý cho chủ có nhà trống, không phải người cần thuê."
+        },
+        {
+          "post_id": "hb-040",
+          "kind": "peer_false_alarm",
+          "expected": "unknown",
+          "actual": "peer",
+          "text": "Dịch vụ dọn dẹp, vệ sinh căn hộ cho thuê giữa hai khách thuê, giá 150k/giờ khu Cầu Giấy, Thanh Xuân 0909.000.603",
+          "ai_reason": "Thợ/dịch vụ vệ sinh chào hàng; giá là phí dịch vụ, không phải ngân sách thuê."
+        },
+        {
+          "post_id": "hb-046",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "Hồ Chí Minh",
+            "raw": "Gò Vấp",
+            "ward": null
+          },
+          "text": "Cần tìm chủ nhà cho thuê phòng trọ khu Gò Vấp, giá khoảng 2tr5-3tr, ưu tiên không chung chủ. Zalo 0909.000.803",
+          "ai_reason": "Người thuê tìm chủ nhà, nêu ngân sách và ưu tiên cá nhân; không có dấu hiệu môi giới."
+        }
+      ]
+    },
+    {
+      "provider": "claude_cli",
+      "radar_version_id": "01HOLDOUTBDSTENANTV1",
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "batch_size": 20,
+      "total_posts": 55,
+      "evaluated_ok": 55,
+      "ai_failed_count": 0,
+      "match_tp": 13,
+      "match_fp": 0,
+      "match_fn": 1,
+      "match_tn": 41,
+      "match_precision": 1.0,
+      "match_recall": 0.9285714285714286,
+      "match_f1": 0.962962962962963,
+      "peer_precision": 0.8571428571428571,
+      "peer_recall": 1.0,
+      "peer_tp": 12,
+      "peer_fp": 2,
+      "peer_fn": 0,
+      "field_stats": {
+        "bedrooms": {
+          "field_key": "bedrooms",
+          "required": false,
+          "total_labeled": 14,
+          "exact_matches": 13,
+          "accuracy": 0.9285714285714286
+        },
+        "location": {
+          "field_key": "location",
+          "required": true,
+          "total_labeled": 14,
+          "exact_matches": 7,
+          "accuracy": 0.5
+        },
+        "phone": {
+          "field_key": "phone",
+          "required": false,
+          "total_labeled": 14,
+          "exact_matches": 14,
+          "accuracy": 1.0
+        },
+        "price": {
+          "field_key": "price",
+          "required": false,
+          "total_labeled": 14,
+          "exact_matches": 14,
+          "accuracy": 1.0
+        },
+        "property_type": {
+          "field_key": "property_type",
+          "required": true,
+          "total_labeled": 14,
+          "exact_matches": 14,
+          "accuracy": 1.0
+        }
+      },
+      "total_non_null_extractions": 135,
+      "hallucinated_raw_count": 0,
+      "hallucinated_raw_rate": 0.0,
+      "total_calls": 3,
+      "avg_input_tokens_per_post": 501.4727272727273,
+      "avg_output_tokens_per_post": 378.3090909090909,
+      "avg_duration_ms_per_post": 2380.5636363636368,
+      "total_cost_usd": 0.2998024,
+      "total_input_tokens": 27581,
+      "total_output_tokens": 20807,
+      "failed_calls": 0,
+      "bisection_count": 0,
+      "total_duration_ms": 130931,
+      "decisions": [
+        {
+          "post_id": "hb-001",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-002",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-003",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-004",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-005",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-006",
+          "expected_match": true,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-007",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-008",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-009",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-010",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-011",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-012",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-013",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-014",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-015",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-016",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-017",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-018",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-019",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-020",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-021",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-022",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-023",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-024",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-025",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-026",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-027",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-028",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-029",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-030",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-031",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-032",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-033",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-034",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-035",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-036",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-037",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-038",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-039",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-040",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-041",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-042",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-043",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-044",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-045",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-046",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-047",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-048",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-049",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-050",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-051",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": null,
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-052",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-053",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-054",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-055",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        }
+      ],
+      "failures": [
+        {
+          "post_id": "hb-002",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Bình Thạnh",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Bình Thạnh",
+            "province": "TP.HCM",
+            "raw": "q binh thanh",
+            "ward": null
+          },
+          "text": "can thue phong tro khep kin q binh thanh gan hutech gia 3tr-4tr5 sdt o909 000 102",
+          "ai_reason": "Cần thuê phòng trọ để ở tại Bình Thạnh, có ngân sách; không có dấu hiệu môi giới. SĐT viết chữ o thay số 0."
+        },
+        {
+          "post_id": "hb-003",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Quận 7",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Quận 7",
+            "province": "TP.HCM",
+            "raw": "Quận 7",
+            "ward": null
+          },
+          "text": "Cần thuê chung cư 2pn Quận 7 13tr 0909000103",
+          "ai_reason": "Nhu cầu thuê chung cư rõ ràng tại Quận 7; không có dấu hiệu môi giới."
+        },
+        {
+          "post_id": "hb-006",
+          "kind": "false_negative",
+          "expected": true,
+          "actual": false,
+          "text": "Cần thuê căn hộ 1pn gần trường ĐH, giá tầm 8tr, nhắn mình qua Zalo 0909.000.106",
+          "ai_reason": "Có nhu cầu thuê thật nhưng không nêu thành phố hay trường nào, tên nhóm cũng không cho biết; chưa xác nhận được thuộc Hà Nội/TP.HCM."
+        },
+        {
+          "post_id": "hb-007",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Tân Bình",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Tân Bình",
+            "province": "TP.HCM",
+            "raw": "khu Tân Bình",
+            "ward": null
+          },
+          "text": "🙏🙏 Vợ chồng mới cưới e cần thuê chung cư 1pn khu Tân Bình tc 8 củ/tháng ạ, ai có nhắn e zalo 0909.000.107 🏠💕",
+          "ai_reason": "Vợ chồng tự tìm nhà để ở; emoji nhiều nhưng không phải spam hay môi giới."
+        },
+        {
+          "post_id": "hb-008",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Quận 7",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Quận 7",
+            "province": "TP.HCM",
+            "raw": "District 7 HCMC",
+            "ward": null
+          },
+          "text": "Hi all, I'm looking to rent a studio in District 7 HCMC, budget 10-12tr per month, pls PM or call 0909.000.108",
+          "ai_reason": "Người đăng tự tìm thuê studio ở Quận 7, có ngân sách; không có dấu hiệu môi giới."
+        },
+        {
+          "post_id": "hb-009",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": null,
+          "actual": {
+            "district": "Hai Bà Trưng",
+            "province": "Hà Nội",
+            "raw": "gần ĐH Bách Khoa",
+            "ward": null
+          },
+          "text": "Cần thuê phòng trọ gần ĐH Bách Khoa, sinh viên nữ, giá 2tr5-3tr, ưu tiên khép kín. Zalo 0909.000.109",
+          "ai_reason": "Sinh viên tự tìm phòng để ở; nhóm Hà Nội nên suy ra ĐH Bách Khoa Hà Nội."
+        },
+        {
+          "post_id": "hb-010",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "TP.HCM",
+            "raw": "khu Gò Vấp",
+            "ward": null
+          },
+          "text": "Gia đình 4 người cần thuê nhà nguyên căn 2 tầng khu Gò Vấp, 4 phòng ngủ, 14-16tr/tháng, thuê dài hạn 2 năm. 0909.000.110",
+          "ai_reason": "Gia đình tự tìm nhà thuê dài hạn để ở; không có dấu hiệu môi giới."
+        },
+        {
+          "post_id": "hb-012",
+          "kind": "field_mismatch",
+          "field": "bedrooms",
+          "expected": null,
+          "actual": 1,
+          "text": "Mình là nhân viên văn phòng, cần thuê studio hoặc căn 1pn khu Hai Bà Trưng, tầm 7-9tr/th, có thang máy. Zalo 0909.000.112",
+          "ai_reason": "Nhân viên văn phòng tự tìm chỗ ở; không có dấu hiệu môi giới."
+        },
+        {
+          "post_id": "hb-013",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Thủ Đức",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Thủ Đức",
+            "province": "TP.HCM",
+            "raw": "Thủ Đức",
+            "ward": null
+          },
+          "text": "Em cần thuê căn hộ 3pn Thủ Đức cho gia đình có con nhỏ, 15-18tr, gần trường học. 0909.000.113",
+          "ai_reason": "Gia đình tự tìm căn hộ để ở, gần trường học; không có dấu hiệu môi giới."
+        },
+        {
+          "post_id": "hb-038",
+          "kind": "peer_false_alarm",
+          "expected": "unknown",
+          "actual": "peer",
+          "text": "Công ty quản lý vận hành căn hộ dịch vụ nhận ký gửi và quản lý căn hộ cho chủ nhà tại Hà Nội, cam kết lấp đầy 95%, hợp tác lâu dài. Liên hệ 0909.000.601",
+          "ai_reason": "Dịch vụ vận hành, nhận ký gửi hướng tới chủ nhà; không có nhu cầu thuê."
+        },
+        {
+          "post_id": "hb-039",
+          "kind": "peer_false_alarm",
+          "expected": "unknown",
+          "actual": "peer",
+          "text": "Nhận quản lý toàn diện nhà cho thuê (thu tiền, sửa chữa, tìm khách) tại TP.HCM, phí 8% doanh thu, ai có nhà trống liên hệ 0909.000.602",
+          "ai_reason": "Dịch vụ quản lý nhà cho thuê, mời chủ nhà trống liên hệ; không có nhu cầu thuê."
+        }
+      ]
+    },
+    {
+      "provider": "claude_cli",
+      "radar_version_id": "01HOLDOUTBDSTENANTV1",
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "batch_size": 20,
+      "total_posts": 55,
+      "evaluated_ok": 55,
+      "ai_failed_count": 0,
+      "match_tp": 13,
+      "match_fp": 0,
+      "match_fn": 1,
+      "match_tn": 41,
+      "match_precision": 1.0,
+      "match_recall": 0.9285714285714286,
+      "match_f1": 0.962962962962963,
+      "peer_precision": 0.8571428571428571,
+      "peer_recall": 1.0,
+      "peer_tp": 12,
+      "peer_fp": 2,
+      "peer_fn": 0,
+      "field_stats": {
+        "bedrooms": {
+          "field_key": "bedrooms",
+          "required": false,
+          "total_labeled": 14,
+          "exact_matches": 13,
+          "accuracy": 0.9285714285714286
+        },
+        "location": {
+          "field_key": "location",
+          "required": true,
+          "total_labeled": 14,
+          "exact_matches": 6,
+          "accuracy": 0.42857142857142855
+        },
+        "phone": {
+          "field_key": "phone",
+          "required": false,
+          "total_labeled": 14,
+          "exact_matches": 14,
+          "accuracy": 1.0
+        },
+        "price": {
+          "field_key": "price",
+          "required": false,
+          "total_labeled": 14,
+          "exact_matches": 14,
+          "accuracy": 1.0
+        },
+        "property_type": {
+          "field_key": "property_type",
+          "required": true,
+          "total_labeled": 14,
+          "exact_matches": 14,
+          "accuracy": 1.0
+        }
+      },
+      "total_non_null_extractions": 134,
+      "hallucinated_raw_count": 0,
+      "hallucinated_raw_rate": 0.0,
+      "total_calls": 3,
+      "avg_input_tokens_per_post": 502.0181818181818,
+      "avg_output_tokens_per_post": 379.1636363636364,
+      "avg_duration_ms_per_post": 2376.7454545454543,
+      "total_cost_usd": 0.3003924,
+      "total_input_tokens": 27611,
+      "total_output_tokens": 20854,
+      "failed_calls": 0,
+      "bisection_count": 0,
+      "total_duration_ms": 130721,
+      "decisions": [
+        {
+          "post_id": "hb-001",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-002",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-003",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-004",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-005",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-006",
+          "expected_match": true,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-007",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-008",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-009",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-010",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-011",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-012",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-013",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-014",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-015",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-016",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-017",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-018",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-019",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-020",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-021",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-022",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-023",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-024",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-025",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-026",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-027",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-028",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-029",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-030",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-031",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-032",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-033",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-034",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-035",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-036",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-037",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "peer",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-038",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-039",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "peer"
+        },
+        {
+          "post_id": "hb-040",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-041",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-042",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-043",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-044",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-045",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-046",
+          "expected_match": true,
+          "predicted_match": true,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-047",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-048",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-049",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "end_user",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-050",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-051",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": null,
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-052",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-053",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "end_user"
+        },
+        {
+          "post_id": "hb-054",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        },
+        {
+          "post_id": "hb-055",
+          "expected_match": false,
+          "predicted_match": false,
+          "expected_role": "unknown",
+          "predicted_role": "unknown"
+        }
+      ],
+      "failures": [
+        {
+          "post_id": "hb-002",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Bình Thạnh",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Bình Thạnh",
+            "province": "TP.HCM",
+            "raw": "q binh thanh",
+            "ward": null
+          },
+          "text": "can thue phong tro khep kin q binh thanh gan hutech gia 3tr-4tr5 sdt o909 000 102",
+          "ai_reason": "Nhu cầu thuê phòng để ở, nêu rõ khu vực và ngân sách; giọng người đi thuê."
+        },
+        {
+          "post_id": "hb-003",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Quận 7",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Quận 7",
+            "province": "TP.HCM",
+            "raw": "Quận 7",
+            "ward": null
+          },
+          "text": "Cần thuê chung cư 2pn Quận 7 13tr 0909000103",
+          "ai_reason": "Nêu trực tiếp nhu cầu thuê chung cư tại Quận 7; không có dấu hiệu môi giới."
+        },
+        {
+          "post_id": "hb-006",
+          "kind": "false_negative",
+          "expected": true,
+          "actual": false,
+          "text": "Cần thuê căn hộ 1pn gần trường ĐH, giá tầm 8tr, nhắn mình qua Zalo 0909.000.106",
+          "ai_reason": "Khách thuê thật nhưng không nêu tỉnh/thành, quận hay tên trường; không xác định được có ở Hà Nội/TP.HCM. Nên hỏi lại."
+        },
+        {
+          "post_id": "hb-007",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Tân Bình",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Tân Bình",
+            "province": "TP.HCM",
+            "raw": "Tân Bình",
+            "ward": null
+          },
+          "text": "🙏🙏 Vợ chồng mới cưới e cần thuê chung cư 1pn khu Tân Bình tc 8 củ/tháng ạ, ai có nhắn e zalo 0909.000.107 🏠💕",
+          "ai_reason": "Hộ gia đình tự tìm chỗ ở, nêu khu vực và ngân sách; emoji không làm thành spam."
+        },
+        {
+          "post_id": "hb-008",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Quận 7",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Quận 7",
+            "province": "TP.HCM",
+            "raw": "District 7 HCMC",
+            "ward": null
+          },
+          "text": "Hi all, I'm looking to rent a studio in District 7 HCMC, budget 10-12tr per month, pls PM or call 0909.000.108",
+          "ai_reason": "Người đăng tự tìm thuê studio ở Quận 7, có ngân sách và liên hệ."
+        },
+        {
+          "post_id": "hb-009",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": null,
+          "actual": {
+            "district": null,
+            "province": "Hà Nội",
+            "raw": "gần ĐH Bách Khoa",
+            "ward": null
+          },
+          "text": "Cần thuê phòng trọ gần ĐH Bách Khoa, sinh viên nữ, giá 2tr5-3tr, ưu tiên khép kín. Zalo 0909.000.109",
+          "ai_reason": "Sinh viên tự tìm phòng để ở; Hà Nội suy từ nhóm và ĐH Bách Khoa."
+        },
+        {
+          "post_id": "hb-010",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "TP.HCM",
+            "raw": "Gò Vấp",
+            "ward": null
+          },
+          "text": "Gia đình 4 người cần thuê nhà nguyên căn 2 tầng khu Gò Vấp, 4 phòng ngủ, 14-16tr/tháng, thuê dài hạn 2 năm. 0909.000.110",
+          "ai_reason": "Gia đình cần thuê dài hạn để ở, yêu cầu và ngân sách rõ ràng."
+        },
+        {
+          "post_id": "hb-012",
+          "kind": "field_mismatch",
+          "field": "bedrooms",
+          "expected": null,
+          "actual": 1,
+          "text": "Mình là nhân viên văn phòng, cần thuê studio hoặc căn 1pn khu Hai Bà Trưng, tầm 7-9tr/th, có thang máy. Zalo 0909.000.112",
+          "ai_reason": "Người đi làm tự tìm chỗ ở, nêu khu vực, ngân sách, yêu cầu thang máy."
+        },
+        {
+          "post_id": "hb-013",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Thủ Đức",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Thủ Đức",
+            "province": "TP.HCM",
+            "raw": "Thủ Đức",
+            "ward": null
+          },
+          "text": "Em cần thuê căn hộ 3pn Thủ Đức cho gia đình có con nhỏ, 15-18tr, gần trường học. 0909.000.113",
+          "ai_reason": "Gia đình tự tìm thuê để ở, yêu cầu cụ thể."
+        },
+        {
+          "post_id": "hb-038",
+          "kind": "peer_false_alarm",
+          "expected": "unknown",
+          "actual": "peer",
+          "text": "Công ty quản lý vận hành căn hộ dịch vụ nhận ký gửi và quản lý căn hộ cho chủ nhà tại Hà Nội, cam kết lấp đầy 95%, hợp tác lâu dài. Liên hệ 0909.000.601",
+          "ai_reason": "Doanh nghiệp quảng cáo dịch vụ quản lý cho chủ nhà, cùng ngành; không cần thuê ở."
+        },
+        {
+          "post_id": "hb-039",
+          "kind": "peer_false_alarm",
+          "expected": "unknown",
+          "actual": "peer",
+          "text": "Nhận quản lý toàn diện nhà cho thuê (thu tiền, sửa chữa, tìm khách) tại TP.HCM, phí 8% doanh thu, ai có nhà trống liên hệ 0909.000.602",
+          "ai_reason": "Quảng cáo dịch vụ quản lý nhà và tìm khách cho chủ nhà; không có nhu cầu thuê."
+        },
+        {
+          "post_id": "hb-046",
+          "kind": "field_mismatch",
+          "field": "location",
+          "expected": {
+            "district": "Gò Vấp",
+            "province": "TP. Hồ Chí Minh"
+          },
+          "actual": {
+            "district": "Gò Vấp",
+            "province": "TP.HCM",
+            "raw": "Gò Vấp",
+            "ward": null
+          },
+          "text": "Cần tìm chủ nhà cho thuê phòng trọ khu Gò Vấp, giá khoảng 2tr5-3tr, ưu tiên không chung chủ. Zalo 0909.000.803",
+          "ai_reason": "Người thuê đang tìm chủ nhà, nêu ngân sách và yêu cầu ở cá nhân; không có dấu hiệu môi giới."
+        }
+      ]
+    }
+  ],
+  "run_checks": [
+    [
+      {
+        "name": "match_precision",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.85,
+        "passed": true
+      },
+      {
+        "name": "match_recall",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 14,
+        "value": 0.9285714285714286,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "field:location",
+        "scope": "issue_gate",
+        "numerator": 6,
+        "denominator": 14,
+        "value": 0.42857142857142855,
+        "threshold": 0.9,
+        "passed": false
+      },
+      {
+        "name": "field:property_type",
+        "scope": "issue_gate",
+        "numerator": 14,
+        "denominator": 14,
+        "value": 1.0,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "peer_precision",
+        "scope": "h2_gate",
+        "numerator": 12,
+        "denominator": 22,
+        "value": 0.5454545454545454,
+        "threshold": 0.75,
+        "passed": false
+      },
+      {
+        "name": "peer_recall",
+        "scope": "h2_gate",
+        "numerator": 12,
+        "denominator": 12,
+        "value": 1.0,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "field:bedrooms",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 14,
+        "value": 0.9285714285714286,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:phone",
+        "scope": "h2_gate",
+        "numerator": 14,
+        "denominator": 14,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:price",
+        "scope": "h2_gate",
+        "numerator": 14,
+        "denominator": 14,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "raw_grounded (1 - hallucinated_raw_rate)",
+        "scope": "h2_gate",
+        "numerator": 197,
+        "denominator": 197,
+        "value": 1.0,
+        "threshold": 0.99,
+        "passed": true
+      }
+    ],
+    [
+      {
+        "name": "match_precision",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.85,
+        "passed": true
+      },
+      {
+        "name": "match_recall",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 14,
+        "value": 0.9285714285714286,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "field:location",
+        "scope": "issue_gate",
+        "numerator": 7,
+        "denominator": 14,
+        "value": 0.5,
+        "threshold": 0.9,
+        "passed": false
+      },
+      {
+        "name": "field:property_type",
+        "scope": "issue_gate",
+        "numerator": 14,
+        "denominator": 14,
+        "value": 1.0,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "peer_precision",
+        "scope": "h2_gate",
+        "numerator": 12,
+        "denominator": 14,
+        "value": 0.8571428571428571,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "peer_recall",
+        "scope": "h2_gate",
+        "numerator": 12,
+        "denominator": 12,
+        "value": 1.0,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "field:bedrooms",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 14,
+        "value": 0.9285714285714286,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:phone",
+        "scope": "h2_gate",
+        "numerator": 14,
+        "denominator": 14,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:price",
+        "scope": "h2_gate",
+        "numerator": 14,
+        "denominator": 14,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "raw_grounded (1 - hallucinated_raw_rate)",
+        "scope": "h2_gate",
+        "numerator": 135,
+        "denominator": 135,
+        "value": 1.0,
+        "threshold": 0.99,
+        "passed": true
+      }
+    ],
+    [
+      {
+        "name": "match_precision",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 13,
+        "value": 1.0,
+        "threshold": 0.85,
+        "passed": true
+      },
+      {
+        "name": "match_recall",
+        "scope": "issue_gate",
+        "numerator": 13,
+        "denominator": 14,
+        "value": 0.9285714285714286,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "field:location",
+        "scope": "issue_gate",
+        "numerator": 6,
+        "denominator": 14,
+        "value": 0.42857142857142855,
+        "threshold": 0.9,
+        "passed": false
+      },
+      {
+        "name": "field:property_type",
+        "scope": "issue_gate",
+        "numerator": 14,
+        "denominator": 14,
+        "value": 1.0,
+        "threshold": 0.9,
+        "passed": true
+      },
+      {
+        "name": "peer_precision",
+        "scope": "h2_gate",
+        "numerator": 12,
+        "denominator": 14,
+        "value": 0.8571428571428571,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "peer_recall",
+        "scope": "h2_gate",
+        "numerator": 12,
+        "denominator": 12,
+        "value": 1.0,
+        "threshold": 0.75,
+        "passed": true
+      },
+      {
+        "name": "field:bedrooms",
+        "scope": "h2_gate",
+        "numerator": 13,
+        "denominator": 14,
+        "value": 0.9285714285714286,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:phone",
+        "scope": "h2_gate",
+        "numerator": 14,
+        "denominator": 14,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "field:price",
+        "scope": "h2_gate",
+        "numerator": 14,
+        "denominator": 14,
+        "value": 1.0,
+        "threshold": 0.8,
+        "passed": true
+      },
+      {
+        "name": "raw_grounded (1 - hallucinated_raw_rate)",
+        "scope": "h2_gate",
+        "numerator": 134,
+        "denominator": 134,
+        "value": 1.0,
+        "threshold": 0.99,
+        "passed": true
+      }
+    ]
+  ],
+  "stability": {
+    "runs": 3,
+    "posts": 55,
+    "posts_changed": 0,
+    "rate": 0.0,
+    "threshold": 0.03,
+    "passed": true,
+    "changed_post_ids": []
+  }
+}

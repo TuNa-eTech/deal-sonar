@@ -1,0 +1,94 @@
+{
+  "radar_version_id": "01HOLDOUTTUTORV1",
+  "id": "holdout.gia-su-phu-huynh",
+  "industry": "Giáo dục kèm cặp (Holdout, ngoài thư viện)",
+  "name": "Gia sư tìm phụ huynh cần dạy kèm môn phổ thông (Holdout v1)",
+  "description": "Phụ huynh hoặc học sinh lớp 1–12 đang tìm gia sư/người dạy kèm một môn văn hoá (toán, lý, hoá, tiếng Anh, ngữ văn, tin học) tại Hà Nội và TP.HCM hoặc học trực tuyến (loại trừ gia sư và trung tâm quảng cáo, tin tuyển giáo viên, nhu cầu ngoài chương trình phổ thông như nhạc cụ, thể thao, bậc mầm non hay đại học)",
+  "user_profession": "gia sư dạy kèm",
+  "language_hint": "vi",
+  "want_intent": "demand",
+  "exclude_roles": [
+    "peer"
+  ],
+  "match_policy": {
+    "want_intent": "demand",
+    "exclude_roles": [
+      "peer"
+    ],
+    "hard_filters": []
+  },
+  "seed_ruleset": null,
+  "fields": [
+    {
+      "key": "subject",
+      "label": "Môn học",
+      "type": "enum",
+      "description": "Môn học cần dạy kèm",
+      "required": true,
+      "options": [
+        "toán",
+        "vật lý",
+        "hoá học",
+        "tiếng Anh",
+        "ngữ văn",
+        "tin học"
+      ],
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "grade",
+      "label": "Lớp",
+      "type": "number",
+      "description": "Lớp của học sinh (1–12)",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "mode",
+      "label": "Hình thức",
+      "type": "enum",
+      "description": "Học trực tuyến hay tại nhà",
+      "required": false,
+      "options": [
+        "online",
+        "tại nhà"
+      ],
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Tỉnh/thành và quận/huyện nếu học tại nhà",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "budget",
+      "label": "Học phí dự kiến",
+      "type": "money",
+      "description": "Học phí mỗi buổi hoặc mỗi giờ nếu bài nêu rõ",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại liên hệ chuẩn E.164",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 6
+    }
+  ],
+  "feedback_examples": []
+}

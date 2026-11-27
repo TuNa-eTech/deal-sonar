@@ -223,7 +223,7 @@ Chi tiết lời gọi ở [06-ai-bridge.md](06-ai-bridge.md). Ở tầng chuỗ
    - Cụm trùng của bài xuất hiện ở 4 nguồn trở lên.
    - Số điện thoại trong bài đã xuất hiện trong bài của 3 tác giả khác nhau trở lên.
    - Hai tín hiệu trở lên cùng xuất hiện thì ghi đè `author_role` thành `peer` dù AI nói khác.
-4. **Điều kiện cứng.** Áp `match_policy.hard_filters` lên giá trị đã chuẩn hoá. Trường thiếu thì theo `when_missing`.
+4. **Điều kiện cứng.** Áp `match_policy.hard_filters` (AND) rồi `match_policy.condition` (nhóm `all`/`any`/`not`, tuỳ chọn) lên giá trị đã chuẩn hoá bằng `evaluate_match_filters`. Trường thiếu thì theo `when_missing` của từng điều kiện đơn, tính trước khi `not` đảo ngược. `condition` hỏng trong DB thì loại bài (fail closed).
 5. **Ngưỡng điểm.** `score ≥ notify.min_score` thì tạo tin và báo; `0,4 ≤ score < min_score` thì tạo tin nhưng không báo (hiện ở Hộp tin với nhãn "khớp yếu"); dưới 0,4 thì không tạo tin.
 
 ## 9. T7: Tạo tin

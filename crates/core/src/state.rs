@@ -202,6 +202,13 @@ pub struct ConnectedProfile {
     pub tx: mpsc::UnboundedSender<Envelope>,
 }
 
+/// A peer on the extension side spoke a different protocol version and was rejected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProtocolMismatchInfo {
+    pub at: i64,
+    pub detail: String,
+}
+
 /// Mutable state inside [`IpcHub`].
 pub struct IpcHubState {
     pub connections: HashMap<u64, ConnectedProfile>,
@@ -213,6 +220,8 @@ pub struct IpcHubState {
     /// Distinct `source_id`s from consecutive `empty` crawl runs (`>= 3` triggers `ExtractorBroken`).
     pub consecutive_empty_sources: Vec<String>,
     pub extractor_broken: bool,
+    /// Set when a message with a foreign protocol version was rejected; cleared by the next `hello`.
+    pub protocol_mismatch: Option<ProtocolMismatchInfo>,
 }
 
 impl Default for IpcHubState {
@@ -226,6 +235,7 @@ impl Default for IpcHubState {
             config_rev: 1,
             consecutive_empty_sources: Vec::new(),
             extractor_broken: false,
+            protocol_mismatch: None,
         }
     }
 }
@@ -447,7 +457,7 @@ impl CoreRuntime {
     pub fn compute_health_status(&self, now: i64) -> CoreResult<HealthStatus> {
         let settings = self.load_settings()?;
 
-        let (ext_connected, ext_version, fb_session, crawl_paused, crawl_pause_reason) = {
+        let (ext_connected, ext_version, fb_session, crawl_paused, crawl_pause_reason, mismatch) = {
             let guard = self.ipc_hub.state.lock().expect("ipc state lock");
             let ext_connected = !guard.connections.is_empty();
             let ext_version = guard
@@ -461,7 +471,20 @@ impl CoreRuntime {
                 guard.facebook_session,
                 guard.crawl_paused,
                 guard.crawl_pause_reason,
+                guard.protocol_mismatch.clone(),
             )
+        };
+        let extension_compat = match (&ext_version, &mismatch) {
+            (Some(v), _)
+                if dealsonar_protocol::compat::is_older_than(
+                    v,
+                    dealsonar_protocol::compat::MIN_EXTENSION_VERSION,
+                ) == Some(true) =>
+            {
+                Some(crate::dto::ExtensionCompat::outdated_extension(v))
+            }
+            (_, Some(m)) => Some(crate::dto::ExtensionCompat::protocol_mismatch(&m.detail)),
+            _ => None,
         };
 
         let (automatic_scanning, extension_paused, next_crawl_at, runtime_checked_at) = {
@@ -597,6 +620,7 @@ impl CoreRuntime {
                 .max(),
             extension_connected: ext_connected,
             extension_version: ext_version,
+            extension_compat,
             facebook_session: fb_session,
             crawl_paused,
             crawl_pause_reason,

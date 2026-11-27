@@ -17,6 +17,27 @@ impl Store {
         &self,
         input: &CreateRadarDraftInput,
     ) -> Result<RadarWithVersion, StoreError> {
+        self.create_draft(input, None)
+    }
+
+    /// Create a draft radar recorded as a variant of `parent_radar_id`.
+    ///
+    /// Only the new radar, its `version = 1` and its sources are written. Nothing owned by the
+    /// parent (leads, evaluations, feedback, rulesets, versions) is copied, moved or modified,
+    /// so the parent keeps its full history and the variant starts empty.
+    pub fn radar_create_variant_draft(
+        &self,
+        parent_radar_id: &str,
+        input: &CreateRadarDraftInput,
+    ) -> Result<RadarWithVersion, StoreError> {
+        self.create_draft(input, Some(parent_radar_id))
+    }
+
+    fn create_draft(
+        &self,
+        input: &CreateRadarDraftInput,
+        variant_of: Option<&str>,
+    ) -> Result<RadarWithVersion, StoreError> {
         validate_field_defs(&input.fields)?;
 
         let radar_id = input.id.clone().unwrap_or_else(new_ulid);
@@ -28,15 +49,31 @@ impl Store {
         let mut conn = self.lock_conn()?;
         let tx = conn.transaction()?;
 
+        if let Some(parent_id) = variant_of {
+            let parent_exists: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM radars WHERE id = ?1)",
+                params![parent_id],
+                |r| r.get(0),
+            )?;
+            if !parent_exists {
+                return Err(StoreError::NotFound {
+                    entity: "radar",
+                    id: parent_id.to_string(),
+                });
+            }
+        }
+
         tx.execute(
             "INSERT INTO radars (
-               id, name, status, template_id, current_version, notify, created_at, updated_at
-             ) VALUES (?1, ?2, 'draft', ?3, 1, ?4, ?5, ?5)",
+               id, name, status, template_id, current_version, notify, variant_of,
+               created_at, updated_at
+             ) VALUES (?1, ?2, 'draft', ?3, 1, ?4, ?5, ?6, ?6)",
             params![
                 radar_id,
                 input.name,
                 input.template_id,
                 notify_json,
+                variant_of,
                 input.now_ms
             ],
         )?;

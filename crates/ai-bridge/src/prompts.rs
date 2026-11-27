@@ -193,6 +193,10 @@ Từ mô tả bằng lời thường của người dùng, hãy đề xuất tê
 danh sách 1–10 trường dữ liệu cần trích xuất, điều kiện lọc cứng (hard_filters) nếu mô tả nêu ngưỡng rõ ràng, \
 tối đa 2 câu hỏi làm rõ nếu mô tả mơ hồ, và gợi ý lọc sơ bộ thận trọng (prefilter_hint).\n\
 Quy tắc:\n\
+- `want_intent` mô tả bài đăng cần tìm, KHÔNG mô tả người dùng. Chỉ chọn demand hoặc supply khi mô tả nêu rõ phía của tác giả bài đăng. \
+Nếu mô tả có thể hiểu theo cả hai phía (ví dụ tìm xe hay tìm hàng, người cần hay người cung cấp), đặt want_intent=any, side_ambiguous=true và đưa một câu hỏi làm rõ đầu tiên về phía giao dịch. Không tự đoán phía cầu.\n\
+- `exclude_peers`: true chỉ khi mô tả cho thấy người dùng không muốn thấy bài của người cùng nghề/đối thủ; false khi người dùng muốn kết nối, hợp tác hoặc nhận bài từ người cùng nghề, hoặc khi phía giao dịch chưa rõ; bỏ trống nếu mô tả không nói gì.\n\
+- `assumptions`: tối đa 5 giả định ngắn bạn đã phải đặt ra (phía giao dịch, đối tượng bị loại, khu vực, ngân sách...) để người dùng sửa; không lặp lại điều mô tả đã nêu rõ.\n\
 - Khoá trường `key` phải ở dạng snake_case tiếng Anh (`^[a-z][a-z0-9_]{1,30}$`), nhãn `label` và `description` bằng ngôn ngữ của người dùng.\n\
 - Chỉ chọn kiểu trường thuộc 11 kiểu hợp lệ: text, number, money, phone, location, enum, multi_enum, boolean, date, range, url.\n\
 - Với kiểu `enum` hoặc `multi_enum`, bắt buộc cung cấp mảng `options` không rỗng.\n\

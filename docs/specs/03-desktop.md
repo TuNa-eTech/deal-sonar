@@ -116,7 +116,7 @@ Giao diện gọi nhân qua lệnh Tauri (yêu cầu–trả lời) và nhận s
 
 | Nhóm | Lệnh |
 |---|---|
-| Radar | `radar_list`, `radar_get`, `radar_create_draft`, `radar_update`, `radar_suggest_fields`, `radar_set_status`, `radar_preview_start`, `radar_preview_get`, `radar_stats` |
+| Radar | `radar_list`, `radar_get`, `radar_create_draft`, `radar_variant_prepare`, `radar_create_variant`, `radar_compare_run`, `radar_compare_get`, `radar_compare_list`, `radar_update`, `radar_suggest_fields`, `radar_set_status`, `radar_preview_start`, `radar_preview_get`, `radar_stats` |
 | Mẫu | `template_list`, `template_get` |
 | Nguồn | `source_list`, `source_follow`, `source_unfollow`, `source_set_priority`, `source_crawl_now` |
 | Tin | `lead_list` (lọc, sắp xếp, phân trang), `lead_get`, `lead_set_status`, `lead_update_field`, `lead_feedback`, `lead_export` |

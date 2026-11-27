@@ -3,6 +3,7 @@
 
 import { restoreQuickScanOptions, type QuickScanOptions } from "../scan-options";
 import type { ScanSummary } from "../messages";
+import type { CompatKind } from "../compat";
 import { DEFAULT_EXTRACTOR_PROFILE } from "../content/extract";
 import {
   generateUlid,
@@ -59,6 +60,8 @@ export type ConnectionState = {
   desktop_version?: string;
   last_seen_at?: number;
   last_error?: string;
+  /** Set when this extension and the Desktop app need an update to work together. */
+  compat?: CompatKind;
 };
 
 export type ActiveCrawlRecord = {

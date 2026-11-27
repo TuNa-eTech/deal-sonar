@@ -442,7 +442,16 @@ fn source_post_list_filters_and_pages_in_publication_order() {
     let other = seed_source(&store, "g2", "Group Mỹ Đình", true);
 
     let insert = |source_id: &str, id: &str, created_at, captured_at| {
-        let mut post = make_post(source_id, id, "author", "Nguyễn Văn A", id, id, 0, captured_at);
+        let mut post = make_post(
+            source_id,
+            id,
+            "author",
+            "Nguyễn Văn A",
+            id,
+            id,
+            0,
+            captured_at,
+        );
         post.id = Some(id.to_string());
         post.created_at = created_at;
         store.insert_post(&post).unwrap();
@@ -704,6 +713,7 @@ fn test_dynamic_lead_list_filters_fts_pagination_and_sql_injection_guard() {
                     value: json!(15_000_000),
                     when_missing: "pass".to_string(),
                 }],
+                condition: None,
                 extra: BTreeMap::new(),
             },
             notify: NotifyConfig::default(),
@@ -2133,21 +2143,6 @@ fn durable_feedback_migrates_rejection_labels_and_survives_preview_cleanup() {
     let backups = tmp.path().join("backups");
     let store = Store::open_with_migrations(&db, &backups, &MIGRATIONS[..1]).unwrap();
     let source = seed_source(&store, "feedback-migration", "Migration", true);
-    let radar = store
-        .radar_create_draft(&CreateRadarDraftInput {
-            id: None,
-            name: "Migration".into(),
-            template_id: None,
-            description: "Radar".into(),
-            language_hint: None,
-            user_profession: None,
-            fields: sample_bds_fields(),
-            match_policy: MatchPolicy::default(),
-            notify: NotifyConfig::default(),
-            source_ids: vec![source.clone()],
-            now_ms: BASE_TS,
-        })
-        .unwrap();
     let (post, _) = store
         .insert_post(&make_post(
             &source,
@@ -2161,20 +2156,23 @@ fn durable_feedback_migrates_rejection_labels_and_survives_preview_cleanup() {
         ))
         .unwrap();
     drop(store);
+    // The radar is written with plain SQL: this database only has schema v1, which predates
+    // columns the current `radar_create_draft` writes.
+    let version_id = "old-version".to_string();
     let conn = rusqlite::Connection::open(&db).unwrap();
+    conn.execute("INSERT INTO radars (id,name,status,current_version,notify,created_at,updated_at) VALUES ('old-radar','Migration','draft',1,'{}',?1,?1)", rusqlite::params![BASE_TS]).unwrap();
+    conn.execute("INSERT INTO radar_versions (id,radar_id,version,description,fields,match_policy,created_at) VALUES (?1,'old-radar',1,'Radar','[]','{}',?2)", rusqlite::params![version_id, BASE_TS]).unwrap();
     conn.execute("INSERT INTO evaluations (id,post_id,radar_version_id,state,verdict,is_preview,created_at) VALUES ('old-eval',?1,?2,'done','no_match',1,?3)",
-        rusqlite::params![post.id, radar.current_version.id, BASE_TS]).unwrap();
+        rusqlite::params![post.id, version_id, BASE_TS]).unwrap();
     conn.execute("INSERT INTO feedback (id,evaluation_id,radar_version_id,post_id,label,post_text,origin,created_at) VALUES ('old-feedback','old-eval',?1,?2,'correct','Snapshot','preview',?3)",
-        rusqlite::params![radar.current_version.id, post.id, BASE_TS]).unwrap();
+        rusqlite::params![version_id, post.id, BASE_TS]).unwrap();
     drop(conn);
     let store = Store::open(&db, &backups).unwrap();
     assert_eq!(
         store.list_schema_migrations().unwrap().len(),
         dealsonar_store::LATEST_SCHEMA_VERSION as usize
     );
-    let examples = store
-        .get_prompt_feedback_examples(&radar.current_version.id, 8)
-        .unwrap();
+    let examples = store.get_prompt_feedback_examples(&version_id, 8).unwrap();
     assert_eq!(examples.len(), 1);
     assert!(
         !examples[0].expected_match,
@@ -2182,19 +2180,15 @@ fn durable_feedback_migrates_rejection_labels_and_survives_preview_cleanup() {
     );
     assert_eq!(
         store
-            .cleanup_preview_evaluations(Some(&radar.current_version.id), None)
+            .cleanup_preview_evaluations(Some(&version_id), None)
             .unwrap(),
         1
     );
     assert_eq!(
-        store
-            .get_prompt_feedback_examples(&radar.current_version.id, 8)
-            .unwrap(),
+        store.get_prompt_feedback_examples(&version_id, 8).unwrap(),
         examples
     );
-    let dataset = store
-        .get_labeled_dataset(&radar.current_version.id)
-        .unwrap();
+    let dataset = store.get_labeled_dataset(&version_id).unwrap();
     assert_eq!(dataset.len(), 1);
     assert!(!dataset[0].is_match);
     assert!(
@@ -2359,11 +2353,255 @@ fn radar_channel_scope_preserves_legacy_and_honors_explicit_local_selection() {
     let legacy = NotifyConfig::default();
     assert!(legacy.sends_to_channel("telegram"));
 
-    let local = NotifyConfig { inherit_channels: Some(false), ..legacy.clone() };
+    let local = NotifyConfig {
+        inherit_channels: Some(false),
+        ..legacy.clone()
+    };
     assert!(!local.sends_to_channel("telegram"));
     assert!(!local.sends_to_channel("webhook"));
 
-    let selected = NotifyConfig { channel_ids: vec!["telegram".into()], ..local };
+    let selected = NotifyConfig {
+        channel_ids: vec!["telegram".into()],
+        ..local
+    };
     assert!(selected.sends_to_channel("telegram"));
     assert!(!selected.sends_to_channel("webhook"));
+}
+
+#[test]
+fn test_journey_snapshot_separates_collection_matching_ai_and_delivery() {
+    let store = Store::open_in_memory().expect("open_in_memory");
+    let empty = store.journey_snapshot().unwrap();
+    assert_eq!(empty.active_radars, 0);
+    assert_eq!(empty.posts_captured, 0);
+    assert_eq!(empty.first_lead_at, None);
+
+    let src = seed_source(&store, "g_journey", "Chợ căn hộ", true);
+    let radar = store
+        .radar_create_draft(&CreateRadarDraftInput {
+            id: None,
+            name: "Khách thuê".to_string(),
+            template_id: None,
+            description: "Khách cần thuê căn hộ".to_string(),
+            language_hint: Some("vi".to_string()),
+            user_profession: None,
+            fields: sample_bds_fields(),
+            match_policy: MatchPolicy::default(),
+            notify: NotifyConfig::default(),
+            source_ids: vec![src.clone()],
+            now_ms: BASE_TS,
+        })
+        .unwrap();
+
+    // A draft is not collecting: its group is not watched by an active Radar yet.
+    let (draft_post, _) = store
+        .insert_post(&make_post(
+            &src,
+            "d0",
+            "u0",
+            "A",
+            "bài nháp",
+            "h_d0",
+            1,
+            BASE_TS,
+        ))
+        .unwrap();
+    let snapshot = store.journey_snapshot().unwrap();
+    assert_eq!(snapshot.first_radar_created_at, Some(BASE_TS));
+    assert_eq!(snapshot.first_followed_source_at, Some(BASE_TS));
+    assert_eq!(snapshot.active_radars, 0);
+    assert_eq!(snapshot.posts_captured, 0);
+    assert_eq!(snapshot.first_post_captured_at, Some(BASE_TS));
+    let _ = draft_post;
+
+    store
+        .radar_set_status(&radar.radar.id, "active", BASE_TS + 1_000)
+        .unwrap();
+    let evaluate = |post_id: String, state: &str, verdict: Option<&str>, ts: i64| {
+        store
+            .upsert_evaluation(&EvaluationUpsertInput {
+                id: None,
+                post_id,
+                radar_version_id: radar.current_version.id.clone(),
+                state: state.to_string(),
+                decided_by: (state == "done").then(|| "ai".to_string()),
+                verdict: verdict.map(str::to_string),
+                reject_reason: None,
+                score: Some(0.9),
+                intent: Some("demand".to_string()),
+                author_role: Some("end_user".to_string()),
+                summary: Some("tóm tắt".to_string()),
+                reason: None,
+                fields: Some(BTreeMap::new()),
+                ruleset_id: None,
+                ai_call_id: None,
+                is_preview: false,
+                created_at: ts,
+                decided_at: (state == "done").then_some(ts + 10),
+            })
+            .unwrap()
+    };
+    let mut ids = Vec::new();
+    for (i, text) in ["một", "hai", "ba", "bốn"].iter().enumerate() {
+        let ts = BASE_TS + 10_000 * (i as i64 + 1);
+        let (post, _) = store
+            .insert_post(&make_post(
+                &src,
+                &format!("j{i}"),
+                &format!("u{i}"),
+                "Người đăng",
+                text,
+                &format!("h_j{i}"),
+                100 + i as i64,
+                ts,
+            ))
+            .unwrap();
+        ids.push((post.id, ts));
+    }
+    evaluate(ids[0].0.clone(), "done", Some("no_match"), ids[0].1);
+    evaluate(ids[1].0.clone(), "pending_ai", None, ids[1].1);
+    evaluate(ids[2].0.clone(), "ai_failed", None, ids[2].1);
+    let matched = evaluate(ids[3].0.clone(), "done", Some("match"), ids[3].1);
+    let (lead, _) = store
+        .create_lead(&CreateLeadInput {
+            id: None,
+            radar_id: radar.radar.id.clone(),
+            radar_version_id: radar.current_version.id.clone(),
+            post_id: ids[3].0.clone(),
+            evaluation_id: matched.id.clone(),
+            contact_id: None,
+            status: "new".to_string(),
+            score: 0.9,
+            summary: "khớp".to_string(),
+            fields: BTreeMap::new(),
+            also_seen_in: None,
+            notified_at: None,
+            follow_up_at: None,
+            note: None,
+            tags: None,
+            now_ms: ids[3].1 + 500,
+        })
+        .unwrap();
+
+    let channel = store
+        .channel_create("telegram", "Bot", &json!({}), BASE_TS)
+        .unwrap();
+    let enqueue = |now_ms: i64| {
+        store
+            .enqueue_outbox(&dealsonar_store::EnqueueOutboxInput {
+                id: None,
+                channel_id: channel.id.clone(),
+                lead_id: Some(lead.id.clone()),
+                kind: "lead".to_string(),
+                payload: json!({}),
+                next_try_at: now_ms,
+                now_ms,
+            })
+            .unwrap()
+    };
+    let sent = enqueue(BASE_TS + 60_000);
+    store
+        .mark_outbox_sent(&sent.id, Some("m1"), BASE_TS + 61_000)
+        .unwrap();
+    let failing = enqueue(BASE_TS + 70_000);
+    store
+        .retry_or_drop_outbox(
+            &failing.id,
+            "Bot bị chặn",
+            None,
+            1,
+            7_200_000,
+            BASE_TS + 71_000,
+        )
+        .unwrap();
+    enqueue(BASE_TS + 80_000);
+
+    // The only notified lead is marked wrong by the user; trial-preview feedback never counts.
+    let before_feedback = store.journey_snapshot().unwrap();
+    assert_eq!(before_feedback.leads_notified, 1);
+    assert_eq!(before_feedback.leads_flagged_wrong, 0);
+    store
+        .record_feedback(&RecordFeedbackInput {
+            evaluation_id: matched.id.clone(),
+            label: "irrelevant".to_string(),
+            corrected_fields: None,
+            post_text: None,
+            origin: "app".to_string(),
+            now_ms: BASE_TS + 90_000,
+        })
+        .unwrap();
+
+    let snapshot = store.journey_snapshot().unwrap();
+    assert_eq!(snapshot.leads_notified, 1);
+    assert_eq!(snapshot.leads_flagged_wrong, 1);
+    assert_eq!(snapshot.active_radars, 1);
+    assert_eq!(snapshot.active_sources, 1);
+    assert_eq!(
+        snapshot.posts_captured, 5,
+        "every stored post from an active Radar's groups"
+    );
+    assert_eq!(snapshot.last_post_captured_at, Some(BASE_TS + 40_000));
+    assert_eq!(snapshot.evaluated_no_match, 1);
+    assert_eq!(snapshot.evaluated_match, 1);
+    assert_eq!(snapshot.waiting_ai, 2, "pending and failed AI both wait");
+    assert_eq!(snapshot.leads_total, 1);
+    assert_eq!(snapshot.first_lead_at, Some(BASE_TS + 40_500));
+    assert_eq!(snapshot.delivery_pending, 1);
+    assert_eq!(snapshot.delivery_failed, 1);
+    assert_eq!(snapshot.last_delivery_error.as_deref(), Some("Bot bị chặn"));
+    assert_eq!(snapshot.first_delivery_at, Some(BASE_TS + 61_000));
+    assert_eq!(snapshot.last_delivery_at, Some(BASE_TS + 61_000));
+}
+
+#[test]
+fn radar_variant_draft_links_to_parent_without_touching_it() {
+    let store = Store::open_in_memory().unwrap();
+    let input = |name: &str| CreateRadarDraftInput {
+        id: None,
+        name: name.to_string(),
+        template_id: None,
+        description: "Khách cần thuê căn hộ Cầu Giấy".to_string(),
+        language_hint: Some("vi".to_string()),
+        user_profession: None,
+        fields: sample_bds_fields(),
+        match_policy: MatchPolicy::default(),
+        notify: NotifyConfig::default(),
+        source_ids: Vec::new(),
+        now_ms: BASE_TS,
+    };
+
+    let parent = store.radar_create_draft(&input("Gốc")).unwrap();
+    assert_eq!(parent.radar.variant_of, None);
+
+    let variant = store
+        .radar_create_variant_draft(&parent.radar.id, &input("Biến thể"))
+        .unwrap();
+    assert_eq!(
+        variant.radar.variant_of.as_deref(),
+        Some(parent.radar.id.as_str())
+    );
+    assert_eq!(variant.radar.status, "draft");
+    assert_eq!(variant.radar.current_version, 1);
+    assert_ne!(variant.radar.id, parent.radar.id);
+    assert_ne!(variant.current_version.id, parent.current_version.id);
+
+    // The link survives a reload and the parent is unchanged.
+    let reloaded = store.radar_get(&variant.radar.id).unwrap().unwrap();
+    assert_eq!(reloaded.radar.variant_of, variant.radar.variant_of);
+    assert_eq!(store.radar_get(&parent.radar.id).unwrap().unwrap(), parent);
+    assert_eq!(store.radar_versions(&parent.radar.id).unwrap().len(), 1);
+
+    // An unknown parent is rejected and nothing is written.
+    let before = store.radar_list(true, BASE_TS).unwrap().len();
+    let err = store
+        .radar_create_variant_draft("missing-radar", &input("Mồ côi"))
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        StoreError::NotFound {
+            entity: "radar",
+            ..
+        }
+    ));
+    assert_eq!(store.radar_list(true, BASE_TS).unwrap().len(), before);
 }

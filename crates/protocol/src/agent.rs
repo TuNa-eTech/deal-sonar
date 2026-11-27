@@ -19,6 +19,7 @@ pub struct AgentRequest {
 #[serde(rename_all = "snake_case")]
 pub enum AgentMethod {
     ListRadarSources,
+    InterpretRadarGoal,
     PrepareRadar,
     CheckRadarPreview,
     RetryRadarPreview,

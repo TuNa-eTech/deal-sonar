@@ -76,6 +76,13 @@ pub fn suggest_fields_schema() -> Value {
                 "maxItems": 2,
                 "items": { "type": "string", "minLength": 1 }
             },
+            "side_ambiguous": { "type": "boolean" },
+            "exclude_peers": { "type": "boolean" },
+            "assumptions": {
+                "type": "array",
+                "maxItems": 5,
+                "items": { "type": "string", "minLength": 1 }
+            },
             "prefilter_hint": {
                 "anyOf": [
                     {

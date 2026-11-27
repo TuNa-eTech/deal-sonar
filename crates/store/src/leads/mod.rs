@@ -10,7 +10,7 @@ use crate::models::{
     FieldDef, FieldSource, FieldType, FilterOp, LabeledSample, LabeledSampleOrigin, LeadDetail,
     LeadEvaluationInfo, LeadEventRecord, LeadFieldFilter, LeadListItem, LeadListPage,
     LeadListQuery, LeadRecord, PendingAiEvaluationItem, PendingAiGroup, RecordFeedbackInput,
-    SortDir,
+    SortDir, COMPARE_EVAL_SCOPE,
 };
 use crate::posts::map_post_row;
 use crate::{Store, StoreError};

@@ -2,6 +2,28 @@
 
 use super::*;
 
+/// Evaluation rows of one pipeline mode: live, preview, or radar comparison scratch rows.
+struct ModeEvaluations<'a> {
+    rt: &'a Arc<CoreRuntime>,
+    scope: i64,
+}
+
+fn evals(rt: &Arc<CoreRuntime>, mode: EvalMode) -> ModeEvaluations<'_> {
+    ModeEvaluations {
+        rt,
+        scope: mode.eval_scope(),
+    }
+}
+
+impl ModeEvaluations<'_> {
+    fn upsert_evaluation(
+        &self,
+        input: &EvaluationUpsertInput,
+    ) -> Result<EvaluationRecord, dealsonar_store::StoreError> {
+        self.rt.store.upsert_evaluation_in_scope(input, self.scope)
+    }
+}
+
 /// Run T3 (Prefilter) & T4 (Ruleset) synchronously for `(post, radar_version)`.
 ///
 /// - `DefiniteMatch` proceeds immediately through T6–T7 without calling AI.
@@ -30,7 +52,7 @@ pub fn evaluate_post_for_radar_sync(
         &post.extracted_phones,
         Some(norm.text_fold.as_str()),
     )? {
-        return Ok(rt.store.upsert_evaluation(&EvaluationUpsertInput {
+        return Ok(evals(rt, mode).upsert_evaluation(&EvaluationUpsertInput {
             id: None,
             post_id: post.id.clone(),
             radar_version_id: radar_version.id.clone(),
@@ -73,7 +95,7 @@ pub fn evaluate_post_for_radar_sync(
     );
 
     if let Some(prefilter_err) = basic_res {
-        return Ok(rt.store.upsert_evaluation(&EvaluationUpsertInput {
+        return Ok(evals(rt, mode).upsert_evaluation(&EvaluationUpsertInput {
             id: None,
             post_id: post.id.clone(),
             radar_version_id: radar_version.id.clone(),
@@ -127,7 +149,7 @@ pub fn evaluate_post_for_radar_sync(
                 let outcome = compiled.evaluate(norm, &rules_field_defs, ref_ts_ms);
                 match outcome {
                     RulesetOutcome::PrefilterReject => {
-                        return Ok(rt.store.upsert_evaluation(&EvaluationUpsertInput {
+                        return Ok(evals(rt, mode).upsert_evaluation(&EvaluationUpsertInput {
                             id: None,
                             post_id: post.id.clone(),
                             radar_version_id: radar_version.id.clone(),
@@ -164,7 +186,7 @@ pub fn evaluate_post_for_radar_sync(
                         } else {
                             "irrelevant"
                         };
-                        let eval = rt.store.upsert_evaluation(&EvaluationUpsertInput {
+                        let eval = evals(rt, mode).upsert_evaluation(&EvaluationUpsertInput {
                             id: None,
                             post_id: post.id.clone(),
                             radar_version_id: radar_version.id.clone(),
@@ -226,7 +248,7 @@ pub fn evaluate_post_for_radar_sync(
 
                         // Create placeholder evaluation first so finalize_candidate_evaluation can update it
                         let eval_placeholder =
-                            rt.store.upsert_evaluation(&EvaluationUpsertInput {
+                            evals(rt, mode).upsert_evaluation(&EvaluationUpsertInput {
                                 id: None,
                                 post_id: post.id.clone(),
                                 radar_version_id: radar_version.id.clone(),
@@ -303,7 +325,7 @@ pub fn evaluate_post_for_radar_sync(
     }
 
     // Queue for T5 AI batch evaluation
-    let pending_eval = rt.store.upsert_evaluation(&EvaluationUpsertInput {
+    let pending_eval = evals(rt, mode).upsert_evaluation(&EvaluationUpsertInput {
         id: None,
         post_id: post.id.clone(),
         radar_version_id: radar_version.id.clone(),

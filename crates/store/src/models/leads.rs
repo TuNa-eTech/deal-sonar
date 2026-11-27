@@ -75,6 +75,10 @@ pub struct PendingAiEvaluationItem {
     pub author_name: Option<String>,
 }
 
+/// `evaluations.is_preview` value for radar-comparison scratch rows. `0` is live and `1` is
+/// preview; comparison rows use their own scope so they never overwrite either.
+pub const COMPARE_EVAL_SCOPE: i64 = 2;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PendingAiGroup {
     pub radar_version_id: String,

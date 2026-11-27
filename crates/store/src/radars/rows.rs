@@ -30,6 +30,7 @@ pub(crate) fn map_radar_row(row: &Row<'_>) -> rusqlite::Result<RadarRecord> {
         template_id: row.get("template_id")?,
         current_version: row.get("current_version")?,
         notify,
+        variant_of: row.get("variant_of")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
     })

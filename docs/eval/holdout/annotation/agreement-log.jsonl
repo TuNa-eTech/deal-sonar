@@ -1,0 +1,4 @@
+# Nhật ký bất đồng nhãn của holdout-v1. Mỗi dòng JSON là một bài–Radar mà hai người gán nhãn khác nhau.
+# Lược đồ: {"radar":"<tên tệp radar không đuôi>","id":"hb-004","a":{…nhãn A…},"b":{…nhãn B…},"final":{…nhãn cuối…},
+#           "resolution":"convention|adjudicator|dropped","convention":"C5","decided_by":"<vai trò, không ghi tên>","date":"YYYY-MM-DD","note":"…"}
+# Hiện CHƯA có dòng nào: chưa có người gán nhãn độc lập thứ hai (xem ../README.md §6).

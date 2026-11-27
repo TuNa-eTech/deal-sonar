@@ -1,0 +1,65 @@
+######## Lượt 1/3 ########
+============================================================
+  DealSonar AI Bridge — Báo cáo đánh giá chất lượng ngoại tuyến
+============================================================
+Provider       : codex_cli
+Kích thước lô  : 10 bài/lô
+Tổng số bài    : 55 (thành công: 55, ai_failed: 0)
+Số lời gọi CLI : 6
+
+1. QUYẾT ĐỊNH KHỚP (Ngưỡng H2: Precision >= 85%, Recall >= 90%)
+   - Precision : 100.00%  [ĐẠT]  (TP=12, FP=0; 12/12)
+   - Recall    :  85.71%  [CHƯA ĐẠT]  (TP=12, FN=2; 12/14)
+   - F1 Score  :  92.31%
+
+2. NHẬN DIỆN NGƯỜI CÙNG NGHỀ (Ngưỡng H2: Precision & Recall >= 75%)
+   - Peer Precision :  93.33%  [ĐẠT]
+   - Peer Recall    : 100.00%  [ĐẠT]
+
+3. ĐỘ ĐÚNG TỪNG TRƯỜNG & TỈ LỆ BỊA `raw` (Ngưỡng H2: bắt buộc >= 90%, tuỳ chọn >= 80%, bịa <= 1%)
+   - bedrooms       (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - furnished      (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - location       (bắt buộc) :  50.00% (7/14)  [CHƯA ĐẠT]
+   - phone          (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - price          (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - property_type  (bắt buộc) : 100.00% (14/14)  [ĐẠT]
+   - Tỉ lệ `raw` không có trong bài :   0.00% (0/186)  [ĐẠT]
+
+4. HIỆU NĂNG & TOKEN TRUNG BÌNH MỖI BÀI
+   - Input tokens / bài  : 3495.0
+   - Output tokens / bài : 310.7
+   - Thời lượng / bài    : 7037.18 ms
+######## Lượt 2/3 ########
+============================================================
+  DealSonar AI Bridge — Báo cáo đánh giá chất lượng ngoại tuyến
+============================================================
+Provider       : codex_cli
+Kích thước lô  : 10 bài/lô
+Tổng số bài    : 55 (thành công: 55, ai_failed: 0)
+Số lời gọi CLI : 6
+
+1. QUYẾT ĐỊNH KHỚP (Ngưỡng H2: Precision >= 85%, Recall >= 90%)
+   - Precision : 100.00%  [ĐẠT]  (TP=12, FP=0; 12/12)
+   - Recall    :  85.71%  [CHƯA ĐẠT]  (TP=12, FN=2; 12/14)
+   - F1 Score  :  92.31%
+
+2. NHẬN DIỆN NGƯỜI CÙNG NGHỀ (Ngưỡng H2: Precision & Recall >= 75%)
+   - Peer Precision :  92.86%  [ĐẠT]
+   - Peer Recall    :  92.86%  [ĐẠT]
+
+3. ĐỘ ĐÚNG TỪNG TRƯỜNG & TỈ LỆ BỊA `raw` (Ngưỡng H2: bắt buộc >= 90%, tuỳ chọn >= 80%, bịa <= 1%)
+   - bedrooms       (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - furnished      (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - location       (bắt buộc) :  50.00% (7/14)  [CHƯA ĐẠT]
+   - phone          (tuỳ chọn) :  85.71% (12/14)  [ĐẠT]
+   - price          (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - property_type  (bắt buộc) : 100.00% (14/14)  [ĐẠT]
+   - Tỉ lệ `raw` không có trong bài :   0.00% (0/179)  [ĐẠT]
+
+4. HIỆU NĂNG & TOKEN TRUNG BÌNH MỖI BÀI
+   - Input tokens / bài  : 3046.9
+   - Output tokens / bài : 313.0
+   - Thời lượng / bài    : 6952.29 ms
+
+--- stderr ---
+Evaluation failed (run 3/3): Đã chạm giới hạn hạn mức AI (thử lại sau: None)

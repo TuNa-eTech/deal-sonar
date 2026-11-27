@@ -83,7 +83,7 @@ pub fn create_diagnostic_bundle(
     // 1. version.json
     let version_json = serde_json::to_vec_pretty(&json!({
         "app_name": "DealSonar",
-        "app_version": env!("CARGO_PKG_VERSION"),
+        "app_version": crate::DESKTOP_VERSION,
         "protocol_version": PROTOCOL_VERSION,
         "os": std::env::consts::OS,
         "arch": std::env::consts::ARCH,
@@ -111,6 +111,11 @@ pub fn create_diagnostic_bundle(
     let counts_json = serde_json::to_vec_pretty(&counts)?;
     zip.start_file("table_counts.json", opts)?;
     zip.write_all(&counts_json)?;
+
+    // 4b. account_safety.json (session incidents and page-load counts; no account identity)
+    let safety = crate::safety::account_safety_report(store, settings, 30, now_ms)?;
+    zip.start_file("account_safety.json", opts)?;
+    zip.write_all(&serde_json::to_vec_pretty(&safety)?)?;
 
     // 5. schema_migrations.json
     let migrations = store.list_schema_migrations()?;

@@ -17,7 +17,7 @@ use dealsonar_notify::{
 };
 use dealsonar_protocol::RawPost;
 use dealsonar_rules::{
-    classify_lead_tier, compile_ruleset_unchecked, evaluate_hard_filters, extract_vn_phone,
+    classify_lead_tier, compile_ruleset_unchecked, evaluate_match_filters, extract_vn_phone,
     normalize_text, postprocess_fields, run_basic_prefilter, BasicPrefilterInput, LeadDisposition,
     NormalizedText, RulesetBody as EngineRulesetBody, RulesetOutcome, DEDUP_WINDOW_MS,
     NEAR_DUP_MAX_HAMMING, NEAR_DUP_MIN_CHARS,
@@ -32,9 +32,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::dto::{
-    extracted_field_ai_to_rules, extracted_field_from_store, extracted_field_rules_to_store,
-    extracted_field_store_to_rules, extracted_fields_store_to_notify, field_def_store_to_ai,
-    field_def_store_to_notify, field_def_store_to_rules, hard_filters_store_to_rules,
+    condition_store_to_rules, extracted_field_ai_to_rules, extracted_field_from_store,
+    extracted_field_rules_to_store, extracted_field_store_to_rules,
+    extracted_fields_store_to_notify, field_def_store_to_ai, field_def_store_to_notify,
+    field_def_store_to_rules, hard_filters_store_to_rules,
 };
 use crate::dto::{
     AlsoSeenSource, AuthorRole, CoreEvent, DecidedBy, FeedbackLabel, Lead, LeadStatus, PostIntent,
@@ -66,15 +67,27 @@ pub enum EvalMode {
     BackfillSilent,
     /// Interactive preview (`is_preview = true`, T2 skipped, no leads or notifications).
     Preview,
+    /// Radar comparison: behaves like `Preview` (no leads, no notifications, no background
+    /// jobs) but keeps its evaluations in their own scratch scope.
+    Compare,
 }
 
 impl EvalMode {
     pub fn is_preview(&self) -> bool {
-        matches!(self, Self::Preview)
+        matches!(self, Self::Preview | Self::Compare)
     }
 
     pub fn is_silent_or_preview(&self) -> bool {
-        matches!(self, Self::BackfillSilent | Self::Preview)
+        matches!(self, Self::BackfillSilent | Self::Preview | Self::Compare)
+    }
+
+    /// `evaluations.is_preview` value rows of this mode are stored under.
+    pub fn eval_scope(&self) -> i64 {
+        match self {
+            Self::Compare => dealsonar_store::models::COMPARE_EVAL_SCOPE,
+            Self::Preview => 1,
+            Self::Live { .. } | Self::BackfillSilent => 0,
+        }
     }
 
     pub fn repost_after_72h(&self) -> bool {

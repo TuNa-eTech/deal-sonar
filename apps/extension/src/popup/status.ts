@@ -26,13 +26,21 @@ export function renderStatus(status: PopupStatusSnapshot): void {
     statusText.textContent = status.desktopVersion
       ? `Đã kết nối (v${status.desktopVersion})`
       : "Đã kết nối";
-    desktopHelp.classList.add("hidden");
+    // Connected, but the Desktop release is older than this extension supports: explain, don't block.
+    if (status.compat?.kind === "desktop_outdated") {
+      desktopHelp.classList.remove("hidden");
+      desktopHelpMsg.textContent = `${status.compat.message} ${status.compat.action}`;
+    } else {
+      desktopHelp.classList.add("hidden");
+    }
   } else {
     statusText.textContent = "Mất kết nối";
     desktopHelp.classList.remove("hidden");
     const errLower = (status.connectionError ?? "").toLowerCase();
     const extIdSuffix = status.extensionId ? ` (ID tiện ích: ${status.extensionId})` : "";
-    if (status.connectionError && status.connectionError.includes("không khớp")) {
+    if (status.compat?.kind === "protocol_mismatch") {
+      desktopHelpMsg.textContent = `${status.compat.message} ${status.compat.action}`;
+    } else if (status.connectionError && status.connectionError.includes("không khớp")) {
       desktopHelpMsg.textContent = status.connectionError;
     } else if (errLower.includes("forbidden")) {
       desktopHelpMsg.textContent =

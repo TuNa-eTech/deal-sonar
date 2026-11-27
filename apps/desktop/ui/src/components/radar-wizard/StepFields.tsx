@@ -5,13 +5,17 @@ import { parseFieldValue } from "../../lib/fieldValues";
 import { FIELD_TYPE_LABELS, slugifyFieldKey } from "../../lib/format";
 import type { HardFilter, FieldType } from "../../types/ipc";
 import type { RadarWizardModel } from "./useRadarWizard";
+import { INTENT_LABELS } from "./constants";
 import { Button, Card, Input, Select } from "../ui";
+import { ConditionEditor } from "./ConditionEditor";
 
 export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
   const {
     license,
     hardFilters,
     setHardFilters,
+    condition,
+    setCondition,
     showFields,
     setShowFields,
     answers,
@@ -19,6 +23,13 @@ export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     setDescription,
     wantIntent,
     excludePeers,
+    assumptions,
+    setAssumptions,
+    sideAmbiguous,
+    setSideAmbiguous,
+    chooseSide,
+    sources,
+    selectedSourceIds,
     fields,
     clarifyingQuestions,
     clarifyingDismissed,
@@ -32,9 +43,25 @@ export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
     addField,
     removeField,
   } = w;
+  const selectedSources = sources.filter(source => selectedSourceIds.includes(source.id));
 
   return (
     <div>
+      {sideAmbiguous && (
+        <Card role="group" aria-label="Chọn phía giao dịch"
+          style={{ background: "var(--warning-soft)", borderColor: "var(--warning)", marginBottom: 12 }}>
+          <strong>Chưa rõ bạn muốn theo dõi bài của ai.</strong>
+          <p className="field-hint">
+            Radar đang giữ trung tính (cả hai chiều) và không loại bài của người cùng nghề để không bỏ sót.
+            Chọn một phía nếu bạn đã chắc chắn.
+          </p>
+          <div className="toolbar-row">
+            <Button size="sm" onClick={() => chooseSide("demand")}>Người đang cần mua / thuê / tìm</Button>
+            <Button size="sm" onClick={() => chooseSide("supply")}>Người đang bán / cho thuê / cung cấp</Button>
+            <Button size="sm" onClick={() => chooseSide("any")}>Giữ cả hai chiều</Button>
+          </div>
+        </Card>
+      )}
       {!clarifyingDismissed && clarifyingQuestions.length > 0 && (
         <Card style={{ background: "var(--warning-soft)", borderColor: "var(--warning)", marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -57,18 +84,41 @@ export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
 
       {!fields.length && <p className="field-hint">Tiêu chí sẽ hiện sau khi AI đọc mô tả.</p>}
       {fields.length > 0 && <div className="radar-criteria-fields">
+        <dl className="radar-interpretation" aria-label="Radar sẽ tìm gì">
+          <dt>Nguồn</dt>
+          <dd>{selectedSources.length ? selectedSources.map(source => source.name).join(" · ") : "Chưa chọn nhóm nào"}</dd>
+          <dt>Phía giao dịch</dt>
+          <dd>{INTENT_LABELS[wantIntent]}</dd>
+          <dt>Đối tượng bị loại</dt>
+          <dd>{excludePeers ? "Người cùng nghề đăng bài chào khách" : "Không loại ai"}</dd>
+          <dt>Thông tin cần lấy</dt>
+          <dd>{fields.map(field => field.label).join(" · ")}</dd>
+        </dl>
         <label className="field-group">
           <span className="field-label">Loại bài</span>
-          <Select value={wantIntent} onChange={event => setWantIntent(event.target.value as typeof wantIntent)}>
-            <option value="demand">Người cần mua / thuê / tìm</option>
-            <option value="supply">Người bán / cho thuê / cung cấp</option>
-            <option value="any">Cả hai chiều</option>
+          <Select value={wantIntent} onChange={event => { setWantIntent(event.target.value as typeof wantIntent); setSideAmbiguous(false); }}>
+            <option value="demand">{INTENT_LABELS.demand}</option>
+            <option value="supply">{INTENT_LABELS.supply}</option>
+            <option value="any">{INTENT_LABELS.any}</option>
           </Select>
         </label>
         <label className="radar-peer-scope">
           <input type="checkbox" checked={excludePeers} onChange={event => setExcludePeers(event.target.checked)} />
           Loại bài chào bán của người cùng nghề
         </label>
+        <div className="field-group radar-assumptions">
+          <span className="field-label">Giả định (sửa nếu chưa đúng)</span>
+          {!assumptions.length && <span className="field-hint">Không có giả định nào ngoài những điều bạn đã nêu.</span>}
+          {assumptions.map((assumption, index) => (
+            <div className="toolbar-row" key={index}>
+              <Input aria-label={`Giả định ${index + 1}`} value={assumption}
+                onChange={event => setAssumptions(items => items.map((item, row) => row === index ? event.target.value : item))} />
+              <Button size="sm" aria-label={`Bỏ giả định ${index + 1}`}
+                onClick={() => setAssumptions(items => items.filter((_, row) => row !== index))}>Bỏ</Button>
+            </div>
+          ))}
+          <Button size="sm" disabled={assumptions.length >= 5} onClick={() => setAssumptions(items => [...items, ""])}>+ Thêm giả định</Button>
+        </div>
         <h4>Điều kiện bắt buộc</h4>
         {hardFilters.map((filter, index) => {
           const field = fields.find(candidate => candidate.key === filter.field);
@@ -125,6 +175,7 @@ export const StepFields: React.FC<{ w: RadarWizardModel }> = ({ w }) => {
         })}
         <Button size="sm" onClick={() => setHardFilters(items =>
           [...items,{ field: fields[0]!.key, op: "eq", value: null, when_missing: "fail" }])}>+ Điều kiện bắt buộc</Button>
+        <ConditionEditor condition={condition} fields={fields} onChange={setCondition} onError={message => setErrorMsg(message)} />
       </div>}
       <div className="radar-field-disclosure">
         <Button aria-expanded={showFields} onClick={() => setShowFields(value => !value)}>

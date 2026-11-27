@@ -5,10 +5,12 @@ import { readWorkspace, saveWorkspace } from "../../lib/workspace";
 import { api, onDesktopEvent } from "../../lib/api";
 import { offerUndo } from "../UndoCenter";
 import { composeTemplateDescription, slugifyFieldKey } from "../../lib/format";
+import { cleanAssumptions, SIDE_NEUTRAL_PREFIX } from "./constants";
 import type {
   Channel,
   HealthStatus,
   HardFilter,
+  FilterExpr,
   RadarNotifyConfig,
   FieldDef,
   LicenseStatus,
@@ -61,6 +63,10 @@ export function useRadarWizard({
   const [channels,setChannels]=useState<Channel[]>([]);
   const [notify,setNotify]=useState<RadarNotifyConfig>(restored?.notify ?? editRadar?.radar.notify ?? {mode:initialTemplate?.notify_mode ?? "instant",inherit_channels:false,channel_ids:[],min_score:0.6,quiet_hours:null,lead_ttl_hours:initialTemplate?.lead_ttl_hours ?? null});
   const [hardFilters,setHardFilters]=useState<HardFilter[]>(restored?.hardFilters ?? version?.match_policy.hard_filters ?? initialTemplate?.match_policy.hard_filters ?? []);
+  // Biểu thức nhóm (all/any/not) chưa có trình soạn thảo trong wizard: giữ nguyên khi lưu để không mất.
+  const [condition,setCondition]=useState<FilterExpr|null>(restored?.condition ?? version?.match_policy.condition ?? initialTemplate?.match_policy.condition ?? null);
+  // Bài người dùng đánh dấu «Đáng lẽ phải khớp»: giữ lại qua các lần chạy lại để kiểm tra sau khi sửa điều kiện.
+  const [missedPostIds,setMissedPostIds]=useState<string[]>([]);
   const [showFields,setShowFields]=useState(false);
   const [templatesOpen,setTemplatesOpen]=useState(!initialTemplate&&!editRadar&&!restored);
   const [answers,setAnswers]=useState<Record<number,string>>({});
@@ -104,13 +110,19 @@ export function useRadarWizard({
   const [wantIntent, setWantIntent] = useState<WantIntent>(
     restored?.wantIntent ?? version?.match_policy.want_intent ??
       defaultTpl?.match_policy.want_intent ??
-      "demand"
+      "any"
   );
+  // A blank brief has no side or excluded audience until the interpretation (or the user)
+  // sets one, so nothing is hidden by a default.
   const [excludePeers, setExcludePeers] = useState<boolean>(
     restored?.excludePeers ?? (editRadar
       ? version!.match_policy.exclude_roles.includes("peer")
-      : (defaultTpl?.match_policy.exclude_roles.includes("peer") ?? true))
+      : (defaultTpl?.match_policy.exclude_roles.includes("peer") ?? false))
   );
+  const [assumptions, setAssumptions] = useState<string[]>(
+    restored?.assumptions ?? version?.match_policy.assumptions ?? defaultTpl?.match_policy.assumptions ?? []
+  );
+  const [sideAmbiguous, setSideAmbiguous] = useState<boolean>(restored?.sideAmbiguous ?? false);
 
   const [fields, setFields] = useState<FieldDef[]>(
     structuredClone(
@@ -121,7 +133,7 @@ export function useRadarWizard({
   const suggestionInFlight = useRef(false);
   const preparing = useRef(false);
   const [analyzedDescription, setAnalyzedDescription] = useState<string | null>(restored?.analyzedDescription ?? null);
-  const [clarifyingQuestions, setClarifyingQuestions] = useState<string[]>([]);
+  const [clarifyingQuestions, setClarifyingQuestions] = useState<string[]>(restored?.clarifyingQuestions ?? []);
   const [clarifyingDismissed, setClarifyingDismissed] = useState(false);
 
   const [sources, setSources] = useState<Source[]>(initialSources);
@@ -150,7 +162,7 @@ export function useRadarWizard({
   const previewRunning = previewState?.status === "crawling" || previewState?.status === "evaluating";
   const previewBusy = previewLoading || previewRunning;
   const evaluatedSignature=useRef<string|null>(null);
-  const definitionSignature=JSON.stringify([description,userProfession,fields,wantIntent,excludePeers,hardFilters,selectedSourceIds]);
+  const definitionSignature=JSON.stringify([description,userProfession,fields,wantIntent,excludePeers,hardFilters,condition,selectedSourceIds]);
   useEffect(()=>{
     if(!previewBusy&&evaluatedSignature.current!==null&&evaluatedSignature.current!==definitionSignature){
       activePreviewId.current = null;
@@ -161,14 +173,15 @@ export function useRadarWizard({
 
 
   useEffect(()=>{
-    saveWorkspace(draftKey,{step,mode,selectedTemplate,placeholderValues,radarName,description,userProfession,wantIntent,excludePeers,fields,selectedSourceIds,draftRadarId,hardFilters,notify,analyzedDescription,sourcesManual,sourcesSuggested});
-  },[draftKey,step,mode,selectedTemplate,placeholderValues,radarName,description,userProfession,wantIntent,excludePeers,fields,selectedSourceIds,draftRadarId,hardFilters,notify,analyzedDescription,sourcesManual,sourcesSuggested]);
+    saveWorkspace(draftKey,{step,mode,selectedTemplate,placeholderValues,radarName,description,userProfession,wantIntent,excludePeers,fields,selectedSourceIds,draftRadarId,hardFilters,notify,analyzedDescription,sourcesManual,sourcesSuggested,assumptions,sideAmbiguous,clarifyingQuestions,condition});
+  },[draftKey,step,mode,selectedTemplate,placeholderValues,radarName,description,userProfession,wantIntent,excludePeers,fields,selectedSourceIds,draftRadarId,hardFilters,notify,analyzedDescription,sourcesManual,sourcesSuggested,assumptions,sideAmbiguous,clarifyingQuestions,condition]);
   const maxFields = license.limits.max_fields_per_radar;
   const maxGroups = license.limits.max_followed_groups;
   const descriptionKey = JSON.stringify([description.trim(), userProfession.trim(), selectedTemplate?.id ?? null]);
 
   const selectTemplate = (tpl: RadarTemplate) => {
     setHardFilters(structuredClone(tpl.match_policy.hard_filters));
+    setCondition(structuredClone(tpl.match_policy.condition ?? null));
     setMode("template");
     setTemplatesOpen(false);
     setSelectedTemplate(tpl);
@@ -178,6 +191,9 @@ export function useRadarWizard({
     setUserProfession(tpl.user_profession);
     setWantIntent(tpl.match_policy.want_intent);
     setExcludePeers(tpl.match_policy.exclude_roles.includes("peer"));
+    setAssumptions(tpl.match_policy.assumptions ?? []);
+    setSideAmbiguous(false);
+    setClarifyingQuestions([]);
     setFields(structuredClone(tpl.fields).slice(0, maxFields));
     // Each trade has its own clock: a bargain car is gone in hours, a job seeker stays for weeks.
     setNotify((n) => ({ ...n, lead_ttl_hours: tpl.lead_ttl_hours ?? null, mode: tpl.notify_mode ?? n.mode }));
@@ -190,10 +206,14 @@ export function useRadarWizard({
     setRadarName("");
     setDescription(initialGoal);
     setUserProfession("");
-    setWantIntent("demand");
-    setExcludePeers(true);
+    setWantIntent("any");
+    setExcludePeers(false);
+    setAssumptions([]);
+    setSideAmbiguous(false);
+    setClarifyingQuestions([]);
     setFields([]);
     setHardFilters([]);
+    setCondition(null);
     setNotify(n => ({ ...n, lead_ttl_hours: null }));
   };
 
@@ -236,13 +256,37 @@ export function useRadarWizard({
       ]);
       const plan = getPreviewPlan();
       if (forceReplace || !fields.length) {
+        const previous = { fields, wantIntent, excludePeers, hardFilters, assumptions, sideAmbiguous, condition };
         plan.fields = res.fields.slice(0, maxFields);
         plan.matchPolicy.want_intent = res.want_intent;
         plan.matchPolicy.hard_filters = res.hard_filters.filter(filter =>
           plan.fields.some(field => field.key === filter.field));
+        const peersExcluded = (res.exclude_roles ?? []).includes("peer");
+        const nextAssumptions = cleanAssumptions(res.assumptions ?? []);
+        plan.matchPolicy.exclude_roles = peersExcluded ? ["peer"] : [];
+        if (nextAssumptions.length) plan.matchPolicy.assumptions = nextAssumptions;
+        else delete plan.matchPolicy.assumptions;
+        // A condition group refers to the old fields, so a fresh reading starts without one.
+        delete plan.matchPolicy.condition;
+        setCondition(null);
         setFields(plan.fields);
         setHardFilters(plan.matchPolicy.hard_filters);
         setWantIntent(plan.matchPolicy.want_intent);
+        setExcludePeers(peersExcluded);
+        setAssumptions(nextAssumptions);
+        setSideAmbiguous(Boolean(res.side_ambiguous));
+        if (fields.length) {
+          // The user's manual edits are replaced only on request, and can be brought back.
+          offerUndo("Đã cập nhật tiêu chí theo mô tả", async () => {
+            setFields(previous.fields);
+            setHardFilters(previous.hardFilters);
+            setWantIntent(previous.wantIntent);
+            setExcludePeers(previous.excludePeers);
+            setAssumptions(previous.assumptions);
+            setSideAmbiguous(previous.sideAmbiguous);
+            setCondition(previous.condition);
+          });
+        }
       }
       if (!radarName.trim()) setRadarName(plan.name = res.suggested_name);
       if (!sourcesManual) {
@@ -354,11 +398,17 @@ export function useRadarWizard({
     } finally { setPreviewLoading(false); }
   };
 
-  const currentMatchPolicy = (): MatchPolicy => ({
-    want_intent: wantIntent,
-    exclude_roles: excludePeers ? ["peer"] : [],
-    hard_filters: hardFilters,
-  });
+  const currentMatchPolicy = (): MatchPolicy => {
+    const kept = cleanAssumptions(assumptions);
+    return {
+      want_intent: wantIntent,
+      exclude_roles: excludePeers ? ["peer"] : [],
+      hard_filters: hardFilters,
+      // Omitted when empty, exactly as the backend stores it, so unchanged drafts compare equal.
+      ...(kept.length ? { assumptions: kept } : {}),
+      ...(condition ? { condition } : {}),
+    };
+  };
 
   const getPreviewPlan = (): RadarPreviewPlan => ({
     name: radarName.trim() || "Radar mới",
@@ -373,7 +423,8 @@ export function useRadarWizard({
     activePreviewId.current = null;
     evaluatedSignature.current = JSON.stringify([
       description, userProfession, previewFields, plan.matchPolicy.want_intent,
-      plan.matchPolicy.exclude_roles.includes("peer"), plan.matchPolicy.hard_filters, plan.sourceIds,
+      plan.matchPolicy.exclude_roles.includes("peer"), plan.matchPolicy.hard_filters,
+      plan.matchPolicy.condition ?? null, plan.sourceIds,
     ]);
     setPreviewState(null);
     setPreviewSyncError(null);
@@ -438,7 +489,7 @@ export function useRadarWizard({
     const savedSignature = JSON.stringify([
       version.description, version.user_profession ?? "", version.fields,
       version.match_policy.want_intent, version.match_policy.exclude_roles.includes("peer"),
-      version.match_policy.hard_filters, editRadar.radar.source_ids,
+      version.match_policy.hard_filters, version.match_policy.condition ?? null, editRadar.radar.source_ids,
     ]);
     if (editRadar.radar.status !== "draft" || savedSignature !== definitionSignature) {
       void startPreviewRun();
@@ -556,6 +607,11 @@ export function useRadarWizard({
   };
 
   const toggleSource = (id: string) => {
+    const source = sources.find((candidate) => candidate.id === id);
+    if (source && source.state !== "ok" && !selectedSourceIds.includes(id)) {
+      setErrorMsg("Chỉ chọn được nhóm đã kết nối và đang hoạt động. Mở nhóm trên Facebook rồi làm mới danh sách.");
+      return;
+    }
     setSourcesManual(true);
     setSourcesSuggested(false);
     setSelectedSourceIds((prev) => {
@@ -587,6 +643,9 @@ export function useRadarWizard({
       label,
       origin: "preview",
     });
+    setMissedPostIds((ids) => label === "missed"
+      ? (ids.includes(item.post_id) ? ids : [...ids, item.post_id])
+      : ids.filter((id) => id !== item.post_id));
     setPreviewState((prev) =>
       prev
         ? {
@@ -682,6 +741,14 @@ export function useRadarWizard({
     }
   };
 
+  /** The user answers the "which side?" question: record it and drop the neutral-side note. */
+  const chooseSide = (intent: WantIntent) => {
+    setWantIntent(intent);
+    setSideAmbiguous(false);
+    setClarifyingDismissed(true);
+    setAssumptions(items => items.filter(item => !item.startsWith(SIDE_NEUTRAL_PREFIX)));
+  };
+
   const goalTemplateId = /bán xe|bán ô tô/i.test(initialGoal) ? "xe-cu.duoi-gia"
     : /cần thợ|tìm thợ/i.test(initialGoal) ? "dich-vu.tim-tho"
     : /cần thuê căn hộ|tìm thuê căn hộ/i.test(initialGoal) ? "bds.khach-thue" : null;
@@ -698,6 +765,11 @@ export function useRadarWizard({
     for (const id of selectedSourceIds) followedSet.add(id);
     return followedSet.size;
   }, [sources, selectedSourceIds]);
+
+  useEffect(() => {
+    const labelled = (previewState?.items ?? []).filter((i) => i.feedback_label === "missed").map((i) => i.post_id);
+    if (labelled.length) setMissedPostIds((ids) => [...new Set([...ids, ...labelled])]);
+  }, [previewState]);
 
   const matchedPreviewItems = useMemo(
     () =>
@@ -734,6 +806,9 @@ export function useRadarWizard({
     setNotify,
     hardFilters,
     setHardFilters,
+    condition,
+    setCondition,
+    missedPostIds,
     showFields,
     setShowFields,
     templatesOpen,
@@ -764,6 +839,11 @@ export function useRadarWizard({
     setWantIntent,
     excludePeers,
     setExcludePeers,
+    assumptions,
+    setAssumptions,
+    sideAmbiguous,
+    setSideAmbiguous,
+    chooseSide,
     fields,
     setFields,
     suggesting,

@@ -11,7 +11,10 @@ import type {
   ContactDetail,
   CrawlRun,
   CreateRadarDraftInput,
+  CreateRadarVariantInput,
   FunnelStats,
+  FirstNewsStatus,
+  AccountSafetyReport,
   HealthStatus,
   LeadDetail,
   LeadExportInput,
@@ -28,10 +31,14 @@ import type {
   PreviewStartInput,
   ProbeResult,
   Radar,
+  RadarCompareInput,
+  RadarComparison,
+  RadarComparisonSummary,
   RadarDetail,
   RadarStatus,
   RadarTemplate,
   RadarUpdateResult,
+  RadarVariantDraft,
   RejectedEvaluation,
   Ruleset,
   RulesetBody,
@@ -90,6 +97,14 @@ export const api = {
   radarGet: (id: string) => callCommand<RadarDetail>("radar_get", { id }),
   radarCreateDraft: (input: CreateRadarDraftInput) =>
     callCommand<RadarDetail>("radar_create_draft", { input }),
+  radarVariantPrepare: (source_radar_id: string) =>
+    callCommand<RadarVariantDraft>("radar_variant_prepare", { source_radar_id }),
+  radarCreateVariant: (input: CreateRadarVariantInput) =>
+    callCommand<RadarDetail>("radar_create_variant", { input }),
+  radarCompareRun: (input: RadarCompareInput) =>
+    callCommand<RadarComparison>("radar_compare_run", { input }),
+  radarCompareGet: (id: string) => callCommand<RadarComparison>("radar_compare_get", { id }),
+  radarCompareList: () => callCommand<RadarComparisonSummary[]>("radar_compare_list"),
   radarUpdate: (input: UpdateRadarInput) =>
     callCommand<RadarUpdateResult>("radar_update", { input }),
   radarSuggestFields: (input: SuggestFieldsInput) =>
@@ -221,6 +236,8 @@ export const api = {
 
   // --- Health & Diagnostics ---
   healthGet: () => callCommand<HealthStatus>("health_get"),
+  firstNewsStatus: () => callCommand<FirstNewsStatus>("first_news_status"),
+  accountSafetyReport: (days = 30) => callCommand<AccountSafetyReport>("account_safety_report", { days }),
   crawlRunList: (source_id?: string | null, limit = 50) =>
     callCommand<CrawlRun[]>("crawl_run_list", { source_id: source_id ?? null, limit }),
   aiUsageGet: (days = 7) => callCommand<AiUsageStats>("ai_usage_get", { days }),

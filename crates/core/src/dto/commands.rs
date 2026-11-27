@@ -60,6 +60,20 @@ pub struct CreateRadarDraftInput {
     pub notify: Option<RadarNotifyPatch>,
 }
 
+/// Copy of an existing radar that the user can review and edit before saving it as a variant.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RadarVariantDraft {
+    pub source_radar_id: String,
+    pub source_radar_name: String,
+    pub input: CreateRadarDraftInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CreateRadarVariantInput {
+    pub source_radar_id: String,
+    pub input: CreateRadarDraftInput,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct UpdateRadarInput {
     pub id: String,
@@ -111,6 +125,15 @@ pub struct SuggestFieldsResult {
     pub prefilter_hint: Option<PrefilterHintDto>,
     #[serde(default)]
     pub suggested_source_ids: Vec<String>,
+    /// Authors excluded by default for this brief; shown so the user can change it.
+    #[serde(default)]
+    pub exclude_roles: Vec<AuthorRole>,
+    /// Interpretation choices (trade side, excluded audience, area...) the user can edit.
+    #[serde(default)]
+    pub assumptions: Vec<String>,
+    /// The brief did not say which side of the trade to follow; `want_intent` stays `any`.
+    #[serde(default)]
+    pub side_ambiguous: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -131,6 +154,10 @@ pub struct PreviewItem {
     pub post_text: String,
     pub post_created_at: Option<i64>,
     pub feedback_label: Option<FeedbackLabel>,
+    /// How the radar's filters judged this post: passed/failed branches and missing fields.
+    /// `None` when the radar has no `hard_filters` or `condition`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filter_trace: Option<dealsonar_rules::FilterTrace>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

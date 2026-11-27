@@ -1,0 +1,95 @@
+######## Lượt 1/3 ########
+============================================================
+  DealSonar AI Bridge — Báo cáo đánh giá chất lượng ngoại tuyến
+============================================================
+Provider       : codex_cli
+Kích thước lô  : 10 bài/lô
+Tổng số bài    : 55 (thành công: 55, ai_failed: 0)
+Số lời gọi CLI : 6
+
+1. QUYẾT ĐỊNH KHỚP (Ngưỡng H2: Precision >= 85%, Recall >= 90%)
+   - Precision : 100.00%  [ĐẠT]  (TP=13, FP=0; 13/13)
+   - Recall    :  92.86%  [ĐẠT]  (TP=13, FN=1; 13/14)
+   - F1 Score  :  96.30%
+
+2. NHẬN DIỆN NGƯỜI CÙNG NGHỀ (Ngưỡng H2: Precision & Recall >= 75%)
+   - Peer Precision :  85.71%  [ĐẠT]
+   - Peer Recall    : 100.00%  [ĐẠT]
+
+3. ĐỘ ĐÚNG TỪNG TRƯỜNG & TỈ LỆ BỊA `raw` (Ngưỡng H2: bắt buộc >= 90%, tuỳ chọn >= 80%, bịa <= 1%)
+   - bedrooms       (tuỳ chọn) :  92.86% (13/14)  [ĐẠT]
+   - location       (bắt buộc) :  35.71% (5/14)  [CHƯA ĐẠT]
+   - phone          (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - price          (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - property_type  (bắt buộc) : 100.00% (14/14)  [ĐẠT]
+   - Tỉ lệ `raw` không có trong bài :   0.00% (0/196)  [ĐẠT]
+
+4. HIỆU NĂNG & TOKEN TRUNG BÌNH MỖI BÀI
+   - Input tokens / bài  : 3037.1
+   - Output tokens / bài : 295.7
+   - Thời lượng / bài    : 6674.51 ms
+######## Lượt 2/3 ########
+============================================================
+  DealSonar AI Bridge — Báo cáo đánh giá chất lượng ngoại tuyến
+============================================================
+Provider       : codex_cli
+Kích thước lô  : 10 bài/lô
+Tổng số bài    : 55 (thành công: 55, ai_failed: 0)
+Số lời gọi CLI : 6
+
+1. QUYẾT ĐỊNH KHỚP (Ngưỡng H2: Precision >= 85%, Recall >= 90%)
+   - Precision : 100.00%  [ĐẠT]  (TP=13, FP=0; 13/13)
+   - Recall    :  92.86%  [ĐẠT]  (TP=13, FN=1; 13/14)
+   - F1 Score  :  96.30%
+
+2. NHẬN DIỆN NGƯỜI CÙNG NGHỀ (Ngưỡng H2: Precision & Recall >= 75%)
+   - Peer Precision :  70.59%  [CHƯA ĐẠT]
+   - Peer Recall    : 100.00%  [ĐẠT]
+
+3. ĐỘ ĐÚNG TỪNG TRƯỜNG & TỈ LỆ BỊA `raw` (Ngưỡng H2: bắt buộc >= 90%, tuỳ chọn >= 80%, bịa <= 1%)
+   - bedrooms       (tuỳ chọn) :  92.86% (13/14)  [ĐẠT]
+   - location       (bắt buộc) :  42.86% (6/14)  [CHƯA ĐẠT]
+   - phone          (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - price          (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - property_type  (bắt buộc) : 100.00% (14/14)  [ĐẠT]
+   - Tỉ lệ `raw` không có trong bài :   0.00% (0/197)  [ĐẠT]
+
+4. HIỆU NĂNG & TOKEN TRUNG BÌNH MỖI BÀI
+   - Input tokens / bài  : 3033.9
+   - Output tokens / bài : 292.7
+   - Thời lượng / bài    : 6566.27 ms
+######## Lượt 3/3 ########
+============================================================
+  DealSonar AI Bridge — Báo cáo đánh giá chất lượng ngoại tuyến
+============================================================
+Provider       : codex_cli
+Kích thước lô  : 10 bài/lô
+Tổng số bài    : 55 (thành công: 55, ai_failed: 0)
+Số lời gọi CLI : 6
+
+1. QUYẾT ĐỊNH KHỚP (Ngưỡng H2: Precision >= 85%, Recall >= 90%)
+   - Precision : 100.00%  [ĐẠT]  (TP=11, FP=0; 11/11)
+   - Recall    :  78.57%  [CHƯA ĐẠT]  (TP=11, FN=3; 11/14)
+   - F1 Score  :  88.00%
+
+2. NHẬN DIỆN NGƯỜI CÙNG NGHỀ (Ngưỡng H2: Precision & Recall >= 75%)
+   - Peer Precision :  57.14%  [CHƯA ĐẠT]
+   - Peer Recall    : 100.00%  [ĐẠT]
+
+3. ĐỘ ĐÚNG TỪNG TRƯỜNG & TỈ LỆ BỊA `raw` (Ngưỡng H2: bắt buộc >= 90%, tuỳ chọn >= 80%, bịa <= 1%)
+   - bedrooms       (tuỳ chọn) :  92.86% (13/14)  [ĐẠT]
+   - location       (bắt buộc) :  42.86% (6/14)  [CHƯA ĐẠT]
+   - phone          (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - price          (tuỳ chọn) : 100.00% (14/14)  [ĐẠT]
+   - property_type  (bắt buộc) : 100.00% (14/14)  [ĐẠT]
+   - Tỉ lệ `raw` không có trong bài :   0.00% (0/191)  [ĐẠT]
+
+4. HIỆU NĂNG & TOKEN TRUNG BÌNH MỖI BÀI
+   - Input tokens / bài  : 3934.9
+   - Output tokens / bài : 289.2
+   - Thời lượng / bài    : 6680.73 ms
+
+5. ỔN ĐỊNH QUA 3 LƯỢT (Ngưỡng: tỉ lệ bài đổi quyết định khớp <= 3%)
+   - Bài đổi quyết định : 2/55 = 3.64%  [CHƯA ĐẠT]
+
+Đã ghi báo cáo nghiên cứu: /Users/anhtu/orca/workspaces/DealSonar/radar-factory-10/docs/eval/reports/real-cli-holdout-v1/codex__gpt-6.2-sol__b10/bds-tim-nguoi-thue.json

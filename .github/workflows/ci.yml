@@ -28,6 +28,11 @@ jobs:
       - run: pnpm ext:test
       - run: pnpm ui:test
       - run: pnpm protocol:verify
+      - run: pnpm eval:holdout:verify
+      - run: pnpm study:h5:test
+      - run: pnpm pilot:test
+      - run: pnpm study:test
+      - run: pnpm dist:verify
 
   rust:
     name: Rust (${{ matrix.os }})
