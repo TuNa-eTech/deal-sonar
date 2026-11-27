@@ -48,6 +48,63 @@ export function validateLedger(ledger, distribution) {
   return problems;
 }
 
+const UPGRADE_UPDATE_PATHS = ["over_install_installer", "dmg_replace_app"];
+const SKEW_SCENARIOS = ["chrome_newer_than_desktop", "desktop_newer_than_chrome"];
+const UPGRADE_CHECKS = ["radar_kept", "old_leads_readable", "new_post_collected", "notification_received"];
+
+/** Problems in the upgrade-run ledger (`upgrade_runs`, optional). */
+export function validateUpgradeRuns(ledger, distribution) {
+  const problems = [];
+  const runs = ledger.upgrade_runs ?? [];
+  if (!Array.isArray(runs)) return ["upgrade_runs must be an array"];
+  const platforms = new Map(distribution.platforms.map((p) => [p.id, p]));
+  const ids = new Set();
+  runs.forEach((r, i) => {
+    const at = `upgrade_runs[${i}]${r.id ? ` (${r.id})` : ""}`;
+    const bad = (msg) => problems.push(`${at}: ${msg}`);
+    if (!r.id) bad("missing id");
+    else if (ids.has(r.id)) bad("duplicate id");
+    ids.add(r.id);
+    if (!DATE.test(r.recorded_on ?? "")) bad("recorded_on must be YYYY-MM-DD");
+    if (!platforms.has(r.platform_id)) bad(`unknown platform_id ${r.platform_id}`);
+    for (const key of ["from_tag", "to_tag"]) {
+      if (!/^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(r[key] ?? "")) bad(`${key} must look like v1.2.3`);
+    }
+    if (r.from_tag && r.from_tag === r.to_tag) bad("from_tag and to_tag must differ");
+    for (const key of ["from_artifact_sha256", "to_artifact_sha256"]) {
+      if (!SHA256.test(r[key] ?? "")) bad(`${key} must be the lowercase SHA-256 of the installer actually run`);
+    }
+    if (!UPGRADE_UPDATE_PATHS.includes(r.update_path)) bad(`update_path must be one of ${UPGRADE_UPDATE_PATHS.join(", ")}`);
+    if (!CHANNELS.includes(r.channel)) bad(`channel must be one of ${CHANNELS.join(", ")}`);
+    if (!r.os_version) bad("os_version is required");
+    if (!r.tester_ref || /@|\s/.test(r.tester_ref)) bad("tester_ref must be an opaque id without spaces or email addresses");
+    if (!r.evidence_ref) bad("evidence_ref is required");
+    for (const check of UPGRADE_CHECKS) {
+      if (typeof r.checks?.[check] !== "boolean") bad(`checks.${check} must be true or false`);
+    }
+    for (const scenario of r.skew_scenarios ?? []) {
+      if (!SKEW_SCENARIOS.includes(scenario.name)) bad(`skew scenario ${scenario.name} is unknown`);
+      if (typeof scenario.guidance_shown !== "boolean" || typeof scenario.data_kept !== "boolean" || typeof scenario.recovered !== "boolean") {
+        bad(`skew scenario ${scenario.name} needs guidance_shown, data_kept and recovered`);
+      }
+    }
+    if (r.channel === "customer_download" && r.to_tag?.includes("-")) bad("a prerelease tag cannot be a customer download");
+  });
+  return problems;
+}
+
+/** A platform is upgrade-verified when a customer-channel run passed every check and both skew scenarios. */
+export function upgradeReadiness(ledger, distribution) {
+  return distribution.platforms.map((p) => {
+    const runs = (ledger.upgrade_runs ?? []).filter((r) => r.platform_id === p.id);
+    const verified = runs.filter((r) =>
+      r.channel === "customer_download" &&
+      UPGRADE_CHECKS.every((c) => r.checks?.[c] === true) &&
+      SKEW_SCENARIOS.every((name) => (r.skew_scenarios ?? []).some((s) => s.name === name && s.guidance_shown && s.data_kept && s.recovered)));
+    return { id: p.id, committed: p.committed, upgrade_verified: verified.length > 0, upgrade_runs: runs.length };
+  });
+}
+
 /** Evidence status per platform. `customer_ready` demands a clean-machine, signed, public download that paired. */
 export function platformReadiness(ledger, distribution) {
   return distribution.platforms.map((p) => {
@@ -84,15 +141,19 @@ function main() {
     return;
   }
 
-  const problems = validateLedger(ledger, distribution);
+  const problems = [...validateLedger(ledger, distribution), ...validateUpgradeRuns(ledger, distribution)];
   if (problems.length) { problems.forEach((p) => console.error(`✗ ${p}`)); process.exit(1); }
   const status = platformReadiness(ledger, distribution);
+  const upgrades = new Map(upgradeReadiness(ledger, distribution).map((u) => [u.id, u]));
   for (const s of status) {
-    console.log(`${s.committed ? "committed  " : "not-committed"} ${s.id.padEnd(20)} customer_ready=${s.customer_ready} internal_trials_paired=${s.internal_trials_paired} entries=${s.entries}`);
+    const u = upgrades.get(s.id);
+    console.log(`${s.committed ? "committed  " : "not-committed"} ${s.id.padEnd(20)} customer_ready=${s.customer_ready} internal_trials_paired=${s.internal_trials_paired} entries=${s.entries} upgrade_verified=${u.upgrade_verified} upgrade_runs=${u.upgrade_runs}`);
   }
   if (args.includes("--require-customer")) {
     const missing = status.filter((s) => s.committed && !s.customer_ready).map((s) => s.id);
     if (missing.length) { console.error(`✗ No customer-download evidence for: ${missing.join(", ")}`); process.exit(1); }
+    const noUpgrade = [...upgrades.values()].filter((u) => u.committed && !u.upgrade_verified).map((u) => u.id);
+    if (noUpgrade.length) { console.error(`✗ No verified upgrade run for: ${noUpgrade.join(", ")}`); process.exit(1); }
   }
 }
 

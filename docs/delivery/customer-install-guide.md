@@ -47,6 +47,10 @@ Giữ ứng dụng DealSonar đang chạy khi muốn quét.
 | Vừa cập nhật hoặc di chuyển ứng dụng | Mở ứng dụng một lần, bấm **Kiểm tra lại** |
 | Ứng dụng báo đã cài cấu hình nhưng tiện ích vẫn không nối | Vào `chrome://extensions`, bật *Chi tiết* của DealSonar, chụp màn hình dòng **ID** (32 chữ cái) và gửi cho bên hỗ trợ |
 
+## Cập nhật lên bản mới
+
+Tải bộ cài mới nhất và cài đè lên bản đang dùng (Windows: chạy bộ cài; macOS: kéo DealSonar đè vào *Applications* sau khi thoát ứng dụng). Radar, tin và cài đặt của bạn được giữ nguyên. Chrome tự cập nhật tiện ích; thường hai bên không cập nhật cùng lúc nên có thể thấy một thông báo **Cần cập nhật Chrome hoặc ứng dụng** trong ứng dụng, hoặc khung hướng dẫn trong tiện ích. Làm theo hướng dẫn đó (cập nhật bên còn cũ rồi bấm **Kiểm tra lại**); không cần xoá dữ liệu hay ghép nối lại từ đầu. Chi tiết: [05-upgrade-and-recovery.md](05-upgrade-and-recovery.md).
+
 ## Gỡ cài đặt
 
 Windows: *Cài đặt → Ứng dụng → DealSonar → Gỡ cài đặt*. macOS: kéo DealSonar ra khỏi *Applications*. Gỡ tiện ích: `chrome://extensions` → *Xóa*.

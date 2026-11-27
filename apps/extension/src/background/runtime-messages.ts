@@ -1,5 +1,6 @@
 // Popup and content-script runtime message handlers.
 
+import { compatGuidance } from "../compat";
 import type { PopupStatusSnapshot, RuntimeMessage, ContentInitResponse } from "../messages";
 import {
   refreshExpiredPauseState,
@@ -47,6 +48,9 @@ async function buildPopupStatus(now: number = Date.now()): Promise<PopupStatusSn
     desktopAvailable: state.connection.desktop_available,
     desktopVersion: state.connection.desktop_version,
     connectionError: state.connection.last_error,
+    compat: state.connection.compat
+      ? compatGuidance(state.connection.compat, state.connection.desktop_version)
+      : undefined,
     extensionId: typeof chrome !== "undefined" ? chrome.runtime?.id : undefined,
     session: {
       state: state.session.state,

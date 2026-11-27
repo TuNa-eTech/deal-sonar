@@ -120,6 +120,10 @@ jobs:
         with:
           key: release-${{ matrix.target }}
       - run: pnpm install --frozen-lockfile
+      - name: Export release version for the app
+        # The app reports this to the extension (hello.ok) so both sides can compare releases;
+        # without it the crate version (0.1.0) would be sent regardless of the tag.
+        run: echo "DEALSONAR_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - name: Build native messaging relay
         run: cargo build --locked --release -p dealsonar-native-host --target '${{ matrix.target }}'
       - name: Import Windows code-signing certificate

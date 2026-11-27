@@ -151,6 +151,17 @@ async fn handle_extension_connection(
             Err(parse_err) => {
                 // Return structured `error` envelope (`protocol_mismatch`, `unknown_type`,
                 // `invalid_payload`) WITHOUT dropping the IPC stream (`01-protocol.md §4.2`).
+                if parse_err.code == ErrorCode::ProtocolMismatch {
+                    // Remember it so the Desktop UI can tell the user which side to update;
+                    // the extension itself never reaches `hello`, so nothing else would notice.
+                    let mut guard = rt.ipc_hub.state.lock().expect("ipc state lock");
+                    guard.protocol_mismatch = Some(crate::state::ProtocolMismatchInfo {
+                        at: now_ms(),
+                        detail: parse_err.message.clone(),
+                    });
+                    drop(guard);
+                    let _ = rt.emit_health_if_changed(now_ms());
+                }
                 let _ = tx.send(parse_err.to_error_envelope());
                 continue;
             }
@@ -237,6 +248,7 @@ fn handle_body(
             let (current_rev, is_paused, pause_reason) = {
                 let mut guard = rt.ipc_hub.state.lock().expect("ipc state lock");
                 guard.last_disconnected_at = None;
+                guard.protocol_mismatch = None;
                 guard.connections.insert(
                     conn_id,
                     ConnectedProfile {
@@ -278,7 +290,7 @@ fn handle_body(
             let _ = tx.send(Envelope::reply(
                 msg_id,
                 Body::HelloOk {
-                    desktop_version: env!("CARGO_PKG_VERSION").to_string(),
+                    desktop_version: crate::DESKTOP_VERSION.to_string(),
                     config_rev: current_rev,
                 },
             ));

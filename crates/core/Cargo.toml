@@ -29,6 +29,7 @@ ulid.workspace = true
 zip = { version = "=2.2.2", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
+rusqlite = { version = "0.32", features = ["bundled"] }
 async-trait = ">=0.1.80, <0.1.89"
 tempfile.workspace = true
 tokio = { version = "=1.42.0", features = ["rt-multi-thread", "macros", "net", "io-util", "time", "sync", "test-util"] }

@@ -83,7 +83,7 @@ pub fn create_diagnostic_bundle(
     // 1. version.json
     let version_json = serde_json::to_vec_pretty(&json!({
         "app_name": "DealSonar",
-        "app_version": env!("CARGO_PKG_VERSION"),
+        "app_version": crate::DESKTOP_VERSION,
         "protocol_version": PROTOCOL_VERSION,
         "os": std::env::consts::OS,
         "arch": std::env::consts::ARCH,
