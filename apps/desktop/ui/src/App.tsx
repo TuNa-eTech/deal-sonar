@@ -368,6 +368,7 @@ export const App: React.FC = () => {
             <InboxScreen
               radars={radars}
               templates={templates}
+              health={health}
               refreshToken={refreshToken}
               onCreateRadarFromTemplate={(tpl) =>
                 setWizardState({

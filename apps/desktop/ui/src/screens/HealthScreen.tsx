@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {PipelineDiagnosis} from "../components/PipelineDiagnosis";
+import { NewsFlowStatus } from "../components/NewsFlowStatus";
 import { OperationStatus } from "../components/OperationStatus";
 import { api } from "../lib/api";
 import { formatExactTime, formatRelativeTime } from "../lib/format";
@@ -121,6 +122,7 @@ export const HealthScreen: React.FC<HealthScreenProps> = ({
       )}
 
       {/* 4 Status Lamps (`03-ux-flows.md §3`) */}
+      <NewsFlowStatus health={health} />
       <PipelineDiagnosis health={health} onRefresh={onRefreshHealth}/>
       <OperationStatus health={health}/>
       <div className="connection-ledger">

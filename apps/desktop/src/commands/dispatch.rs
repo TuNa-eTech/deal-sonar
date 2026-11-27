@@ -238,6 +238,7 @@ pub async fn invoke_command_json(
 
         // 9. Health, Diagnostics, Data Lifecycle, External URL
         "health_get" => to_json(c.health_get()?),
+        "first_news_status" => to_json(c.first_news_status()?),
         "crawl_run_list" => {
             let source_id: Option<String> = parse_opt_arg(map, "source_id")?;
             let limit: Option<usize> = parse_opt_arg(map, "limit")?;

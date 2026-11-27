@@ -524,6 +524,15 @@ pub struct SuggestFieldsOutput {
     pub prefilter_hint: Option<PrefilterHint>,
     #[serde(default)]
     pub suggested_source_ids: Vec<String>,
+    /// The brief does not say which side of the trade authors should be on.
+    #[serde(default)]
+    pub side_ambiguous: bool,
+    /// Whether same-trade authors should be excluded; `None` when the brief is silent.
+    #[serde(default)]
+    pub exclude_peers: Option<bool>,
+    /// Interpretation choices the user should confirm or edit.
+    #[serde(default)]
+    pub assumptions: Vec<String>,
 }
 
 /// User feedback example included in `judge_extract` prompts (`06-ai-bridge.md §5.2`, `02-radar-spec.md §6`).

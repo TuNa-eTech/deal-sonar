@@ -237,6 +237,9 @@ pub struct MatchPolicy {
     pub exclude_roles: Vec<AuthorRole>,
     #[serde(default)]
     pub hard_filters: Vec<HardFilter>,
+    /// Interpretation choices made for this brief that the user can review and edit.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assumptions: Vec<String>,
 }
 
 impl Default for MatchPolicy {
@@ -245,6 +248,7 @@ impl Default for MatchPolicy {
             want_intent: WantIntent::Any,
             exclude_roles: vec![AuthorRole::Peer],
             hard_filters: Vec::new(),
+            assumptions: Vec::new(),
         }
     }
 }

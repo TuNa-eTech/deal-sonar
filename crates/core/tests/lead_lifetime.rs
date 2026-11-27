@@ -102,6 +102,7 @@ async fn expired_leads_are_kept_but_not_notified() {
                 want_intent: WantIntent::Demand,
                 exclude_roles: vec![AuthorRole::Peer],
                 hard_filters: Vec::new(),
+                assumptions: Vec::new(),
             },
             source_ids: vec![src_id.clone()],
             notify: Some(RadarNotifyPatch {

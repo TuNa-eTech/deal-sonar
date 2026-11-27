@@ -376,6 +376,13 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
     .await
     .expect("radar_suggest_fields");
     assert!(suggested["fields"].as_array().is_some());
+    // The desktop wizard receives the shared interpretation: side, excluded audience, assumptions.
+    assert_eq!(suggested["want_intent"], json!("demand"));
+    assert_eq!(suggested["side_ambiguous"], json!(false));
+    assert_eq!(suggested["exclude_roles"], json!(["peer"]));
+    assert!(suggested["assumptions"]
+        .as_array()
+        .is_some_and(|items| !items.is_empty()));
 
     let created_radar = invoke_command_json(
         &state,
@@ -941,6 +948,15 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
         .expect("health_get");
     assert_eq!(health["extension_connected"], json!(true));
 
+    // The first-run journey keeps install time apart from Radar creation and activation.
+    let journey = invoke_command_json(&state, "first_news_status", json!({}))
+        .await
+        .expect("first_news_status");
+    assert_eq!(journey["installed_at_estimated"], json!(false));
+    let at = |key: &str| journey[key].as_i64().unwrap();
+    assert!(at("first_radar_activated_at") >= at("first_radar_created_at"));
+    assert!(at("installed_at") <= at("first_radar_created_at"));
+    assert!(at("leads_total") >= 1);
     let paused_health = state.core().toggle_crawl_paused().expect("pause crawl");
     assert!(paused_health.crawl_paused);
     let resumed_health = state.core().toggle_crawl_paused().expect("resume crawl");

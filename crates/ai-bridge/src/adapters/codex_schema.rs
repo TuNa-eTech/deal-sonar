@@ -222,7 +222,8 @@ mod tests {
                 "suggested_name": "Radar", "want_intent": "demand",
                 "fields": [{"key": "budget", "label": "Ngân sách", "type": "number", "description": "Ngân sách", "required": false, "options": null}],
                 "hard_filters": [{"field": "budget", "op": "eq", "value": value.to_string(), "when_missing": null}],
-                "clarifying_questions": null, "prefilter_hint": {"any": null, "none": null}
+                "clarifying_questions": null, "prefilter_hint": {"any": null, "none": null},
+                "side_ambiguous": null, "exclude_peers": null, "assumptions": null
             });
             validate_json_schema(&strict_output_schema(&schema), &wire).unwrap();
             let output = decode_strict_output(&schema, wire).unwrap();
@@ -230,6 +231,8 @@ mod tests {
             validate_suggest_fields_output(&output).unwrap();
             assert_eq!(output["hard_filters"][0]["value"], value);
             assert!(output.get("clarifying_questions").is_none());
+            assert!(output.get("side_ambiguous").is_none());
+            assert!(output.get("exclude_peers").is_none());
             assert!(output["hard_filters"][0].get("when_missing").is_none());
         }
     }

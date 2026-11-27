@@ -50,7 +50,8 @@ use crate::dto::{
     BlocklistRemoveResult, Channel, ChannelConfig, ChannelRemoveResult, ChromeConnectOptions,
     ChromeConnectResult, Contact, ContactBlockResult, ContactDetail, CoreEvent, CrawlRun,
     CreateRadarDraftInput, DataBackupResult, DataDeleteAllResult, DataPurgeResult, DecidedBy,
-    DiagnosticBundleResult, ExportFormat, FacebookSessionState, FeedbackLabel, FunnelStats,
+    DiagnosticBundleResult, ExportFormat, FacebookSessionState, FeedbackLabel, FirstNewsStatus,
+    FunnelStats,
     HardFilter, HealthStatus, LeadCrmPatch, LeadDetail, LeadEvent, LeadExportInput,
     LeadExportResult, LeadFeedbackInput, LeadFeedbackResult, LeadFilterQuery, LeadListResponse,
     LeadStatus, LicenseStatus, ModelTierMap, Post, PrefilterHintDto, PreviewRunState,
@@ -83,6 +84,8 @@ mod builder;
 mod channels;
 mod chrome;
 mod contacts;
+mod goal;
+mod journey;
 mod leads;
 mod posts;
 mod radars;
@@ -94,6 +97,7 @@ mod system;
 pub(crate) use agent::{handle_agent_request, issue_agent_token};
 pub use builder::*;
 use contacts::*;
+use goal::interpret_goal;
 use posts::*;
 use settings::*;
 

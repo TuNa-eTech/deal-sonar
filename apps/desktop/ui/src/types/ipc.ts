@@ -61,6 +61,8 @@ export interface MatchPolicy {
   want_intent: WantIntent;
   exclude_roles: AuthorRole[];
   hard_filters: HardFilter[];
+  /** Interpretation choices the user can review and edit. */
+  assumptions?: string[];
 }
 
 export interface QuietHours {
@@ -417,6 +419,36 @@ export interface HealthStatus {
   checked_at: number;
 }
 
+/** Facts about the path from first launch to the first real lead. */
+export interface FirstNewsStatus {
+  /** First app launch, not Radar creation. */
+  installed_at: number;
+  /** The database already had data, so `installed_at` is the earliest timestamp found. */
+  installed_at_estimated: boolean;
+  /** First time any Radar was switched on. */
+  first_radar_activated_at: number | null;
+  first_followed_source_at: number | null;
+  first_radar_created_at: number | null;
+  first_post_captured_at: number | null;
+  first_lead_at: number | null;
+  first_delivery_at: number | null;
+  active_radars: number;
+  active_sources: number;
+  posts_captured: number;
+  last_post_captured_at: number | null;
+  evaluated_match: number;
+  evaluated_no_match: number;
+  waiting_ai: number;
+  last_evaluated_at: number | null;
+  leads_total: number;
+  last_lead_at: number | null;
+  delivery_pending: number;
+  delivery_failed: number;
+  last_delivery_at: number | null;
+  last_delivery_error: string | null;
+  checked_at: number;
+}
+
 export interface CrawlRun {
   id: string;
   source_id: string;
@@ -665,6 +697,12 @@ export interface SuggestFieldsResult {
   hard_filters: HardFilter[];
   clarifying_questions: string[];
   suggested_source_ids?: string[];
+  /** Authors the interpretation excludes; shown so the user can change it. */
+  exclude_roles?: AuthorRole[];
+  /** Choices the brief did not state, for the user to review and edit. */
+  assumptions?: string[];
+  /** The brief did not say which side to follow; `want_intent` stays "any". */
+  side_ambiguous?: boolean;
   prefilter_hint: {
     any: string[];
     none: string[];

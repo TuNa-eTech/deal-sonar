@@ -223,6 +223,9 @@ export const radarCommands: MockCommandTable = {
           clarifying_questions: [],
           prefilter_hint: null,
           suggested_source_ids: suggestedSourceIds,
+          exclude_roles: tpl.match_policy.exclude_roles,
+          assumptions: tpl.match_policy.assumptions ?? [],
+          side_ambiguous: false,
         } satisfies SuggestFieldsResult);
       }
     }
@@ -343,13 +346,34 @@ export const radarCommands: MockCommandTable = {
       when_missing: "fail",
     }] : [];
 
+    const demandCue = ["can thue", "can mua", "can tim", "tim thue", "tim mua", "khach thue", "khach can", "nguoi can", "can xe", "can tho", "can nguoi"]
+      .some(cue => folded.includes(cue));
+    const supplyCue = ["chinh chu", "cho thue", "tin ban", "can ban", "nhuong", "nguoi tim viec", "co xe trong"]
+      .some(cue => folded.includes(cue));
+    // "tim xe" / "tim hang" do not say who the post author is: stay neutral and ask.
+    const sideAmbiguous = (demandCue && supplyCue)
+      || (!demandCue && !supplyCue && (/(^|\s)xe(\s|$)/.test(folded) || folded.includes("hang")));
+    const wantsPeers = ["doi tac", "cung nghe", "hop tac", "ket noi"].some(cue => folded.includes(cue));
+    const wantIntent: SuggestFieldsResult["want_intent"] = sideAmbiguous ? "any" : supplyCue ? "supply" : "demand";
+    const excludePeers = !sideAmbiguous && !wantsPeers;
+    const assumptions: string[] = [];
+    if (sideAmbiguous) {
+      assumptions.push("Chưa rõ bạn muốn tìm bài của người cần hay người cung cấp, nên giữ trung tính cả hai chiều và không loại bài của người cùng nghề.");
+    } else if (excludePeers) {
+      assumptions.push("Loại bài của người cùng nghề vì mô tả không nói bạn muốn nhận bài từ họ.");
+    }
+    if (sideAmbiguous) clarifying.unshift("Bạn muốn tìm bài của người đang cần hay người đang cung cấp (ví dụ tìm xe hay tìm hàng)?");
+
     const result: SuggestFieldsResult = {
       suggested_name: input.description.trim().slice(0, 48) || "Radar tuỳ chỉnh",
-      want_intent: folded.includes("can ban") || folded.includes("cho thue") ? "supply" : "demand",
+      want_intent: wantIntent,
       fields,
       hard_filters: hardFilters,
-      clarifying_questions: clarifying,
+      clarifying_questions: clarifying.slice(0, 2),
       suggested_source_ids: suggestedSourceIds,
+      exclude_roles: excludePeers ? ["peer"] : [],
+      assumptions,
+      side_ambiguous: sideAmbiguous,
       prefilter_hint: {
         any: ["can", "tim"],
         none: ["tuyen cong tac vien"],
