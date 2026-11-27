@@ -21,6 +21,8 @@
     "eval:bds": "cargo run -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/golden/bds.jsonl --radar docs/eval/golden/bds.radar.json",
     "desktop": "pnpm ui:build && pnpm ext:build && cargo build -p dealsonar-native-host && cargo run -p dealsonar-desktop",
     "study:h5": "node scripts/account-safety-report.mjs",
-    "study:h5:test": "node --test scripts/account-safety-report.test.mjs"
+    "study:h5:test": "node --test scripts/account-safety-report.test.mjs",
+    "study:report": "node scripts/study-report.mjs",
+    "study:test": "node --test scripts/study-report.test.mjs"
   }
 }
