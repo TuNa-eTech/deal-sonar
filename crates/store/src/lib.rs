@@ -1,5 +1,6 @@
 pub mod contacts;
 pub mod field_values;
+pub mod journey;
 pub mod leads;
 pub mod models;
 pub mod ops;
@@ -19,6 +20,7 @@ use rusqlite::{params, Connection};
 use thiserror::Error;
 
 pub use models::*;
+pub use journey::JourneySnapshot;
 
 /// Embedded numbered SQL migration definition.
 #[derive(Debug, Clone, Copy)]

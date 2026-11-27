@@ -236,7 +236,9 @@ impl CoreService {
         }
 
         let _ = self.rt.store.radar_set_status(id, status.as_str(), now)?;
-
+        if status == RadarStatus::Active {
+            journey::record_first_activation(&self.rt.store, now)?;
+        }
         // If transitioning `Paused -> Active` (`02-radar-spec.md §4`), backfill last 24h silently!
         if status == RadarStatus::Active && prev_status == RadarStatus::Paused {
             let refreshed = self.rt.store.radar_get(id)?.unwrap_or(existing);

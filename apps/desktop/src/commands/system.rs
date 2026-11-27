@@ -2,7 +2,7 @@
 
 use dealsonar_core::dto::{
     AiUsageStats, CrawlRun, DataBackupResult, DataDeleteAllResult, DataPurgeResult,
-    DiagnosticBundleResult, HealthStatus,
+    DiagnosticBundleResult, FirstNewsStatus, HealthStatus,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -21,6 +21,13 @@ pub struct OpenExternalUrlResult {
 #[tauri::command(rename_all = "snake_case")]
 pub async fn health_get(state: State<'_, DesktopState>) -> Result<HealthStatus, CommandError> {
     Ok(state.core().health_get()?)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn first_news_status(
+    state: State<'_, DesktopState>,
+) -> Result<FirstNewsStatus, CommandError> {
+    Ok(state.core().first_news_status()?)
 }
 
 #[tauri::command(rename_all = "snake_case")]

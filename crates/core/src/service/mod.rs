@@ -50,7 +50,8 @@ use crate::dto::{
     BlocklistRemoveResult, Channel, ChannelConfig, ChannelRemoveResult, ChromeConnectOptions,
     ChromeConnectResult, Contact, ContactBlockResult, ContactDetail, CoreEvent, CrawlRun,
     CreateRadarDraftInput, DataBackupResult, DataDeleteAllResult, DataPurgeResult, DecidedBy,
-    DiagnosticBundleResult, ExportFormat, FacebookSessionState, FeedbackLabel, FunnelStats,
+    DiagnosticBundleResult, ExportFormat, FacebookSessionState, FeedbackLabel, FirstNewsStatus,
+    FunnelStats,
     HardFilter, HealthStatus, LeadCrmPatch, LeadDetail, LeadEvent, LeadExportInput,
     LeadExportResult, LeadFeedbackInput, LeadFeedbackResult, LeadFilterQuery, LeadListResponse,
     LeadStatus, LicenseStatus, ModelTierMap, Post, PrefilterHintDto, PreviewRunState,
@@ -84,6 +85,7 @@ mod channels;
 mod chrome;
 mod contacts;
 mod goal;
+mod journey;
 mod leads;
 mod posts;
 mod radars;

@@ -214,6 +214,7 @@ impl CoreServiceBuilder {
 
         // Restore persisted outbox pending/failed state across restarts
         rt.restore_outbox_tracker()?;
+        super::journey::record_install(&rt.store, started_at_ms)?;
 
         // Enforce license limits on startup (e.g. if a Pro license expired while app was closed)
         let boot_license = rt.current_license_status(started_at_ms)?;

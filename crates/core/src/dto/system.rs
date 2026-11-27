@@ -140,6 +140,20 @@ pub struct HealthStatus {
     pub checked_at: i64,
 }
 
+/// Facts about the path from install to the first real lead, for the first-run guide and the
+/// "why no news?" explanation. Install time is the first app launch, not Radar creation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FirstNewsStatus {
+    pub installed_at: i64,
+    /// True when the database already had data and `installed_at` is the earliest timestamp found.
+    pub installed_at_estimated: bool,
+    /// First time any Radar was switched on; `None` until then.
+    pub first_radar_activated_at: Option<i64>,
+    #[serde(flatten)]
+    pub facts: dealsonar_store::JourneySnapshot,
+    pub checked_at: i64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrawlRun {
     pub id: String,

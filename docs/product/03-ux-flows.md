@@ -18,6 +18,8 @@ Mục tiêu: đưa người dùng từ "vừa tải về" tới "radar đầu ti
 
 Bước 3 và 4 là hai chỗ dễ mất người dùng nhất. Cả hai cho phép **bỏ qua**: thiếu AI thì radar chỉ chạy được bằng bộ luật có sẵn của mẫu (hiện chỉ có BĐS); thiếu Telegram thì tin chỉ hiện trong app và thông báo của hệ điều hành.
 
+**Kiểm tra từng kết nối.** Màn hình thiết lập liệt kê riêng Chrome, Facebook, AI, Quét tự động và Kênh nhận tin (tuỳ chọn). Mỗi dòng có nút "Kiểm tra" chỉ chạy lại đúng kết nối đó, kèm lệnh hoặc thao tác cần làm khi lỗi. Dòng "Tiếp theo" luôn chỉ vào kết nối bắt buộc đầu tiên chưa đạt, nên sửa xong một chỗ là biết làm tiếp chỗ nào. Đóng app giữa chừng rồi mở lại sẽ quay về đúng bước đang làm. Quét tự động tắt được xem là lỗi vì Radar sẽ chỉ đọc bài khi người dùng bấm Quét ngay.
+
 App nói rõ ràng buộc vận hành ngay ở cuối trình hướng dẫn: "Radar chỉ chạy khi máy bật, Chrome mở và DealSonar đang chạy ở khay hệ thống", kèm công tắc "Mở cùng máy tính" (mặc định bật).
 
 ## 2. Tạo radar
@@ -86,12 +88,23 @@ Một màn hình duy nhất, không có cấu hình:
 | Tình huống | App hiện gì |
 |---|---|
 | Chưa có radar | Lưới mẫu theo ngành ngay trên Hộp tin |
-| Radar đã bật, chưa có tin | "Đã đọc N bài, chưa bài nào khớp" kèm link xem các bài bị loại gần nhất |
+| Radar đã bật, chưa có tin | Bốn tình huống hiển thị riêng, mỗi tình huống có lần thành công gần nhất và việc cần làm tiếp (bảng dưới) |
 | Extension mất kết nối | Dải cảnh báo đỏ trên mọi màn hình; hướng dẫn mở Chrome |
 | Facebook đăng xuất hoặc bị chặn tạm | Dừng quét toàn bộ; giải thích; nút "Tiếp tục" chỉ bật sau khi phiên ổn |
 | AI không gọi được | Bài xếp hàng chờ; hiện số bài đang chờ; tự xử lý khi AI trở lại |
 | Hết hạn mức gói AI | Như trên, kèm thời điểm dự kiến hạn mức hồi phục nếu CLI có báo |
 | Radar khớp quá nhiều (trên 30 tin/giờ) | Tự chuyển radar sang gửi gộp, báo người dùng xem lại mô tả |
+
+### 5.1 Khi Radar đã bật nhưng chưa có tin
+
+Hộp tin (khi trống) và màn hình Kết nối hiển thị "Tin đang dừng ở đâu?" với bốn tình huống tách riêng. Mỗi tình huống ghi trạng thái, lần thành công gần nhất và một việc tiếp theo.
+
+| Tình huống | Nghĩa là | Lần thành công gần nhất | Việc tiếp theo |
+|---|---|---|---|
+| Chưa thu bài | Chưa có bài nào từ các nhóm của Radar đang bật. Nguyên nhân được nêu đúng chỗ: Chrome, Facebook, tạm dừng, chưa chọn nhóm, quét tự động tắt | Lần thu bài thành công | Mở Kết nối, Nguồn hoặc Radar tuỳ nguyên nhân |
+| Đã thu nhưng chưa khớp | Đã đọc N bài, chưa bài nào khớp | Lần chấm xong gần nhất | Xem các bài bị loại gần nhất |
+| Chờ AI | Bài đang xếp hàng chờ AI (kể cả lần gọi AI đã lỗi) | Lần chấm xong gần nhất | Mở cấu hình AI nếu AI lỗi; nếu không thì xem tiến độ |
+| Đã khớp nhưng gửi lỗi | Tin đã khớp, vẫn xem được trong Cơ hội, nhưng chưa gửi được tới kênh nhận | Lần gửi thành công gần nhất | Mở cấu hình thông báo |
 
 ## 6. Kiểm tra dưới 5 phút
 
@@ -106,3 +119,19 @@ Phép đo cho giả thuyết 1 tính từ lúc bấm "Tạo radar" tới lúc ra
 | Bật | 10 giây |
 
 Bước xem thử là rủi ro lớn nhất về thời gian: chấm 50 bài qua CLI có thể mất 30–90 giây. Giao diện phải hiện kết quả dần theo lô thay vì chờ xong hết.
+
+### 6.1 Từ lần mở đầu tiên đến tin thật đầu tiên
+
+Phép đo ở trên chỉ tính thao tác tạo radar. Với người thử trên máy mới, app ghi thêm các mốc dưới đây và hiển thị ở màn hình Kết nối ("Hành trình từ lúc cài đến tin đầu tiên"):
+
+| Mốc | Nguồn ghi |
+|---|---|
+| Mở DealSonar lần đầu (thời gian cài) | Ghi một lần khi app khởi động trên cơ sở dữ liệu trống. Với dữ liệu có từ trước, lấy mốc cũ nhất tìm được và gắn nhãn "ước tính" |
+| Kết nối nguồn đầu tiên | Thời điểm group đầu tiên được theo dõi |
+| Tạo Radar đầu tiên | `radars.created_at` nhỏ nhất |
+| Bật Radar đầu tiên | Ghi một lần khi radar đầu tiên chuyển sang `active`; tạm dừng rồi bật lại không đổi mốc này |
+| Thu bài đầu tiên, nhận tin thật đầu tiên, tin đầu tiên gửi tới kênh nhận | Bài, cơ hội và lần gửi thành công sớm nhất |
+
+Thời gian cài và thời gian tạo Radar là hai con số riêng: mỗi mốc sau đó hiển thị khoảng cách tới lúc cài và tới lúc tạo Radar, để người thử cài hôm trước, tạo Radar hôm sau không bị tính nhầm là mất cả ngày để có tin đầu tiên. "Thời gian cài" là lần mở app đầu tiên chứ không phải lúc tải file cài.
+
+Việc đo này chỉ ghi mốc thời gian. Bằng chứng người thật nhận được một tin thật trên máy mới phải thu thập trong buổi thử với người dùng.

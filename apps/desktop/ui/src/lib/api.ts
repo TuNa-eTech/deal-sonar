@@ -12,6 +12,7 @@ import type {
   CrawlRun,
   CreateRadarDraftInput,
   FunnelStats,
+  FirstNewsStatus,
   HealthStatus,
   LeadDetail,
   LeadExportInput,
@@ -221,6 +222,7 @@ export const api = {
 
   // --- Health & Diagnostics ---
   healthGet: () => callCommand<HealthStatus>("health_get"),
+  firstNewsStatus: () => callCommand<FirstNewsStatus>("first_news_status"),
   crawlRunList: (source_id?: string | null, limit = 50) =>
     callCommand<CrawlRun[]>("crawl_run_list", { source_id: source_id ?? null, limit }),
   aiUsageGet: (days = 7) => callCommand<AiUsageStats>("ai_usage_get", { days }),

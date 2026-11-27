@@ -2367,3 +2367,171 @@ fn radar_channel_scope_preserves_legacy_and_honors_explicit_local_selection() {
     assert!(selected.sends_to_channel("telegram"));
     assert!(!selected.sends_to_channel("webhook"));
 }
+
+#[test]
+fn test_journey_snapshot_separates_collection_matching_ai_and_delivery() {
+    let store = Store::open_in_memory().expect("open_in_memory");
+    let empty = store.journey_snapshot().unwrap();
+    assert_eq!(empty.active_radars, 0);
+    assert_eq!(empty.posts_captured, 0);
+    assert_eq!(empty.first_lead_at, None);
+
+    let src = seed_source(&store, "g_journey", "Chợ căn hộ", true);
+    let radar = store
+        .radar_create_draft(&CreateRadarDraftInput {
+            id: None,
+            name: "Khách thuê".to_string(),
+            template_id: None,
+            description: "Khách cần thuê căn hộ".to_string(),
+            language_hint: Some("vi".to_string()),
+            user_profession: None,
+            fields: sample_bds_fields(),
+            match_policy: MatchPolicy::default(),
+            notify: NotifyConfig::default(),
+            source_ids: vec![src.clone()],
+            now_ms: BASE_TS,
+        })
+        .unwrap();
+
+    // A draft is not collecting: its group is not watched by an active Radar yet.
+    let (draft_post, _) = store
+        .insert_post(&make_post(
+            &src,
+            "d0",
+            "u0",
+            "A",
+            "bài nháp",
+            "h_d0",
+            1,
+            BASE_TS,
+        ))
+        .unwrap();
+    let snapshot = store.journey_snapshot().unwrap();
+    assert_eq!(snapshot.first_radar_created_at, Some(BASE_TS));
+    assert_eq!(snapshot.first_followed_source_at, Some(BASE_TS));
+    assert_eq!(snapshot.active_radars, 0);
+    assert_eq!(snapshot.posts_captured, 0);
+    assert_eq!(snapshot.first_post_captured_at, Some(BASE_TS));
+    let _ = draft_post;
+
+    store
+        .radar_set_status(&radar.radar.id, "active", BASE_TS + 1_000)
+        .unwrap();
+    let evaluate = |post_id: String, state: &str, verdict: Option<&str>, ts: i64| {
+        store
+            .upsert_evaluation(&EvaluationUpsertInput {
+                id: None,
+                post_id,
+                radar_version_id: radar.current_version.id.clone(),
+                state: state.to_string(),
+                decided_by: (state == "done").then(|| "ai".to_string()),
+                verdict: verdict.map(str::to_string),
+                reject_reason: None,
+                score: Some(0.9),
+                intent: Some("demand".to_string()),
+                author_role: Some("end_user".to_string()),
+                summary: Some("tóm tắt".to_string()),
+                reason: None,
+                fields: Some(BTreeMap::new()),
+                ruleset_id: None,
+                ai_call_id: None,
+                is_preview: false,
+                created_at: ts,
+                decided_at: (state == "done").then_some(ts + 10),
+            })
+            .unwrap()
+    };
+    let mut ids = Vec::new();
+    for (i, text) in ["một", "hai", "ba", "bốn"].iter().enumerate() {
+        let ts = BASE_TS + 10_000 * (i as i64 + 1);
+        let (post, _) = store
+            .insert_post(&make_post(
+                &src,
+                &format!("j{i}"),
+                &format!("u{i}"),
+                "Người đăng",
+                text,
+                &format!("h_j{i}"),
+                100 + i as i64,
+                ts,
+            ))
+            .unwrap();
+        ids.push((post.id, ts));
+    }
+    evaluate(ids[0].0.clone(), "done", Some("no_match"), ids[0].1);
+    evaluate(ids[1].0.clone(), "pending_ai", None, ids[1].1);
+    evaluate(ids[2].0.clone(), "ai_failed", None, ids[2].1);
+    let matched = evaluate(ids[3].0.clone(), "done", Some("match"), ids[3].1);
+    let (lead, _) = store
+        .create_lead(&CreateLeadInput {
+            id: None,
+            radar_id: radar.radar.id.clone(),
+            radar_version_id: radar.current_version.id.clone(),
+            post_id: ids[3].0.clone(),
+            evaluation_id: matched.id,
+            contact_id: None,
+            status: "new".to_string(),
+            score: 0.9,
+            summary: "khớp".to_string(),
+            fields: BTreeMap::new(),
+            also_seen_in: None,
+            notified_at: None,
+            follow_up_at: None,
+            note: None,
+            tags: None,
+            now_ms: ids[3].1 + 500,
+        })
+        .unwrap();
+
+    let channel = store
+        .channel_create("telegram", "Bot", &json!({}), BASE_TS)
+        .unwrap();
+    let enqueue = |now_ms: i64| {
+        store
+            .enqueue_outbox(&dealsonar_store::EnqueueOutboxInput {
+                id: None,
+                channel_id: channel.id.clone(),
+                lead_id: Some(lead.id.clone()),
+                kind: "lead".to_string(),
+                payload: json!({}),
+                next_try_at: now_ms,
+                now_ms,
+            })
+            .unwrap()
+    };
+    let sent = enqueue(BASE_TS + 60_000);
+    store
+        .mark_outbox_sent(&sent.id, Some("m1"), BASE_TS + 61_000)
+        .unwrap();
+    let failing = enqueue(BASE_TS + 70_000);
+    store
+        .retry_or_drop_outbox(
+            &failing.id,
+            "Bot bị chặn",
+            None,
+            1,
+            7_200_000,
+            BASE_TS + 71_000,
+        )
+        .unwrap();
+    enqueue(BASE_TS + 80_000);
+
+    let snapshot = store.journey_snapshot().unwrap();
+    assert_eq!(snapshot.active_radars, 1);
+    assert_eq!(snapshot.active_sources, 1);
+    assert_eq!(
+        snapshot.posts_captured, 5,
+        "every stored post from an active Radar's groups"
+    );
+    assert_eq!(snapshot.last_post_captured_at, Some(BASE_TS + 40_000));
+    assert_eq!(snapshot.evaluated_no_match, 1);
+    assert_eq!(snapshot.evaluated_match, 1);
+    assert_eq!(snapshot.waiting_ai, 2, "pending and failed AI both wait");
+    assert_eq!(snapshot.leads_total, 1);
+    assert_eq!(snapshot.first_lead_at, Some(BASE_TS + 40_500));
+    assert_eq!(snapshot.delivery_pending, 1);
+    assert_eq!(snapshot.delivery_failed, 1);
+    assert_eq!(snapshot.last_delivery_error.as_deref(), Some("Bot bị chặn"));
+    assert_eq!(snapshot.first_delivery_at, Some(BASE_TS + 61_000));
+    assert_eq!(snapshot.last_delivery_at, Some(BASE_TS + 61_000));
+}

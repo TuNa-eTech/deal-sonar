@@ -1,6 +1,6 @@
 // Mock handlers: health and diagnostics.
 
-import type { AiUsageStats } from "../../../types/ipc";
+import type { AiUsageStats, FirstNewsStatus } from "../../../types/ipc";
 import type { MockCommandTable } from "./types";
 import { state } from "../store";
 
@@ -11,6 +11,42 @@ export const healthCommands: MockCommandTable = {
 
   crawl_run_list: async () => {
     return structuredClone(state.crawlRuns);
+  },
+
+  first_news_status: async () => {
+    const now = Date.now();
+    const active = state.radars.filter((radar) => radar.status === "active");
+    const activeSourceIds = new Set(active.flatMap((radar) => radar.source_ids));
+    const posts = state.posts.filter((post) => activeSourceIds.has(post.source_id));
+    const min = (values: number[]) => (values.length ? Math.min(...values) : null);
+    const max = (values: number[]) => (values.length ? Math.max(...values) : null);
+    const leadTimes = state.leads.map((lead) => lead.created_at);
+    const createdTimes = state.radars.map((radar) => radar.created_at);
+    return {
+      installed_at: Math.min(now, ...createdTimes) - 3_600_000,
+      installed_at_estimated: false,
+      first_radar_activated_at: min(active.map((radar) => radar.updated_at)),
+      first_followed_source_at: state.sources.some((source) => source.followed) ? min(createdTimes) : null,
+      first_radar_created_at: min(createdTimes),
+      first_post_captured_at: min(state.posts.map((post) => post.captured_at)),
+      first_lead_at: min(leadTimes),
+      first_delivery_at: min(state.leads.filter((lead) => lead.notified_at).map((lead) => lead.notified_at!)),
+      active_radars: active.length,
+      active_sources: activeSourceIds.size,
+      posts_captured: posts.length,
+      last_post_captured_at: max(posts.map((post) => post.captured_at)),
+      evaluated_match: state.leads.length,
+      evaluated_no_match: 0,
+      waiting_ai: state.health.pending_ai_posts,
+      last_evaluated_at: max(leadTimes),
+      leads_total: state.leads.length,
+      last_lead_at: max(leadTimes),
+      delivery_pending: state.health.outbox_pending,
+      delivery_failed: state.health.outbox_failed,
+      last_delivery_at: max(state.leads.filter((lead) => lead.notified_at).map((lead) => lead.notified_at!)),
+      last_delivery_error: null,
+      checked_at: now,
+    } satisfies FirstNewsStatus;
   },
 
   ai_usage_get: async () => {
