@@ -19,6 +19,8 @@
     "test": "pnpm ext:test && pnpm ui:test && pnpm protocol:verify && cargo test --workspace",
     "lint": "pnpm ext:typecheck && pnpm ui:typecheck && pnpm rust:lint",
     "eval:bds": "cargo run -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/golden/bds.jsonl --radar docs/eval/golden/bds.radar.json",
+    "eval:holdout:verify": "node scripts/verify-holdout.mjs",
+    "eval:holdout": "pnpm eval:holdout:verify && cargo run -q -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/holdout/bds-tim-nguoi-thue.jsonl --radar docs/eval/holdout/bds-tim-nguoi-thue.radar.json && cargo run -q -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/holdout/bds-tim-chu-nha.jsonl --radar docs/eval/holdout/bds-tim-chu-nha.radar.json && cargo run -q -p dealsonar-ai-bridge --bin eval -- --dataset docs/eval/holdout/gia-su-phu-huynh.jsonl --radar docs/eval/holdout/gia-su-phu-huynh.radar.json",
     "desktop": "pnpm ui:build && pnpm ext:build && cargo build -p dealsonar-native-host && cargo run -p dealsonar-desktop"
   }
 }

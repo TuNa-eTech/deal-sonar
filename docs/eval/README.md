@@ -26,6 +26,9 @@ docs/eval/
 > [!IMPORTANT]
 > **Cam kết 0% Dữ liệu Cá nhân Thật (Zero PII):** Toàn bộ **185 mẫu** trong `docs/eval/golden/*.jsonl` đều dùng tên tác giả tổng hợp và số điện thoại giả định kiểm thử (`0912.345.678`, `+84 909 111 222`, v.v.). Khi bổ sung mẫu mới vào kho mã nguồn, tuyệt đối **không** sao chép tên thật, đường dẫn trang cá nhân thật hoặc số điện thoại thật từ mạng xã hội.
 
+> [!NOTE]
+> **Tập đánh giá riêng (holdout)** cho Radar do khách tự mô tả — gồm hai Radar trái chiều dùng chung nguồn bài và một nhu cầu ngoài thư viện — nằm ở [`holdout/`](./holdout/README.md). Tập này chỉ để đo, **không** dùng để chỉnh prompt, ví dụ phản hồi hay bộ luật; nhãn hiện là bản nháp một người gán.
+
 ---
 
 ## 2. Lược đồ Dữ liệu (`GoldenSample` & `RadarPromptContext`)

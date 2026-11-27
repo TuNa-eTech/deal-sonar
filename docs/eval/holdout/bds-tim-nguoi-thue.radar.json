@@ -1,0 +1,79 @@
+{
+  "radar_version_id": "01HOLDOUTBDSTENANTV1",
+  "id": "holdout.bds-tim-nguoi-thue",
+  "industry": "Bất động sản (Holdout)",
+  "name": "Môi giới cho thuê tìm người đang cần thuê nhà ở (Holdout v1)",
+  "description": "Cá nhân đang cần thuê căn hộ, studio, phòng trọ hoặc nhà nguyên căn để ở tại Hà Nội và TP.HCM (loại trừ môi giới giả khách, chủ nhà đăng tin cho thuê, người pass lại hợp đồng, tin mua bán và thuê mặt bằng kinh doanh)",
+  "user_profession": "môi giới nhà cho thuê",
+  "language_hint": "vi",
+  "want_intent": "demand",
+  "exclude_roles": [
+    "peer"
+  ],
+  "match_policy": {
+    "want_intent": "demand",
+    "exclude_roles": [
+      "peer"
+    ],
+    "hard_filters": []
+  },
+  "seed_ruleset": null,
+  "fields": [
+    {
+      "key": "property_type",
+      "label": "Loại hình",
+      "type": "enum",
+      "description": "Loại nhà ở khách muốn thuê",
+      "required": true,
+      "options": [
+        "apartment",
+        "house",
+        "room",
+        "studio"
+      ],
+      "show_in_alert": true,
+      "order": 1
+    },
+    {
+      "key": "location",
+      "label": "Khu vực",
+      "type": "location",
+      "description": "Tỉnh/thành và quận/huyện khách muốn thuê",
+      "required": true,
+      "options": null,
+      "show_in_alert": true,
+      "order": 2
+    },
+    {
+      "key": "price",
+      "label": "Ngân sách thuê",
+      "type": "money",
+      "description": "Ngân sách thuê mỗi tháng khách nêu trong bài",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 3
+    },
+    {
+      "key": "bedrooms",
+      "label": "Số phòng ngủ",
+      "type": "number",
+      "description": "Số phòng ngủ yêu cầu",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 4
+    },
+    {
+      "key": "phone",
+      "label": "Số điện thoại",
+      "type": "phone",
+      "description": "Số điện thoại liên hệ của khách chuẩn E.164",
+      "required": false,
+      "options": null,
+      "show_in_alert": true,
+      "order": 5
+    }
+  ],
+  "feedback_examples": []
+}

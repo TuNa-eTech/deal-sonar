@@ -1,0 +1,40 @@
+{
+  "suite": "holdout-v1",
+  "issue": "TuNa-eTech/deal-sonar#10",
+  "purpose": "Tập bài đánh giá riêng cho Radar do khách tự mô tả: nhu cầu ngoài thư viện ngành và cùng một bài mang nghĩa khác nhau với từng khách.",
+  "provenance": "synthetic_anonymized: bài viết được dựng lại từ các mẫu ngôn ngữ nhóm Facebook (viết tắt, không dấu, emoji, câu mồi) bằng tên bí danh và số điện thoại giả dải 09xx.000.xxx. Chưa lấy từ nhóm thật.",
+  "labeling_status": "draft_single_annotator: nhãn do một người gán theo bộ quy ước C1–C21 trong README. Chưa có người gán nhãn độc lập thứ hai.",
+  "min_second_pass_ratio": 0.2,
+  "min_kappa_match": 0.8,
+  "min_cross_radar_flips": 20,
+  "required_tags": ["missing_data", "exception", "confusable"],
+  "radars": [
+    {
+      "radar_id": "holdout.bds-tim-nguoi-thue",
+      "radar": "bds-tim-nguoi-thue.radar.json",
+      "dataset": "bds-tim-nguoi-thue.jsonl",
+      "shared_source": "bds-pool",
+      "kind": "in_library",
+      "customer": "Môi giới cho thuê tìm người đang cần thuê (want_intent=demand)",
+      "counts": { "total": 55, "positive": 14, "negative": 41, "peer": 12, "end_user": 31, "unknown": 11, "role_unscored": 1 }
+    },
+    {
+      "radar_id": "holdout.bds-tim-chu-nha",
+      "radar": "bds-tim-chu-nha.radar.json",
+      "dataset": "bds-tim-chu-nha.jsonl",
+      "shared_source": "bds-pool",
+      "kind": "in_library",
+      "customer": "Đơn vị quản lý nhà tìm chủ nhà chính chủ cho thuê (want_intent=supply)",
+      "counts": { "total": 55, "positive": 14, "negative": 41, "peer": 14, "end_user": 31, "unknown": 9, "role_unscored": 1 }
+    },
+    {
+      "radar_id": "holdout.gia-su-phu-huynh",
+      "radar": "gia-su-phu-huynh.radar.json",
+      "dataset": "gia-su-phu-huynh.jsonl",
+      "shared_source": null,
+      "kind": "out_of_library",
+      "customer": "Gia sư tìm phụ huynh cần dạy kèm môn phổ thông (want_intent=demand)",
+      "counts": { "total": 41, "positive": 13, "negative": 28, "peer": 9, "end_user": 22, "unknown": 9, "role_unscored": 1 }
+    }
+  ]
+}
