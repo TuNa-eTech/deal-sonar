@@ -19,8 +19,7 @@ use dealsonar_core::{CoreConfig, CoreServiceBuilder, OsNotification, DEFAULT_CHR
 use dealsonar_protocol::native_manifest::NativeHostManifest;
 use dealsonar_protocol::{AuthorInfo, ExtractionInfo, ExtractionStrategy, RawPost};
 use dealsonar_store::models::{
-    now_ms, AuthorInput, CreateRadarDraftInput, DiscoveredSourceInput, FieldDef, MatchPolicy,
-    NewPost, NotifyConfig,
+    now_ms, AuthorInput, DiscoveredSourceInput, FieldDef, MatchPolicy, NewPost, NotifyConfig,
 };
 use dealsonar_store::{Store, LATEST_SCHEMA_VERSION, MIGRATIONS};
 use serde_json::json;
@@ -59,21 +58,6 @@ fn write_previous_release_db(db: &Path, backups: &Path, now: i64) -> (String, St
         .source
         .id
         .clone();
-    let radar = store
-        .radar_create_draft(&CreateRadarDraftInput {
-            id: None,
-            name: "Khách thuê căn hộ".into(),
-            template_id: None,
-            description: "Tìm khách cần thuê căn hộ Cầu Giấy".into(),
-            language_hint: Some("vi".into()),
-            user_profession: Some("Môi giới cho thuê".into()),
-            fields: vec![money_field()],
-            match_policy: MatchPolicy::default(),
-            notify: NotifyConfig::default(),
-            source_ids: vec![source_id.clone()],
-            now_ms: now - 86_400_000,
-        })
-        .expect("radar");
     let (post, _) = store
         .insert_post(&NewPost {
             id: None,
@@ -103,11 +87,44 @@ fn write_previous_release_db(db: &Path, backups: &Path, now: i64) -> (String, St
         .expect("post");
     drop(store);
 
+    // The radar is written with the schema-0001 columns only. Going through the current store API
+    // would fail here because it also writes columns added by later migrations (e.g. `variant_of`).
+    let (radar_id, version_id) = (
+        "radar-from-previous-release",
+        "radar-version-from-previous-release",
+    );
     let conn = rusqlite::Connection::open(db).expect("raw db");
+    conn.execute(
+        "INSERT INTO radars (id,name,status,template_id,current_version,notify,created_at,updated_at)
+         VALUES (?1,'Khách thuê căn hộ','draft',NULL,1,?2,?3,?3)",
+        rusqlite::params![
+            radar_id,
+            serde_json::to_string(&NotifyConfig::default()).expect("notify"),
+            now - 86_400_000
+        ],
+    )
+    .expect("radar");
+    conn.execute(
+        "INSERT INTO radar_versions (id,radar_id,version,description,language_hint,user_profession,fields,match_policy,created_at)
+         VALUES (?1,?2,1,'Tìm khách cần thuê căn hộ Cầu Giấy','vi','Môi giới cho thuê',?3,?4,?5)",
+        rusqlite::params![
+            version_id,
+            radar_id,
+            serde_json::to_string(&vec![money_field()]).expect("fields"),
+            serde_json::to_string(&MatchPolicy::default()).expect("policy"),
+            now - 86_400_000
+        ],
+    )
+    .expect("radar version");
+    conn.execute(
+        "INSERT INTO radar_sources (radar_id,source_id) VALUES (?1,?2)",
+        rusqlite::params![radar_id, source_id],
+    )
+    .expect("radar source");
     conn.execute(
         "INSERT INTO evaluations (id,post_id,radar_version_id,state,decided_by,verdict,score,summary,fields,is_preview,created_at,decided_at)
          VALUES ('eval-old',?1,?2,'done','ai','match',0.9,'Khách thuê Cầu Giấy','{}',0,?3,?3)",
-        rusqlite::params![post.id, radar.current_version.id, now - 86_400_000],
+        rusqlite::params![post.id, version_id, now - 86_400_000],
     )
     .expect("evaluation");
     conn.execute(
@@ -115,8 +132,8 @@ fn write_previous_release_db(db: &Path, backups: &Path, now: i64) -> (String, St
          VALUES (?1,?2,?3,?4,'eval-old','new',0.9,'Khách thuê Cầu Giấy','{}',?5,?5)",
         rusqlite::params![
             OLD_LEAD_ID,
-            radar.radar.id,
-            radar.current_version.id,
+            radar_id,
+            version_id,
             post.id,
             now - 86_400_000
         ],
@@ -124,10 +141,10 @@ fn write_previous_release_db(db: &Path, backups: &Path, now: i64) -> (String, St
     .expect("lead");
     conn.execute(
         "UPDATE radars SET status = 'active' WHERE id = ?1",
-        [&radar.radar.id],
+        [radar_id],
     )
     .expect("activate");
-    (radar.radar.id, source_id)
+    (radar_id.to_string(), source_id)
 }
 
 fn raw_post(post_id: &str, text: &str, now: i64) -> RawPost {
