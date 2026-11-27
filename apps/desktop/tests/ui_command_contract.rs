@@ -126,6 +126,16 @@ fn test_endpoint(dir: &std::path::Path, name: &str) -> IpcEndpoint {
     }
 }
 
+/// The `path` field of a Chrome Native Host manifest. Parsed rather than substring-matched because
+/// JSON escapes Windows path separators (`C:\\Users` is stored as `C:\\\\Users`).
+fn manifest_host_path(manifest_raw: &str) -> String {
+    serde_json::from_str::<Value>(manifest_raw)
+        .expect("manifest is valid JSON")["path"]
+        .as_str()
+        .expect("manifest has a string `path`")
+        .to_owned()
+}
+
 async fn recv_ipc_env(stream: &mut IpcStream) -> Envelope {
     let bytes = tokio::time::timeout(
         Duration::from_secs(3),
@@ -291,7 +301,11 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
     .expect("chrome_connect");
     assert_eq!(chrome_res["native_host_installed"], json!(true));
     let manifest_raw_v1 = fs::read_to_string(&manifest_path).expect("read manifest v1");
-    assert!(manifest_raw_v1.contains(&bin_v1.to_string_lossy().to_string()));
+    assert_eq!(
+        manifest_host_path(&manifest_raw_v1),
+        bin_v1.to_string_lossy(),
+        "manifest must point at the installed native host binary"
+    );
     assert!(manifest_raw_v1.contains(ext_id));
 
     // ------------------------------------------------------------------------
@@ -1104,8 +1118,9 @@ async fn full_ui_to_desktop_command_contract_and_lifecycle() {
     };
     let state_v2 = DesktopState::open_for_test(cfg_v2, None, None).expect("open state_v2");
     let manifest_raw_v2 = fs::read_to_string(&manifest_path).expect("read manifest v2");
-    assert!(
-        manifest_raw_v2.contains(bin_v2.to_string_lossy().as_ref()),
+    assert_eq!(
+        manifest_host_path(&manifest_raw_v2),
+        bin_v2.to_string_lossy(),
         "DesktopState startup must auto-refresh Chrome Native Host manifest when binary path changes"
     );
     assert!(
